@@ -1,7 +1,8 @@
-# N Kolay Bayim — B2B Ödeme Paneli (Frontend Mockup)
+# N Kolay Bayim — B2B Panel UI Tasarımları
 
-pay'n kolay **N Kolay Bayim** B2B panelinin **frontend-only** mockup'ı.
-Next.js (Pages Router) + Tailwind CSS. Backend / servis **yok** — tüm veriler `lib/mockData.js` içinde statiktir.
+pay'n kolay **N Kolay Bayim** B2B ödeme paneli için hazırlanmış **6 tasarım yönü**.
+Next.js (Pages Router) + Tailwind CSS. Yalnızca ön yüz: servis / API çağrısı **yok**, tüm veriler
+`lib/mockData.js` içinde örnek veridir.
 
 ## Çalıştırma
 
@@ -10,39 +11,37 @@ npm install
 npm run dev      # http://localhost:3000
 ```
 
-Giriş ekranında herhangi bir bilgiyle "Giriş Yap" → panele geçilir.
+Ana adres (`/`) tasarım galerisini açar; her kart ilgili tasarıma götürür.
 
-## Rol Değiştirici
+## Tasarımlar
 
-Üst bardaki **Ana Firma / Bayi / Alt Bayi** düğmeleri ile üç panel tipi arasında geçiş yapılır.
-Menüler ve ekranlar seçili role göre değişir (spec'teki "Panel Menüleri" yapısına uygun).
+| # | Adres | Özet |
+|---|-------|------|
+| 01 | `/designs/atlas` | Marka mavisi, açılır kapanır sol menü, ince üst bar, ölçekli çubuk grafik |
+| 02 | `/designs/horizon` | Beyaz sol menü, mavi hero bandı ve alan grafiği, hızlı işlemler |
+| 03 | `/designs/bento` | Lavanta zeminde yüzen paneller, renkli KPI blokları, animasyonlar |
+| 04 | `/designs/nova` | Mavi tonlu kartlar, daraltılabilir menü, karşılama bandı, etkileşimli grafik |
+| 05 | `/designs/klasik` | Lacivert menü, renkli KPI rakamları, banka kartı görünümlü bakiye |
+| 06 | `/designs/kagit` | Broadsheet editoryal: serif tipografi, yan menü + üst kısayol menüsü |
 
-## Ekranlar
+Her tasarımda:
 
-| Modül | Ekranlar |
-|-------|----------|
-| Ana Sayfa | KPI kartları (Başarılı/Başarısız/İptal/İade/Toplam), hacim grafiği, bakiye & borç, son işlemler |
-| Ödeme Al | Manuel Ödeme, Link ile Ödeme, USD/Euro Kur Bilgisi |
-| İptal / İade | Onay (onay/red), Takip |
-| Raporlar | İşlem Detayları, Bayi/Alt Bayi Özet, Fatura Yükleme Detay |
-| Bayi Tanım | Tanımlama (vade profili, taksit sınırı, limit, yetki), Liste |
-| Ayarlar | Kullanıcı Tanım, Vade Farkı Profili (max 5), Firma Bilgileri |
-| Duyuru | Bayi/Alt bayi ekranına pop-up duyuru (yalnız Ana Firma) |
+- **Rol değiştirici** (Ana Firma / Bayi / Alt Bayi): menü ve rakamlar role göre değişir.
+- **Açık / koyu mod**; tercih tarayıcıda hatırlanır.
+- **Giriş ekranı**: "Çıkış Yap" ile açılır, "Giriş Yap" panele döndürür.
+- Bağlantıyla durum zorlama: `?theme=dark`, `?view=giris`, `?menu=closed` (Nova ve Klasik'te `?menu=rail`).
 
 ## Yapı
 
 ```
-components/   Layout, Sidebar, Topbar, DataTable, StatCard, Badge, ui.js, Icons.js
-lib/          roles.js (3 rol), nav.js (role-aware menü), mockData.js (statik veri)
-pages/        route bazlı ekranlar (Pages Router)
-styles/       globals.css (Tailwind)
+components/   DesignIcons.js, Icons.js (ikon setleri), RoleContext.js (seçili rol)
+lib/          roles.js (3 rol), nav.js (role göre menü), mockData.js (örnek veri)
+pages/        index.js (galeri), designs/ (galeri + 6 tasarım)
+styles/       globals.css (Tailwind + yazı tipleri)
 ```
 
 ## Notlar
 
-- Bu bir mockup'tır; form gönderimleri ve butonlar servis çağrısı yapmaz.
-- Tasarım detayları (renk, tipografi, düzen) sonradan iyileştirilecek şekilde token'lar
-  `tailwind.config.js` içinde tanımlıdır.
-- Next.js sürümü 14.2.35 (yamalı). `npm audit`, self-hosted üretim sunucularını ilgilendiren
-  ve bu mockup'ta kullanılmayan özelliklere dair uyarılar gösterebilir; temiz çözüm Next 16'ya
-  geçiştir (breaking change).
+- Bu bir mockup'tır; düğmeler ve menü öğeleri servis çağrısı yapmaz, sayfa değiştirmez.
+- Next.js sürümü 14.2.35. `npm audit`, self-hosted üretim sunucularını ilgilendiren ve bu
+  mockup'ta kullanılmayan özelliklere dair uyarılar gösterebilir.

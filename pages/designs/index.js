@@ -175,10 +175,7 @@ export default function DesignsIndex() {
           </div>
 
           <footer className="mt-12 border-t border-[var(--border)] pt-6 text-sm text-[var(--muted)]">
-            Mevcut (temel) mockup:{" "}
-            <Link href="/login" className="font-semibold text-[var(--fg)] hover:underline">
-              /login
-            </Link>
+            Yalnızca ön yüz mockup&apos;ı — servis bağlantısı yoktur; tüm veriler örnektir.
           </footer>
         </div>
       </div>
