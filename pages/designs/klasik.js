@@ -384,7 +384,7 @@ function Sidebar({ role, mobileOpen, hidden, onClose, collapsed, setCollapsed, o
         </div>
 
         {/* ana firma — her rolde göz önünde: beyaz kart, büyük logo */}
-        <div className={`relative mx-3 mt-1 flex items-center gap-3 rounded-xl bg-white p-3 shadow-[0_10px_24px_-12px_rgba(0,0,0,0.5)] ${hideLg}`}>
+        <div className={`relative mx-3 mt-1 flex shrink-0 items-center gap-3 rounded-xl bg-white p-3 shadow-[0_10px_24px_-12px_rgba(0,0,0,0.5)] ${hideLg}`}>
           <CompanyLogo name={anaFirma.ad} size={48} className="shrink-0" />
           <div className="min-w-0 leading-tight">
             <p className="truncate text-[15px] font-bold text-[#0F1E8A]">{anaFirma.ad}</p>
@@ -399,7 +399,7 @@ function Sidebar({ role, mobileOpen, hidden, onClose, collapsed, setCollapsed, o
         )}
         {/* bayi / alt bayi girişinde kullanıcının kendi firması */}
         {role !== ROLES.ANA_FIRMA && (
-          <div className={`relative mx-3 mt-2 flex items-center gap-2.5 rounded-lg bg-[var(--sidebar-card)] px-2.5 py-2 ring-1 ring-[var(--sidebar-border)] ${hideLg}`}>
+          <div className={`relative mx-3 mt-2 flex shrink-0 items-center gap-2.5 rounded-lg bg-[var(--sidebar-card)] px-2.5 py-2 ring-1 ring-[var(--sidebar-border)] ${hideLg}`}>
             <CompanyLogo name={meta.company} color={meta.logoColor} size={32} tone="light" className="shrink-0" />
             <span className="min-w-0 leading-tight">
               <span className="block truncate text-[12.5px] font-semibold text-white">{meta.company}</span>

@@ -361,7 +361,7 @@ function Sidebar({ role, desktopOpen, mobileOpen, hidden, onClose, onLogout }) {
         </div>
 
         {/* ana firma — her rolde göz önünde: mavi kart, büyük logo */}
-        <div className="relative mx-3 mt-1 flex items-center gap-3 overflow-hidden rounded-2xl bg-[#0C34E7] p-3 text-white [box-shadow:0_12px_26px_-14px_rgba(12,52,231,0.8)]">
+        <div className="relative mx-3 mt-1 flex shrink-0 items-center gap-3 overflow-hidden rounded-2xl bg-[#0C34E7] p-3 text-white [box-shadow:0_12px_26px_-14px_rgba(12,52,231,0.8)]">
           <div className="pointer-events-none absolute -right-8 -top-10 h-24 w-24 rounded-full bg-[#D4D1FC] opacity-30 blur-2xl" aria-hidden="true" />
           <CompanyLogo name={anaFirma.ad} size={48} tone="light" className="relative shrink-0" />
           <div className="relative min-w-0 leading-tight">
@@ -371,7 +371,7 @@ function Sidebar({ role, desktopOpen, mobileOpen, hidden, onClose, onLogout }) {
         </div>
         {/* bayi / alt bayi girişinde kullanıcının kendi firması */}
         {role !== ROLES.ANA_FIRMA && (
-          <div className="mx-3 mt-2 flex items-center gap-2.5 rounded-xl bg-[var(--soft)] px-2.5 py-2">
+          <div className="mx-3 mt-2 flex shrink-0 items-center gap-2.5 rounded-xl bg-[var(--soft)] px-2.5 py-2">
             <CompanyLogo name={meta.company} color={meta.logoColor} size={32} className="shrink-0" />
             <span className="min-w-0 leading-tight">
               <span className="block truncate text-[12.5px] font-bold text-[var(--fg)]">{meta.company}</span>
