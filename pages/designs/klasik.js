@@ -230,24 +230,21 @@ function TrendArrow({ up }) {
   );
 }
 
+// N Kolay logosu (CDN). Tek renk mavi SVG; lacivert zeminlerde beyaza çevrilir.
+const NK_LOGO = "https://cdn.nkolayislem.com.tr/e-full-logo.svg";
+
+function NkLogo({ className = "h-7" }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={NK_LOGO} alt="N Kolay" className={`w-auto shrink-0 ${className}`} style={{ filter: "brightness(0) invert(1)" }} />
+  );
+}
+
 function Monogram() {
   return (
     <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#2B4BF2] text-xs font-extrabold text-white" aria-hidden="true">
       N
     </span>
-  );
-}
-
-function Wordmark({ onBrand, compact }) {
-  return (
-    <div className="min-w-0 leading-none">
-      <p className={`font-semibold tracking-[0.2em] ${compact ? "text-[8px]" : "text-[8.5px]"} ${onBrand ? "text-[#AEBBFF]" : "text-[var(--brand-text)]"}`}>
-        N KOLAY BAYİM
-      </p>
-      <p className={`mt-1 font-extrabold tracking-tight ${compact ? "text-sm" : "text-[17px]"} ${onBrand ? "text-white" : "text-[var(--navy-text)]"}`}>
-        pay<span className={onBrand ? "text-[#7F95FF]" : "text-[var(--brand-text)]"}>{"'n"}</span>kolay
-      </p>
-    </div>
   );
 }
 
@@ -369,9 +366,14 @@ function Sidebar({ role, mobileOpen, hidden, onClose, collapsed, setCollapsed, o
         <div className="pointer-events-none absolute -left-24 -top-24 h-64 w-64 rounded-full bg-[#2B4BF2] opacity-30 blur-3xl" aria-hidden="true" />
 
         <div className={`relative flex h-14 shrink-0 items-center gap-2.5 pl-4 pr-2.5 ${collapsed ? "lg:justify-center lg:px-0" : ""}`}>
-          <Monogram />
+          {/* daraltılmış şeritte yalnızca "N" işareti, açıkken tam logo */}
+          {collapsed && (
+            <span className="hidden lg:block">
+              <Monogram />
+            </span>
+          )}
           <div className={`flex-1 ${hideLg}`}>
-            <Wordmark onBrand />
+            <NkLogo />
           </div>
           <button
             type="button"
@@ -1058,8 +1060,7 @@ function LoginView({ isDark, onToggleTheme, onLogin }) {
         />
         <div className="relative flex h-full flex-col justify-between gap-12">
           <div className="flex items-center gap-2.5">
-            <Monogram />
-            <Wordmark onBrand />
+            <NkLogo className="h-9" />
           </div>
           <div className="kl-rise">
             <div className="mb-7 flex items-center gap-4">

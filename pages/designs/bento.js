@@ -40,6 +40,7 @@ const light = {
   "--shadow": "0 1px 2px rgba(12,52,231,0.04), 0 10px 30px -20px rgba(12,52,231,0.30)",
   "--shadow-hover": "0 2px 4px rgba(12,52,231,0.06), 0 18px 36px -18px rgba(12,52,231,0.42)",
   "--pop-shadow": "0 14px 36px -12px rgba(12,52,231,0.30), 0 2px 6px rgba(30,30,30,0.06)",
+  "--logo-filter": "none",
 };
 
 const dark = {
@@ -71,6 +72,7 @@ const dark = {
   "--shadow": "0 1px 2px rgba(0,0,0,0.4), 0 12px 28px -18px rgba(0,0,0,0.7)",
   "--shadow-hover": "0 2px 4px rgba(0,0,0,0.5), 0 20px 36px -18px rgba(0,0,0,0.85)",
   "--pop-shadow": "0 16px 40px -12px rgba(0,0,0,0.8), 0 2px 6px rgba(0,0,0,0.4)",
+  "--logo-filter": "brightness(0) invert(1)",
 };
 
 // Giriş ve etkileşim animasyonları. Hareket azaltma tercihinde tamamı kapanır.
@@ -227,24 +229,18 @@ function TrendArrow({ up }) {
   );
 }
 
+// N Kolay logosu (CDN). Tek renk mavi SVG; koyu ve mavi zeminlerde beyaza çevrilir.
+const NK_LOGO = "https://cdn.nkolayislem.com.tr/e-full-logo.svg";
+
 function Logo({ onBrand, compact }) {
   return (
-    <div className="flex items-center gap-2.5">
-      <span
-        className={`grid shrink-0 place-items-center rounded-[10px] font-extrabold ${compact ? "h-7 w-7 text-[11px]" : "h-8 w-8 text-xs"} ${
-          onBrand ? "bg-white text-[#0C34E7]" : "bg-[var(--brand)] text-white"
-        }`}
-        aria-hidden="true"
-      >
-        N
-      </span>
-      <div className="leading-none">
-        <p className={`text-[8px] font-bold tracking-[0.2em] ${onBrand ? "text-[#D4D1FC]" : "text-[var(--brand-text)]"}`}>N KOLAY BAYİM</p>
-        <p className={`mt-1 font-extrabold tracking-tight ${compact ? "text-sm" : "text-[15px]"} ${onBrand ? "text-white" : "text-[var(--fg)]"}`}>
-          pay<span className={onBrand ? "text-[#D4D1FC]" : "text-[var(--brand-text)]"}>{"'n"}</span>kolay
-        </p>
-      </div>
-    </div>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={NK_LOGO}
+      alt="N Kolay"
+      className={`w-auto shrink-0 ${compact ? "h-6" : "h-7"}`}
+      style={{ filter: onBrand ? "brightness(0) invert(1)" : "var(--logo-filter)" }}
+    />
   );
 }
 
