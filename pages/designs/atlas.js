@@ -5,7 +5,8 @@ import Icon from "@/components/Icons";
 import { useRole } from "@/components/RoleContext";
 import { ROLES, ROLE_META, ROLE_ORDER } from "@/lib/roles";
 import { getNav } from "@/lib/nav";
-import { kpis, islemler, bakiyeOzet } from "@/lib/mockData";
+import CompanyLogo from "@/components/CompanyLogo";
+import { kpis, islemler, bakiyeOzet, anaFirma } from "@/lib/mockData";
 
 // Tasarım 01 — temel /dashboard mockup'ının Figma marka paletiyle geliştirilmiş hali.
 // Açılır kapanır sol menü (akordiyon gruplar), ince üst bar, açık / koyu mod.
@@ -252,8 +253,15 @@ function Sidebar({ role, desktopOpen, mobileOpen, hidden, onClose, onLogout }) {
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         } ${desktopOpen ? "lg:ml-0" : "lg:-ml-64"}`}
       >
-        <div className="flex h-14 shrink-0 items-center justify-between pl-5 pr-3">
-          <Wordmark onBrand />
+        {/* ana firma — logo ve isim her rolde görünür */}
+        <div className="flex h-[64px] shrink-0 items-center justify-between pl-4 pr-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <CompanyLogo size={38} tone="light" />
+            <div className="min-w-0 leading-tight">
+              <p className="truncate text-[14px] font-bold text-white">{anaFirma.ad}</p>
+              <p className="truncate text-[10.5px] font-medium text-[var(--sidebar-accent)]">Ana Firma · B2B Bayi Ağı</p>
+            </div>
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -267,12 +275,14 @@ function Sidebar({ role, desktopOpen, mobileOpen, hidden, onClose, onLogout }) {
           </button>
         </div>
 
-        {/* aktif firma */}
+        {/* oturumdaki panel: ana firmada panel adı, bayi / alt bayide kendi firması */}
         <div className="mx-3 mb-3 mt-1 flex items-center gap-2.5 rounded-lg border border-[var(--sidebar-border)] bg-[var(--sidebar-card)] px-2.5 py-2">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-white/15 text-[11px] font-bold text-white">{meta.short}</span>
           <span className="min-w-0 leading-tight">
-            <span className="block truncate text-[13px] font-semibold text-white">{meta.company}</span>
-            <span className="block truncate text-[11px] text-[var(--sidebar-muted)]">{meta.label} Paneli</span>
+            <span className="block truncate text-[13px] font-semibold text-white">{role === ROLES.ANA_FIRMA ? "Ana Firma Paneli" : meta.company}</span>
+            <span className="block truncate text-[11px] text-[var(--sidebar-muted)]">
+              {role === ROLES.ANA_FIRMA ? "Tüm bayi ağı · Yönetici" : `${meta.label} Paneli · ${anaFirma.kisa} ağı`}
+            </span>
           </span>
         </div>
 
@@ -304,6 +314,14 @@ function Sidebar({ role, desktopOpen, mobileOpen, hidden, onClose, onLogout }) {
         </nav>
 
         <div className="shrink-0 border-t border-[var(--sidebar-border)] p-3">
+          {/* ödeme altyapısı markası */}
+          <div className="mb-2 rounded-lg bg-[var(--sidebar-card)] px-3 py-2">
+            <p className="text-[9px] font-semibold tracking-[0.2em] text-[var(--sidebar-muted)]">ÖDEME ALTYAPISI</p>
+            <p className="mt-0.5 text-[15px] font-bold tracking-tight text-white">
+              pay<span className="text-[var(--sidebar-accent)]">{"'n"}</span>kolay
+              <span className="ml-1.5 text-[10.5px] font-medium text-[var(--sidebar-muted)]">· N Kolay Bayim</span>
+            </p>
+          </div>
           <button
             type="button"
             onClick={onLogout}
@@ -460,11 +478,17 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
           {/* menü kapalıyken marka üst barda görünür */}
           <div
             className={`overflow-hidden transition-[max-width,opacity,margin] duration-300 motion-reduce:transition-none ${
-              desktopOpen ? "lg:ml-0 lg:max-w-0 lg:opacity-0" : "lg:ml-2 lg:max-w-[140px] lg:opacity-100"
-            } ml-1 hidden max-w-[140px] sm:block`}
+              desktopOpen ? "lg:ml-0 lg:max-w-0 lg:opacity-0" : "lg:ml-2 lg:max-w-[220px] lg:opacity-100"
+            } ml-1 hidden max-w-[220px] sm:block`}
             aria-hidden={desktopOpen && isDesktop ? "true" : undefined}
           >
-            <Wordmark compact />
+            <div className="flex items-center gap-2 whitespace-nowrap">
+              <CompanyLogo size={28} tone="brand" />
+              <span className="leading-tight">
+                <span className="block text-[13px] font-semibold text-[var(--fg)]">{anaFirma.ad}</span>
+                <span className="block text-[10px] text-[var(--muted)]">Ana Firma</span>
+              </span>
+            </div>
           </div>
 
           <label className="relative ml-2 hidden w-full max-w-xs md:block">
@@ -790,10 +814,16 @@ function LoginView({ isDark, onToggleTheme, onLogin }) {
         />
         <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-[#D4D1FC] opacity-20 blur-3xl" aria-hidden="true" />
         <div className="relative flex h-full flex-col justify-between gap-12">
-          <Wordmark onBrand />
+          <div className="flex items-center gap-3">
+            <CompanyLogo size={48} tone="light" />
+            <div className="leading-tight">
+              <p className="text-[17px] font-bold">{anaFirma.ad}</p>
+              <p className="text-[11.5px] text-white/75">{anaFirma.aciklama}</p>
+            </div>
+          </div>
           <div>
             <span className="inline-block rounded-full border border-white/25 bg-white/10 px-3 py-1 text-[11px] font-semibold tracking-wide text-[#EAE8FD]">
-              B2B ÖDEME PANELİ
+              {anaFirma.kisa.toLocaleUpperCase("tr-TR")} B2B ÖDEME PANELİ
             </span>
             <h2 className="mt-5 text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
               Bayi ağınızı
@@ -818,7 +848,10 @@ function LoginView({ isDark, onToggleTheme, onLogin }) {
               ))}
             </dl>
           </div>
-          <p className="text-xs text-white/60">© 2026 pay{"'"}n kolay · N Kolay Bayim</p>
+          <div className="flex items-center justify-between gap-4">
+            <Wordmark onBrand compact />
+            <p className="text-[11px] text-white/60">N Kolay Bayim altyapısı · © 2026</p>
+          </div>
         </div>
       </div>
 
