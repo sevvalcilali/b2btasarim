@@ -5,7 +5,8 @@ import I from "@/components/DesignIcons";
 import { useRole } from "@/components/RoleContext";
 import { ROLES, ROLE_META, ROLE_ORDER } from "@/lib/roles";
 import { getNav } from "@/lib/nav";
-import { kpis, islemler, bakiyeOzet, iptalIadeTalepleri, kurBilgisi } from "@/lib/mockData";
+import CompanyLogo from "@/components/CompanyLogo";
+import { kpis, islemler, bakiyeOzet, iptalIadeTalepleri, kurBilgisi, anaFirma } from "@/lib/mockData";
 
 // Tasarım 05 — Klasik: temel /dashboard mockup'ının lacivert kimliği (lacivert menü, renkli KPI
 // rakamları, gradyan çubuklar) üzerine kurulu geliştirilmiş hali. Daraltılabilir sol menü,
@@ -382,16 +383,32 @@ function Sidebar({ role, mobileOpen, hidden, onClose, collapsed, setCollapsed, o
           </button>
         </div>
 
-        {/* aktif firma */}
-        <div className={`relative mx-3 mt-1 flex items-center gap-2.5 rounded-lg bg-[var(--sidebar-card)] px-2.5 py-2 ring-1 ring-[var(--sidebar-border)] ${hideLg}`}>
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-white/10 text-white">
-            <I name="building" size={15} />
-          </span>
-          <span className="min-w-0 leading-tight">
-            <span className="block truncate text-[12.5px] font-semibold text-white">{meta.company}</span>
-            <span className="block truncate text-[11px] text-[var(--sidebar-muted)]">{meta.label} Paneli</span>
-          </span>
+        {/* ana firma — her rolde göz önünde: beyaz kart, büyük logo */}
+        <div className={`relative mx-3 mt-1 flex items-center gap-3 rounded-xl bg-white p-3 shadow-[0_10px_24px_-12px_rgba(0,0,0,0.5)] ${hideLg}`}>
+          <CompanyLogo name={anaFirma.ad} size={48} className="shrink-0" />
+          <div className="min-w-0 leading-tight">
+            <p className="truncate text-[15px] font-bold text-[#0F1E8A]">{anaFirma.ad}</p>
+            <p className="mt-0.5 truncate text-[11px] font-medium text-[#64748B]">Ana Firma · B2B Bayi Ağı</p>
+          </div>
         </div>
+        {/* menü daraltılmışken yalnızca ana firma logosu */}
+        {collapsed && (
+          <div className="relative mt-1 hidden justify-center lg:flex" title={anaFirma.ad}>
+            <CompanyLogo name={anaFirma.ad} size={40} tone="light" />
+          </div>
+        )}
+        {/* bayi / alt bayi girişinde kullanıcının kendi firması */}
+        {role !== ROLES.ANA_FIRMA && (
+          <div className={`relative mx-3 mt-2 flex items-center gap-2.5 rounded-lg bg-[var(--sidebar-card)] px-2.5 py-2 ring-1 ring-[var(--sidebar-border)] ${hideLg}`}>
+            <CompanyLogo name={meta.company} color={meta.logoColor} size={32} tone="light" className="shrink-0" />
+            <span className="min-w-0 leading-tight">
+              <span className="block truncate text-[12.5px] font-semibold text-white">{meta.company}</span>
+              <span className="block text-[10.5px] leading-snug text-[var(--sidebar-muted)]">
+                {meta.label} · {meta.parentNote}
+              </span>
+            </span>
+          </div>
+        )}
 
         <nav
           className={`relative flex-1 overflow-y-auto overscroll-contain px-3 pb-3 [scrollbar-color:transparent_transparent] [scrollbar-width:thin] hover:[scrollbar-color:var(--sidebar-scroll)_transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[var(--sidebar-scroll)] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:w-1.5 ${
@@ -882,6 +899,12 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
             <I name="arrowLeft" size={17} />
           </Link>
 
+          {/* dar ekranda menü çekmecede olduğu için ana firma üst barda görünür */}
+          <div className="ml-1 flex shrink-0 items-center gap-2 lg:hidden">
+            <CompanyLogo name={anaFirma.ad} size={30} className="shrink-0" />
+            <span className="hidden text-[13px] font-bold text-[var(--navy-text)] sm:block">{anaFirma.ad}</span>
+          </div>
+
           <label className="relative ml-1.5 hidden min-w-0 max-w-xs flex-1 md:block">
             <span className="sr-only">Ara</span>
             <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]">
@@ -1039,6 +1062,13 @@ function LoginView({ isDark, onToggleTheme, onLogin }) {
             <Wordmark onBrand />
           </div>
           <div className="kl-rise">
+            <div className="mb-7 flex items-center gap-4">
+              <CompanyLogo name={anaFirma.ad} size={72} tone="light" className="shrink-0 shadow-[0_16px_32px_-14px_rgba(0,0,0,0.6)]" />
+              <div className="leading-tight">
+                <p className="text-[24px] font-extrabold tracking-tight">{anaFirma.ad}</p>
+                <p className="mt-1 text-[13px] text-slate-300">{anaFirma.aciklama}</p>
+              </div>
+            </div>
             <span className="inline-block rounded-full bg-[#2B4BF2]/25 px-3 py-1 text-[11px] font-semibold tracking-wide text-[#EAEFFF] ring-1 ring-[#2B4BF2]/40">
               B2B ÖDEME PANELİ
             </span>

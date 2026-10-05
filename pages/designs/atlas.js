@@ -280,10 +280,12 @@ function Sidebar({ role, desktopOpen, mobileOpen, hidden, onClose, onLogout }) {
         {/* bayi / alt bayi girişinde kullanıcının kendi firması */}
         {role !== ROLES.ANA_FIRMA ? (
           <div className="mx-3 mb-3 mt-2 flex items-center gap-2.5 rounded-lg border border-[var(--sidebar-border)] bg-[var(--sidebar-card)] px-2.5 py-2">
-            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-white/15 text-[10.5px] font-bold text-white">{meta.short}</span>
+            <CompanyLogo name={meta.company} color={meta.logoColor} size={32} tone="light" className="shrink-0" />
             <span className="min-w-0 leading-tight">
               <span className="block truncate text-[12.5px] font-semibold text-white">{meta.company}</span>
-              <span className="block truncate text-[10.5px] text-[var(--sidebar-muted)]">{meta.label} Paneli</span>
+              <span className="block text-[10.5px] leading-snug text-[var(--sidebar-muted)]">
+                {meta.label} · {meta.parentNote}
+              </span>
             </span>
           </div>
         ) : (

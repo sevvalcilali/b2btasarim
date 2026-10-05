@@ -5,7 +5,8 @@ import I from "@/components/DesignIcons";
 import { useRole } from "@/components/RoleContext";
 import { ROLES, ROLE_META, ROLE_ORDER } from "@/lib/roles";
 import { getNav } from "@/lib/nav";
-import { kpis, islemler, bakiyeOzet } from "@/lib/mockData";
+import CompanyLogo from "@/components/CompanyLogo";
+import { kpis, islemler, bakiyeOzet, anaFirma } from "@/lib/mockData";
 
 // Tasarım 03 — Bento: lavanta zemin üzerinde yüzen yuvarlak paneller, renkli KPI blokları.
 // Açılır kapanır sol menü, ince yüzen üst bar, giriş animasyonları, açık / koyu mod.
@@ -359,16 +360,27 @@ function Sidebar({ role, desktopOpen, mobileOpen, hidden, onClose, onLogout }) {
           </button>
         </div>
 
-        {/* aktif firma */}
-        <div className="mx-3 flex items-center gap-2.5 rounded-xl bg-[var(--soft)] px-2.5 py-2">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--surface)] text-[var(--brand-text)]">
-            <I name="building" size={15} />
-          </span>
-          <span className="min-w-0 leading-tight">
-            <span className="block truncate text-[12.5px] font-bold text-[var(--fg)]">{meta.company}</span>
-            <span className="block truncate text-[11px] font-medium text-[var(--muted)]">{meta.label} Paneli</span>
-          </span>
+        {/* ana firma — her rolde göz önünde: mavi kart, büyük logo */}
+        <div className="relative mx-3 mt-1 flex items-center gap-3 overflow-hidden rounded-2xl bg-[#0C34E7] p-3 text-white [box-shadow:0_12px_26px_-14px_rgba(12,52,231,0.8)]">
+          <div className="pointer-events-none absolute -right-8 -top-10 h-24 w-24 rounded-full bg-[#D4D1FC] opacity-30 blur-2xl" aria-hidden="true" />
+          <CompanyLogo name={anaFirma.ad} size={48} tone="light" className="relative shrink-0" />
+          <div className="relative min-w-0 leading-tight">
+            <p className="truncate text-[15px] font-extrabold">{anaFirma.ad}</p>
+            <p className="mt-0.5 truncate text-[11px] font-medium text-white/75">Ana Firma · B2B Bayi Ağı</p>
+          </div>
         </div>
+        {/* bayi / alt bayi girişinde kullanıcının kendi firması */}
+        {role !== ROLES.ANA_FIRMA && (
+          <div className="mx-3 mt-2 flex items-center gap-2.5 rounded-xl bg-[var(--soft)] px-2.5 py-2">
+            <CompanyLogo name={meta.company} color={meta.logoColor} size={32} className="shrink-0" />
+            <span className="min-w-0 leading-tight">
+              <span className="block truncate text-[12.5px] font-bold text-[var(--fg)]">{meta.company}</span>
+              <span className="block text-[10.5px] font-medium leading-snug text-[var(--muted)]">
+                {meta.label} · {meta.parentNote}
+              </span>
+            </span>
+          </div>
+        )}
 
         <nav className="flex-1 overflow-y-auto overscroll-contain px-3 pb-3 [scrollbar-color:transparent_transparent] [scrollbar-width:thin] hover:[scrollbar-color:var(--border-strong)_transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[var(--border-strong)] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:w-1.5">
           <NavSection label="İşlemler" entries={main} openGroup={openGroup} setOpenGroup={setOpenGroup} />
@@ -822,12 +834,18 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
 
             {/* menü kapalıyken marka üst barda görünür */}
             <div
-              className={`ml-1 hidden max-w-[150px] overflow-hidden transition-[max-width,opacity,margin] duration-300 motion-reduce:transition-none sm:block ${
-                desktopOpen ? "lg:ml-0 lg:max-w-0 lg:opacity-0" : "lg:ml-1.5 lg:max-w-[150px] lg:opacity-100"
+              className={`ml-1 block max-w-[220px] shrink-0 overflow-hidden transition-[max-width,opacity,margin] duration-300 motion-reduce:transition-none ${
+                desktopOpen ? "lg:ml-0 lg:max-w-0 lg:opacity-0" : "lg:ml-1.5 lg:max-w-[220px] lg:opacity-100"
               }`}
               aria-hidden={desktopOpen && isDesktop ? "true" : undefined}
             >
-              <Logo compact />
+              <div className="flex items-center gap-2.5 whitespace-nowrap">
+                <CompanyLogo name={anaFirma.ad} size={32} className="shrink-0" />
+                <span className="hidden leading-tight sm:block">
+                  <span className="block text-[13.5px] font-extrabold text-[var(--fg)]">{anaFirma.ad}</span>
+                  <span className="block text-[10.5px] font-medium text-[var(--muted)]">Ana Firma · N Kolay Bayim</span>
+                </span>
+              </div>
             </div>
 
             <label className="relative ml-1.5 hidden w-full max-w-[260px] md:block">
@@ -972,6 +990,13 @@ function LoginView({ isDark, onToggleTheme, onLogin }) {
             <Logo onBrand />
           </div>
           <div className="relative py-10">
+            <div className="mb-6 flex items-center gap-3.5">
+              <CompanyLogo name={anaFirma.ad} size={64} tone="light" className="shrink-0 shadow-[0_16px_32px_-14px_rgba(0,0,0,0.5)]" />
+              <div className="leading-tight">
+                <p className="text-[21px] font-extrabold tracking-tight">{anaFirma.ad}</p>
+                <p className="mt-1 text-[12.5px] text-white/80">{anaFirma.aciklama}</p>
+              </div>
+            </div>
             <span className="inline-block rounded-full bg-white/15 px-2.5 py-1 text-[10.5px] font-bold tracking-wide">B2B ÖDEME PANELİ</span>
             <h2 className="mt-4 text-[26px] font-extrabold leading-tight tracking-tight">
               Bayi ağınızı
