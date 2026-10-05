@@ -1,6 +1,6 @@
 # N Kolay Bayim — B2B Panel UI Tasarımları
 
-pay'n kolay **N Kolay Bayim** B2B ödeme paneli için hazırlanmış **6 tasarım yönü**.
+pay'n kolay **N Kolay Bayim** B2B ödeme paneli için hazırlanmış **5 tasarım yönü**.
 Next.js (Pages Router) + Tailwind CSS. Yalnızca ön yüz: servis / API çağrısı **yok**, tüm veriler
 `lib/mockData.js` içinde örnek veridir.
 
@@ -22,7 +22,6 @@ Ana adres (`/`) tasarım galerisini açar; her kart ilgili tasarıma götürür.
 | 03 | `/designs/bento` | Lavanta zeminde yüzen paneller, renkli KPI blokları, animasyonlar |
 | 04 | `/designs/nova` | Mavi tonlu kartlar, daraltılabilir menü, karşılama bandı, etkileşimli grafik |
 | 05 | `/designs/klasik` | Lacivert menü, renkli KPI rakamları, banka kartı görünümlü bakiye |
-| 06 | `/designs/kagit` | Broadsheet editoryal: serif tipografi, yan menü + üst kısayol menüsü |
 
 Her tasarımda:
 
@@ -36,7 +35,7 @@ Her tasarımda:
 ```
 components/   DesignIcons.js, Icons.js (ikon setleri), RoleContext.js (seçili rol)
 lib/          roles.js (3 rol), nav.js (role göre menü), mockData.js (örnek veri)
-pages/        index.js (galeri), designs/ (galeri + 6 tasarım)
+pages/        index.js (galeri), designs/ (galeri + 5 tasarım)
 styles/       globals.css (Tailwind + yazı tipleri)
 ```
 

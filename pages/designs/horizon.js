@@ -5,7 +5,8 @@ import Icon from "@/components/Icons";
 import { useRole } from "@/components/RoleContext";
 import { ROLES, ROLE_META, ROLE_ORDER } from "@/lib/roles";
 import { getNav } from "@/lib/nav";
-import { kpis, islemler, bakiyeOzet, iptalIadeTalepleri } from "@/lib/mockData";
+import CompanyLogo from "@/components/CompanyLogo";
+import { kpis, islemler, bakiyeOzet, iptalIadeTalepleri, anaFirma } from "@/lib/mockData";
 
 // Tasarım 02 — Horizon: açılır kapanır beyaz sol menü (akordiyon gruplar), ince üst bar,
 // marka mavisi hero bandı ve alan grafiği. Açık / koyu mod.
@@ -42,6 +43,7 @@ const light = {
   "--ring": "#0C34E7",
   "--shadow": "0 1px 2px rgba(30,30,30,0.04), 0 10px 26px -20px rgba(30,30,30,0.20)",
   "--pop-shadow": "0 14px 36px -14px rgba(30,30,30,0.28), 0 2px 6px rgba(30,30,30,0.06)",
+  "--logo-filter": "none",
 };
 
 const dark = {
@@ -76,6 +78,7 @@ const dark = {
   "--ring": "#D4D1FC",
   "--shadow": "0 1px 2px rgba(0,0,0,0.4), 0 12px 28px -18px rgba(0,0,0,0.7)",
   "--pop-shadow": "0 16px 40px -12px rgba(0,0,0,0.8), 0 2px 6px rgba(0,0,0,0.4)",
+  "--logo-filter": "brightness(0) invert(1)",
 };
 
 // Haftalık hacim (bin ₺)
@@ -158,16 +161,18 @@ function useDismiss(open, close) {
   }, [open, close]);
 }
 
+// N Kolay logosu (CDN). Tek renk mavi SVG; koyu ve mavi zeminlerde beyaza çevrilir.
+const NK_LOGO = "https://cdn.nkolayislem.com.tr/e-full-logo.svg";
+
 function Wordmark({ compact, onBrand }) {
   return (
-    <div className="leading-none">
-      <p className={`font-semibold tracking-[0.22em] ${compact ? "text-[8px]" : "text-[9px]"} ${onBrand ? "text-[#D4D1FC]" : "text-[var(--brand-text)]"}`}>
-        N KOLAY BAYİM
-      </p>
-      <p className={`mt-1 font-bold tracking-tight ${compact ? "text-base" : "text-[19px]"} ${onBrand ? "text-white" : "text-[var(--fg)]"}`}>
-        pay<span className={onBrand ? "text-[#D4D1FC]" : "text-[var(--brand-text)]"}>{"'n"}</span>kolay
-      </p>
-    </div>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={NK_LOGO}
+      alt="N Kolay"
+      className={`w-auto shrink-0 ${compact ? "h-6" : "h-7"}`}
+      style={{ filter: onBrand ? "brightness(0) invert(1)" : "var(--logo-filter)" }}
+    />
   );
 }
 
@@ -288,6 +293,28 @@ function Sidebar({ role, desktopOpen, mobileOpen, hidden, onClose, onLogout }) {
           </button>
         </div>
 
+        {/* ana firma — her rolde göz önünde: mavi kart, büyük logo */}
+        <div className="relative mx-3 mt-3 flex shrink-0 items-center gap-3 overflow-hidden rounded-xl bg-[#0C34E7] p-3 text-white [box-shadow:0_12px_26px_-14px_rgba(12,52,231,0.8)]">
+          <div className="pointer-events-none absolute -right-8 -top-10 h-24 w-24 rounded-full bg-[#D4D1FC] opacity-30 blur-2xl" aria-hidden="true" />
+          <CompanyLogo name={anaFirma.ad} size={48} tone="light" className="relative shrink-0" />
+          <div className="relative min-w-0 leading-tight">
+            <p className="truncate text-[15px] font-bold">{anaFirma.ad}</p>
+            <p className="mt-0.5 truncate text-[11px] font-medium text-white/75">Ana Firma · B2B Bayi Ağı</p>
+          </div>
+        </div>
+        {/* bayi / alt bayi girişinde kullanıcının kendi firması */}
+        {role !== ROLES.ANA_FIRMA && (
+          <div className="mx-3 mt-2 flex shrink-0 items-center gap-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-2.5 py-2">
+            <CompanyLogo name={meta.company} color={meta.logoColor} size={32} className="shrink-0" />
+            <span className="min-w-0 leading-tight">
+              <span className="block truncate text-[12.5px] font-semibold text-[var(--fg)]">{meta.company}</span>
+              <span className="block text-[10.5px] leading-snug text-[var(--muted)]">
+                {meta.label} · {meta.parentNote}
+              </span>
+            </span>
+          </div>
+        )}
+
         <p className="px-6 pb-1.5 pt-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Menü</p>
         <nav className="flex-1 space-y-0.5 overflow-y-auto overscroll-contain px-3 pb-3 [scrollbar-color:transparent_transparent] [scrollbar-width:thin] hover:[scrollbar-color:var(--side-scroll)_transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[var(--side-scroll)] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:w-1.5">
           {nav.map((entry) =>
@@ -319,14 +346,14 @@ function Sidebar({ role, desktopOpen, mobileOpen, hidden, onClose, onLogout }) {
           )}
         </nav>
 
-        {/* aktif firma + çıkış */}
+        {/* kullanıcı + çıkış */}
         <div className="flex shrink-0 items-center gap-2.5 border-t border-[var(--border)] p-3">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[var(--brand-soft)] text-[11px] font-bold text-[var(--brand-text)]">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--brand)] text-[11px] font-bold text-[var(--brand-fg)]">
             {meta.short}
           </span>
           <span className="min-w-0 flex-1 leading-tight">
-            <span className="block truncate text-[13px] font-semibold text-[var(--fg)]">{meta.company}</span>
-            <span className="block truncate text-[11.5px] text-[var(--muted)]">{meta.label} Paneli</span>
+            <span className="block truncate text-[13px] font-semibold text-[var(--fg)]">{meta.user}</span>
+            <span className="block truncate text-[11.5px] text-[var(--muted)]">Çevrimiçi</span>
           </span>
           <button
             type="button"
@@ -628,12 +655,18 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
 
           {/* menü kapalıyken marka üst barda görünür */}
           <div
-            className={`ml-1 hidden max-w-[140px] overflow-hidden transition-[max-width,opacity,margin] duration-300 motion-reduce:transition-none sm:block ${
-              desktopOpen ? "lg:ml-0 lg:max-w-0 lg:opacity-0" : "lg:ml-2 lg:max-w-[140px] lg:opacity-100"
+            className={`ml-1 block max-w-[220px] shrink-0 overflow-hidden transition-[max-width,opacity,margin] duration-300 motion-reduce:transition-none ${
+              desktopOpen ? "lg:ml-0 lg:max-w-0 lg:opacity-0" : "lg:ml-2 lg:max-w-[220px] lg:opacity-100"
             }`}
             aria-hidden={desktopOpen && isDesktop ? "true" : undefined}
           >
-            <Wordmark compact />
+            <div className="flex items-center gap-2.5 whitespace-nowrap">
+              <CompanyLogo name={anaFirma.ad} size={32} className="shrink-0" />
+              <span className="hidden leading-tight sm:block">
+                <span className="block text-[13.5px] font-bold text-[var(--fg)]">{anaFirma.ad}</span>
+                <span className="block text-[10.5px] text-[var(--muted)]">Ana Firma · N Kolay Bayim</span>
+              </span>
+            </div>
           </div>
 
           <span className="mx-1.5 hidden h-5 w-px bg-[var(--border-strong)] sm:block" aria-hidden="true" />
@@ -899,6 +932,13 @@ function LoginView({ isDark, onToggleTheme, onLogin }) {
             <Wordmark onBrand />
           </div>
           <div className="relative py-12">
+            <div className="mb-7 flex items-center gap-4">
+              <CompanyLogo name={anaFirma.ad} size={68} tone="light" className="shrink-0 shadow-[0_16px_32px_-14px_rgba(0,0,0,0.5)]" />
+              <div className="leading-tight">
+                <p className="text-[22px] font-bold tracking-tight">{anaFirma.ad}</p>
+                <p className="mt-1 text-[13px] text-white/80">{anaFirma.aciklama}</p>
+              </div>
+            </div>
             <h2 className="text-3xl font-semibold leading-tight tracking-tight">
               Bayi ağınızı
               <br />

@@ -5,7 +5,8 @@ import I from "@/components/DesignIcons";
 import { useRole } from "@/components/RoleContext";
 import { ROLES, ROLE_META, ROLE_ORDER } from "@/lib/roles";
 import { getNav } from "@/lib/nav";
-import { kpis, islemler, bakiyeOzet, kurBilgisi, iptalIadeTalepleri, faturaYuklemeleri } from "@/lib/mockData";
+import CompanyLogo from "@/components/CompanyLogo";
+import { kpis, islemler, bakiyeOzet, kurBilgisi, iptalIadeTalepleri, faturaYuklemeleri, anaFirma } from "@/lib/mockData";
 
 // Tasarım 04 — Nova: beyaz zemin üzerinde mavi tonlu kartlar, yüzen ve daraltılabilir sol menü,
 // karşılama bandı, mini grafikli KPI'lar, etkileşimli alan grafiği, dağılım halkası, filtreli tablo.
@@ -40,6 +41,7 @@ const light = {
   "--ring": "#0C34E7",
   "--lift-shadow": "0 16px 32px -20px rgba(12,52,231,0.45)",
   "--pop-shadow": "0 14px 36px -12px rgba(12,52,231,0.30), 0 2px 6px rgba(30,30,30,0.06)",
+  "--logo-filter": "none",
 };
 
 const dark = {
@@ -72,6 +74,7 @@ const dark = {
   "--ring": "#D4D1FC",
   "--lift-shadow": "0 18px 34px -20px rgba(0,0,0,0.9)",
   "--pop-shadow": "0 16px 40px -12px rgba(0,0,0,0.8), 0 2px 6px rgba(0,0,0,0.4)",
+  "--logo-filter": "brightness(0) invert(1)",
 };
 
 // Giriş ve etkileşim animasyonları. Hareket azaltma tercihinde tamamı kapanır.
@@ -251,14 +254,13 @@ function Monogram({ onBrand }) {
   );
 }
 
+// N Kolay logosu (CDN). Tek renk mavi SVG; koyu zeminde beyaza çevrilir.
+const NK_LOGO = "https://cdn.nkolayislem.com.tr/e-full-logo.svg";
+
 function WordmarkText() {
   return (
-    <div className="min-w-0 leading-none">
-      <p className="text-[8.5px] font-semibold tracking-[0.2em] text-[var(--brand-text)]">N KOLAY BAYİM</p>
-      <p style={DISPLAY} className="mt-1 text-base font-bold tracking-tight text-[var(--fg)]">
-        pay<span className="text-[var(--brand-text)]">{"'n"}</span>kolay
-      </p>
-    </div>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={NK_LOGO} alt="N Kolay" className="h-7 w-auto shrink-0" style={{ filter: "var(--logo-filter)" }} />
   );
 }
 
@@ -377,7 +379,12 @@ function Sidebar({ role, mobileOpen, hidden, onClose, collapsed, setCollapsed, o
         } ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div className={`flex h-14 shrink-0 items-center gap-2.5 pl-4 pr-2.5 ${collapsed ? "lg:justify-center lg:px-0" : ""}`}>
-          <Monogram />
+          {/* daraltılmış şeritte yalnızca "N" işareti, açıkken tam logo */}
+          {collapsed && (
+            <span className="hidden lg:block">
+              <Monogram />
+            </span>
+          )}
           <div className={`flex-1 ${hideLg}`}>
             <WordmarkText />
           </div>
@@ -390,6 +397,34 @@ function Sidebar({ role, mobileOpen, hidden, onClose, collapsed, setCollapsed, o
             <I name="x" size={16} />
           </button>
         </div>
+
+        {/* ana firma — her rolde göz önünde: mavi kart, büyük logo */}
+        <div className={`relative mx-2.5 flex shrink-0 items-center gap-3 overflow-hidden rounded-2xl bg-[#0C34E7] p-3 text-white [box-shadow:0_12px_26px_-14px_rgba(12,52,231,0.8)] ${hideLg}`}>
+          <div className="pointer-events-none absolute -right-8 -top-10 h-24 w-24 rounded-full bg-[#D4D1FC] opacity-30 blur-2xl" aria-hidden="true" />
+          <CompanyLogo name={anaFirma.ad} size={48} tone="light" className="relative shrink-0" />
+          <div className="relative min-w-0 leading-tight">
+            <p style={DISPLAY} className="truncate text-[15px] font-bold">{anaFirma.ad}</p>
+            <p className="mt-0.5 truncate text-[11px] font-medium text-white/75">Ana Firma · B2B Bayi Ağı</p>
+          </div>
+        </div>
+        {/* menü daraltılmışken yalnızca ana firma logosu */}
+        {collapsed && (
+          <div className="hidden shrink-0 justify-center lg:flex" title={anaFirma.ad}>
+            <CompanyLogo name={anaFirma.ad} size={40} />
+          </div>
+        )}
+        {/* bayi / alt bayi girişinde kullanıcının kendi firması */}
+        {role !== ROLES.ANA_FIRMA && (
+          <div className={`mx-2.5 mt-2 flex shrink-0 items-center gap-2.5 rounded-2xl bg-[var(--side-well)] px-2.5 py-2 ${hideLg}`}>
+            <CompanyLogo name={meta.company} color={meta.logoColor} size={32} className="shrink-0" />
+            <span className="min-w-0 leading-tight">
+              <span className="block truncate text-[12.5px] font-semibold text-[var(--fg)]">{meta.company}</span>
+              <span className="block text-[10.5px] leading-snug text-[var(--muted)]">
+                {meta.label} · {meta.parentNote}
+              </span>
+            </span>
+          </div>
+        )}
 
         <nav
           className={`flex-1 overflow-y-auto overscroll-contain px-2.5 pb-2 [scrollbar-color:transparent_transparent] [scrollbar-width:thin] hover:[scrollbar-color:var(--border-strong)_transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[var(--border-strong)] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:w-1.5 ${
@@ -420,7 +455,7 @@ function Sidebar({ role, mobileOpen, hidden, onClose, collapsed, setCollapsed, o
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--brand)] text-[10px] font-bold text-white">{meta.short}</span>
           <span className={`min-w-0 flex-1 leading-tight ${hideLg}`}>
             <span className="block truncate text-[12.5px] font-semibold text-[var(--fg)]">{meta.user}</span>
-            <span className="block truncate text-[11px] text-[var(--muted)]">{meta.company}</span>
+            <span className="block truncate text-[11px] text-[var(--muted)]">Çevrimiçi</span>
           </span>
           <button
             type="button"
@@ -1046,6 +1081,12 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
             <I name="arrowLeft" size={17} />
           </Link>
 
+          {/* dar ekranda menü çekmecede olduğu için ana firma üst barda görünür */}
+          <div className="ml-1 flex shrink-0 items-center gap-2 lg:hidden">
+            <CompanyLogo name={anaFirma.ad} size={30} className="shrink-0" />
+            <span className="hidden text-[13px] font-bold text-[var(--fg)] sm:block">{anaFirma.ad}</span>
+          </div>
+
           {/* konum */}
           <nav aria-label="Konum" className="ml-1 hidden shrink-0 items-center gap-1.5 whitespace-nowrap text-[12.5px] sm:flex lg:hidden xl:flex">
             <span className="text-[var(--muted)]">{meta.label} Paneli</span>
@@ -1160,10 +1201,7 @@ function LoginView({ isDark, onToggleTheme, onLogin }) {
             onLogin();
           }}
         >
-          <div className="flex items-center gap-2.5">
-            <Monogram />
-            <WordmarkText />
-          </div>
+          <WordmarkText />
           <h2 style={DISPLAY} className="mt-9 text-[26px] font-bold tracking-tight text-[var(--fg)]">
             Giriş Yap
           </h2>
@@ -1197,6 +1235,13 @@ function LoginView({ isDark, onToggleTheme, onLogin }) {
         <div style={{ "--i": 1 }} className="nv-rise relative hidden flex-col justify-between overflow-hidden rounded-[20px] bg-[#0C34E7] p-9 text-white lg:flex">
           <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-[#D4D1FC] opacity-25 blur-3xl" aria-hidden="true" />
           <div className="relative">
+            <div className="mb-6 flex items-center gap-3.5">
+              <CompanyLogo name={anaFirma.ad} size={64} tone="light" className="shrink-0 shadow-[0_16px_32px_-14px_rgba(0,0,0,0.5)]" />
+              <div className="leading-tight">
+                <p style={DISPLAY} className="text-[21px] font-bold tracking-tight">{anaFirma.ad}</p>
+                <p className="mt-1 text-[12.5px] text-white/80">{anaFirma.aciklama}</p>
+              </div>
+            </div>
             <span className="inline-block rounded-full bg-white/15 px-2.5 py-1 text-[10.5px] font-semibold tracking-wide">B2B ÖDEME PANELİ</span>
             <h2 style={DISPLAY} className="mt-4 text-[32px] font-bold leading-[1.1] tracking-tight">
               Bayi ağınızı

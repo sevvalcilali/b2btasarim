@@ -58,17 +58,6 @@ const DIRECTIONS = [
     previewBg: "#F8FAFC",
     previewBgDark: "#0B0E1A",
   },
-  {
-    slug: "kagit",
-    n: "06",
-    name: "Kağıt",
-    tag: "Broadsheet Editoryal",
-    desc: "Kutusuz düzen, serif tipografi ve ince çizgiler. Solda açılır kapanır ana menü, üstte kısayol menüsü; büyük hero rakam, gün gün okunan alan grafiği, çalışan onay listesi, duyuru taslağı ve ciro sıralaması. Newsreader + IBM Plex Sans.",
-    swatches: ["#1E1E1E", "#0C34E7", "#D8D9DB", "#F7F6F3"],
-    accent: "#0C34E7",
-    previewBg: "#F7F6F3",
-    previewBgDark: "#111214",
-  },
 ];
 
 const light = {
@@ -120,9 +109,9 @@ export default function DesignsIndex() {
               <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
                 N Kolay Bayim · B2B Panel
               </p>
-              <h1 className="mt-2 text-4xl font-extrabold">6 Tasarım Yönü</h1>
+              <h1 className="mt-2 text-4xl font-extrabold">5 Tasarım Yönü</h1>
               <p className="mt-3 max-w-2xl text-[var(--muted)]">
-                Aynı ekranlar (Giriş + Panel), altı farklı görsel dil ile. Her yön kendi içinde açık/koyu
+                Aynı ekranlar (Giriş + Panel), beş farklı görsel dil ile. Her yön kendi içinde açık/koyu
                 moda sahiptir. Tüm mockup&apos;lar servis içermez — yalnızca ön yüz.
               </p>
             </div>
