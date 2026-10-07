@@ -7,7 +7,7 @@ import { useRole } from "@/components/RoleContext";
 import { ROLES, ROLE_META, ROLE_ORDER } from "@/lib/roles";
 import { getNav } from "@/lib/nav";
 import CompanyLogo from "@/components/CompanyLogo";
-import { kpis, islemler, bakiyeOzet, anaFirma, bayiler, altBayiler } from "@/lib/mockData";
+import { kpis, islemler, bakiyeOzet, anaFirma, bayiler, altBayiler, musteriler, vadeFarkiProfilleri } from "@/lib/mockData";
 
 // N Kolay Bayim paneli — seçilen tasarım: Bento (Tasarım 03). Diğer tasarımlar arsiv/ klasöründe.
 // Lavanta zemin üzerinde yüzen yuvarlak paneller, renkli KPI blokları.
@@ -135,9 +135,9 @@ const SEGMENTS = [
 ];
 
 const QUICK = [
-  { label: "Manuel Ödeme", desc: "Kart bilgisiyle tahsilat", icon: "wallet" },
-  { label: "Link ile Ödeme", desc: "Ödeme linki oluştur", icon: "link" },
-  { label: "Fatura Yükle", desc: "Bekleyen faturaları tamamla", icon: "receipt" },
+  { label: "Manuel Ödeme", desc: "Kart bilgisiyle tahsilat", icon: "wallet", href: "/odeme/manuel" },
+  { label: "Link ile Ödeme", desc: "Ödeme linki oluştur", icon: "link", href: "/odeme/link" },
+  { label: "Fatura Yükle", desc: "Bekleyen faturaları tamamla", icon: "receipt", href: "/raporlar/fatura-yukleme" },
 ];
 
 // Menüde "Yönetim" bölümüne giren öğeler
@@ -147,6 +147,7 @@ const MANAGE_ICONS = new Set(["dealer", "settings", "megaphone"]);
 // Burada olmayan menü öğeleri henüz bir ekrana gitmez.
 const HOME = "/dashboard";
 const SAYFALAR = {
+  "manuel-odeme": "/odeme/manuel",
   "islem-detaylari": "/raporlar/islem-detaylari",
 };
 const isReady = (href) => href === HOME || Object.values(SAYFALAR).includes(href);
@@ -1034,7 +1035,7 @@ function TransactionsCard({ role, onSeeAll }) {
   );
 }
 
-function QuickCard() {
+function QuickCard({ onNavigate }) {
   return (
     <section style={{ "--i": 8 }} className={`bn-rise p-2 ${CARD}`} aria-labelledby="bn-quick-title">
       <h2 id="bn-quick-title" className="px-2 pb-1 pt-2 text-sm font-bold text-[var(--fg)]">
@@ -1043,7 +1044,11 @@ function QuickCard() {
       <ul>
         {QUICK.map((q) => (
           <li key={q.label}>
-            <button type="button" className={`group flex h-12 w-full items-center gap-2.5 rounded-xl px-2 text-left transition-colors hover:bg-[var(--soft)] ${FOCUS}`}>
+            <button
+              type="button"
+              onClick={isReady(q.href) ? () => onNavigate(q.href) : undefined}
+              className={`group flex h-12 w-full items-center gap-2.5 rounded-xl px-2 text-left transition-colors hover:bg-[var(--soft)] ${FOCUS}`}
+            >
               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-[var(--brand-soft)] text-[var(--brand-text)] transition-colors duration-200 group-hover:bg-[var(--brand)] group-hover:text-white">
                 <I name={q.icon} size={15} />
               </span>
@@ -1094,6 +1099,29 @@ function DistributionCard({ stats }) {
         ))}
       </ul>
     </section>
+  );
+}
+
+// Sayfa başlığının üstündeki konum satırı: Ana Sayfa › grup › ekran
+function Konum({ onHome, yol }) {
+  return (
+    <nav aria-label="Konum" className="mb-1 flex items-center gap-1 text-[11.5px] font-medium text-[var(--muted)]">
+      <button type="button" onClick={onHome} className={`rounded hover:text-[var(--brand-text)] ${FOCUS}`}>
+        Ana Sayfa
+      </button>
+      {yol.map((y, i) => (
+        <span key={y} className="contents">
+          <I name="chevronRight" size={11} />
+          {i === yol.length - 1 ? (
+            <span aria-current="page" className="font-semibold text-[var(--fg-2)]">
+              {y}
+            </span>
+          ) : (
+            <span>{y}</span>
+          )}
+        </span>
+      ))}
+    </nav>
   );
 }
 
@@ -1154,17 +1182,7 @@ function IslemDetaylari({ role, meta, onHome }) {
     <>
       <div className="bn-rise mb-4 flex flex-col gap-3 px-1 md:flex-row md:items-end md:justify-between">
         <div>
-          <nav aria-label="Konum" className="mb-1 flex items-center gap-1 text-[11.5px] font-medium text-[var(--muted)]">
-            <button type="button" onClick={onHome} className={`rounded hover:text-[var(--brand-text)] ${FOCUS}`}>
-              Ana Sayfa
-            </button>
-            <I name="chevronRight" size={11} />
-            <span>Raporlar</span>
-            <I name="chevronRight" size={11} />
-            <span aria-current="page" className="font-semibold text-[var(--fg-2)]">
-              İşlem Detayları
-            </span>
-          </nav>
+          <Konum onHome={onHome} yol={["Raporlar", "İşlem Detayları"]} />
           <h1 className="text-xl font-extrabold tracking-tight text-[var(--fg)]">İşlem Detayları</h1>
           <p className="mt-0.5 text-[12.5px] text-[var(--muted)]">
             {meta.company} · {KAPSAM[role]}
@@ -1329,8 +1347,731 @@ function IslemDetaylari({ role, meta, onHome }) {
   );
 }
 
+// ---- Ödeme Al › Manuel Ödeme --------------------------------------------------------------
+// Şartname s.6 (tahsilat ekranları), s.5 (taksit sınırı, işlem bazlı limit, ortaklar),
+// s.4 (vade farkı profili), s.9 (müşteri kartında fatura beyanı). Mockup: kart bilgisi hiçbir yere gönderilmez.
+const MUSTERI_SECENEKLERI = {
+  [ROLES.ANA_FIRMA]: ["Bayi", "Düzenli Müşteri", "Düzensiz Müşteri"],
+  [ROLES.BAYI]: ["Alt Bayi", "Düzenli Müşteri", "Düzensiz Müşteri", "Kendi Kartı"],
+  [ROLES.ALT_BAYI]: ["Müşteri Kartı", "Kendi Kartı"],
+};
+const TAHSILAT_CARISI = {
+  [ROLES.ANA_FIRMA]: "Üye İşyeri",
+  [ROLES.BAYI]: "Ana Firma Carisi",
+  [ROLES.ALT_BAYI]: "Bayi Carisi",
+};
+// tanımlı (listeden seçilen) müşteri türleri
+const LISTELI = new Set(["Bayi", "Alt Bayi", "Düzenli Müşteri"]);
+const ANA_FIRMA_TAKSITLER = [1, 2, 3, 6, 9, 12];
+
+// Rolün kendi bayi / alt bayi kaydı: taksit sınırı, işlem limiti, vade profili, ortaklar
+function firmaKaydi(role) {
+  const ad = ROLE_META[role].company;
+  return bayiler.find((b) => b.unvan === ad) || altBayiler.find((b) => b.unvan === ad) || null;
+}
+
+// "Profil 2" → { ad: "Vade Farkı Profil 2", oran: 2.45 }
+function vadeProfili(kisaAd) {
+  const p = vadeFarkiProfilleri.find((v) => v.ad.endsWith(kisaAd));
+  return p ? { ad: p.ad, oran: Number(p.oran.replace("%", "").replace(",", ".")) } : null;
+}
+
+// "12.400,50" → 12400.5 (boş ya da geçersizse NaN)
+function tutarCoz(metin) {
+  const t = metin.replace(/[₺\s.]/g, "").replace(",", ".");
+  return t === "" ? NaN : Number(t);
+}
+
+const tl2 = (n) => `₺ ${n.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const rakamlar = (x) => x.replace(/\D/g, "");
+
+function inputCls(hata) {
+  return `h-10 w-full rounded-xl border bg-[var(--surface)] px-3 text-[13px] text-[var(--fg)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--brand)] read-only:bg-[var(--soft)] read-only:text-[var(--fg-2)] ${
+    hata ? "border-[var(--danger)]" : "border-[var(--border-strong)]"
+  }`;
+}
+
+function Alan({ id, etiket, hata, ipucu, className = "", children }) {
+  return (
+    <div className={className}>
+      <label htmlFor={id} className="mb-1 block text-[12px] font-semibold text-[var(--fg-2)]">
+        {etiket}
+      </label>
+      {children}
+      {hata ? (
+        <p id={`${id}-hata`} className="mt-1 text-[11.5px] font-semibold text-[var(--danger-text)]">
+          {hata}
+        </p>
+      ) : ipucu ? (
+        <p className="mt-1 text-[11.5px] text-[var(--muted)]">{ipucu}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function FormBolum({ no, baslik, aciklama, i, children }) {
+  return (
+    <section style={{ "--i": i }} className={`bn-rise p-4 sm:p-5 ${CARD} hover:!translate-y-0`} aria-labelledby={`bn-bolum-${no}`}>
+      <div className="mb-4 flex items-start gap-3">
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--brand)] text-[12px] font-extrabold text-white">{no}</span>
+        <div>
+          <h2 id={`bn-bolum-${no}`} className="text-sm font-bold text-[var(--fg)]">
+            {baslik}
+          </h2>
+          {aciklama && <p className="mt-0.5 text-[12px] text-[var(--muted)]">{aciklama}</p>}
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+// Tanımlı müşteriyi unvan, cari no ya da vergi no ile arayıp seçtiren liste kutusu (combobox)
+function MusteriSecici({ id, secenekler, secili, onSec, hata }) {
+  const [acik, setAcik] = useState(false);
+  const [arama, setArama] = useState("");
+  const [aktif, setAktif] = useState(0);
+  const kutuRef = useRef(null);
+  const kucuk = (x) => x.toLocaleLowerCase("tr-TR");
+  const liste = secenekler.filter((m) => !arama || [m.unvan, m.cari, m.vergiNo].some((f) => kucuk(f).includes(kucuk(arama))));
+
+  useEffect(() => {
+    if (!acik) return undefined;
+    const disari = (e) => !kutuRef.current?.contains(e.target) && setAcik(false);
+    document.addEventListener("mousedown", disari);
+    return () => document.removeEventListener("mousedown", disari);
+  }, [acik]);
+
+  const sec = (m) => {
+    onSec(m);
+    setArama("");
+    setAcik(false);
+  };
+  const onKey = (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setAcik(true);
+      setAktif((a) => Math.min(a + 1, liste.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setAktif((a) => Math.max(a - 1, 0));
+    } else if (e.key === "Enter" && acik && liste[aktif]) {
+      e.preventDefault();
+      sec(liste[aktif]);
+    } else if (e.key === "Escape") {
+      setAcik(false);
+    }
+  };
+
+  return (
+    <div ref={kutuRef} className="relative">
+      <input
+        id={id}
+        type="text"
+        role="combobox"
+        autoComplete="off"
+        aria-expanded={acik}
+        aria-controls={`${id}-liste`}
+        aria-autocomplete="list"
+        aria-activedescendant={acik && liste[aktif] ? `${id}-sec-${aktif}` : undefined}
+        aria-invalid={hata ? true : undefined}
+        aria-describedby={hata ? `${id}-hata` : undefined}
+        value={acik || !secili ? arama : `${secili.unvan} — ${secili.cari}`}
+        placeholder="Unvan, cari no ya da vergi no ile arayın"
+        onFocus={() => {
+          setAcik(true);
+          setAktif(0);
+        }}
+        onChange={(e) => {
+          setArama(e.target.value);
+          setAktif(0);
+          setAcik(true);
+        }}
+        onKeyDown={onKey}
+        className={`${inputCls(hata)} pr-9`}
+      />
+      <I name="chevronDown" size={15} className="pointer-events-none absolute right-3 top-[13px] text-[var(--muted)]" />
+      {acik && (
+        <ul
+          id={`${id}-liste`}
+          role="listbox"
+          className="bn-pop absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1 [box-shadow:var(--pop-shadow)]"
+        >
+          {liste.length === 0 ? (
+            <li className="px-3 py-2 text-[12.5px] text-[var(--muted)]">Eşleşen kayıt yok</li>
+          ) : (
+            liste.map((m, i) => (
+              <li
+                key={m.cari}
+                id={`${id}-sec-${i}`}
+                role="option"
+                aria-selected={secili?.cari === m.cari}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  sec(m);
+                }}
+                onMouseEnter={() => setAktif(i)}
+                className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg px-3 py-2 ${i === aktif ? "bg-[var(--soft)]" : ""}`}
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-[13px] font-semibold text-[var(--fg)]">{m.unvan}</span>
+                  <span className="block text-[11px] tabular-nums text-[var(--muted)]">
+                    {m.cari} · VKN {m.vergiNo}
+                  </span>
+                </span>
+                {secili?.cari === m.cari && <I name="check" size={15} className="shrink-0 text-[var(--brand-text)]" />}
+              </li>
+            ))
+          )}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function ManuelOdeme({ role, meta, onNavigate }) {
+  const turler = MUSTERI_SECENEKLERI[role];
+  const kayit = firmaKaydi(role);
+  const cariler =
+    role === ROLES.ALT_BAYI
+      ? bayiler.filter((b) => b.unvan === meta.parent).map((b) => ({ ad: b.unvan, cari: b.cari }))
+      : anaFirma.uyeIsyerleri;
+
+  const [tur, setTur] = useState(turler[0]);
+  const [secili, setSecili] = useState(null);
+  const [kendi, setKendi] = useState("");
+  const [kisi, setKisi] = useState({ ad: "", vkn: "", tel: "", email: "" });
+  const [cari, setCari] = useState(cariler[0]?.cari || "");
+  const [tutarMetni, setTutarMetni] = useState("");
+  const [taksit, setTaksit] = useState(1);
+  const [aciklama, setAciklama] = useState("");
+  const [kart, setKart] = useState({ isim: "", no: "", skt: "", cvv: "" });
+  const [beyan, setBeyan] = useState(false);
+  const [denendi, setDenendi] = useState(false);
+  const [durum, setDurum] = useState("form"); // form | isleniyor | tamam
+  const zamanRef = useRef(null);
+  useEffect(() => () => clearTimeout(zamanRef.current), []);
+
+  // listeden seçilecek müşteriler
+  const secenekler =
+    tur === "Bayi"
+      ? bayiler.filter((b) => b.durum === "Aktif")
+      : tur === "Alt Bayi"
+        ? altBayiler.filter((b) => b.durum === "Aktif")
+        : musteriler.filter((m) => m.sahip === meta.company);
+
+  // kendi kartı: firmanın kendi unvanı ya da ortakları
+  const kendiSecenekleri = [{ ad: meta.company, rol: "Firma unvanı" }, ...(kayit?.ortaklar || []).map((o) => ({ ad: o, rol: "Ortak" }))];
+  const kendiKarti = tur === "Kendi Kartı";
+
+  // taksit sınırı, işlem limiti ve vade profili bayi tanımından gelir; ana firma bayiden tahsilatta o bayinin profilini uygular
+  const taksitler = kayit ? kayit.taksitler : ANA_FIRMA_TAKSITLER;
+  const limit = kayit ? kayit.islemLimiti : null;
+  const profil = vadeProfili(kayit ? kayit.vadeProfil : tur === "Bayi" && secili ? secili.vadeProfil : "Profil 1");
+  const secilenTaksit = taksitler.includes(taksit) ? taksit : 1;
+
+  const tutar = tutarCoz(tutarMetni);
+  const gecerliTutar = Number.isFinite(tutar) && tutar > 0;
+  const hesap = (n) => {
+    const vade = gecerliTutar && n > 1 && profil ? (tutar * profil.oran * (n - 1)) / 100 : 0;
+    const toplam = (gecerliTutar ? tutar : 0) + vade;
+    return { vade, toplam, aylik: toplam / n };
+  };
+  const ozet = hesap(secilenTaksit);
+
+  const kartIsmi = kendiKarti ? kendi : kart.isim;
+  const turDegis = (t) => {
+    setTur(t);
+    setSecili(null);
+    setKendi("");
+  };
+
+  // doğrulama
+  const hatalar = {};
+  if (LISTELI.has(tur) && !secili) hatalar.musteri = "Listeden bir müşteri seçin.";
+  if (tur === "Düzensiz Müşteri" || tur === "Müşteri Kartı") {
+    if (!kisi.ad.trim()) hatalar.ad = "Ad soyad ya da unvan girin.";
+    if (rakamlar(kisi.tel).length < 10) hatalar.tel = "Geçerli bir telefon numarası girin.";
+  }
+  if (tur === "Düzensiz Müşteri" && ![10, 11].includes(rakamlar(kisi.vkn).length)) hatalar.vkn = "10 haneli VKN ya da 11 haneli TCKN girin.";
+  if (kendiKarti && !kendi) hatalar.kendi = "Kartın kime ait olduğunu seçin.";
+  if (!gecerliTutar) hatalar.tutar = "Tutar girin.";
+  else if (limit && tutar > limit) hatalar.tutar = `İşlem bazlı ödeme limiti ₺ ${limit.toLocaleString("tr-TR")}.`;
+  if (!kartIsmi.trim()) hatalar.isim = "Kart üzerindeki ismi girin.";
+  if (rakamlar(kart.no).length !== 16) hatalar.no = "16 haneli kart numarasını girin.";
+  const [ay, yil] = kart.skt.split("/").map((x) => Number(x));
+  const simdi = new Date();
+  const yy = simdi.getFullYear() % 100;
+  if (!(ay >= 1 && ay <= 12 && (yil > yy || (yil === yy && ay >= simdi.getMonth() + 1)))) hatalar.skt = "AA/YY biçiminde geçerli bir tarih girin.";
+  if (rakamlar(kart.cvv).length !== 3) hatalar.cvv = "3 haneli güvenlik kodu.";
+  if (!kendiKarti && !beyan) hatalar.beyan = "Müşteri kartıyla ödemede beyanı onaylayın.";
+  const h = (k) => (denendi ? hatalar[k] : undefined);
+
+  const musteriAdi = LISTELI.has(tur) ? secili?.unvan : kendiKarti ? kendi : kisi.ad.trim();
+  const cariAdi = cariler.find((c) => c.cari === cari);
+
+  const gonder = (e) => {
+    e.preventDefault();
+    setDenendi(true);
+    if (Object.keys(hatalar).length > 0) {
+      requestAnimationFrame(() => document.querySelector('#bn-manuel [aria-invalid="true"]')?.focus());
+      return;
+    }
+    setDurum("isleniyor");
+    zamanRef.current = setTimeout(() => setDurum("tamam"), 900);
+  };
+  const yeniOdeme = () => {
+    setTur(turler[0]);
+    setSecili(null);
+    setKendi("");
+    setKisi({ ad: "", vkn: "", tel: "", email: "" });
+    setTutarMetni("");
+    setTaksit(1);
+    setAciklama("");
+    setKart({ isim: "", no: "", skt: "", cvv: "" });
+    setBeyan(false);
+    setDenendi(false);
+    setDurum("form");
+  };
+
+  const baslik = (
+    <div className="bn-rise mb-4 px-1">
+      <Konum onHome={() => onNavigate(HOME)} yol={["Ödeme Al", "Manuel Ödeme"]} />
+      <h1 className="text-xl font-extrabold tracking-tight text-[var(--fg)]">Manuel Ödeme</h1>
+      <p className="mt-0.5 text-[12.5px] text-[var(--muted)]">{meta.company} · Kart bilgisiyle tahsilat</p>
+    </div>
+  );
+
+  if (durum === "tamam") {
+    const satirlar = [
+      ["İşlem No", "TRX-90243"],
+      ["Müşteri", `${musteriAdi} · ${tur}`],
+      [TAHSILAT_CARISI[role], cariAdi ? `${cariAdi.ad} — ${cariAdi.cari}` : "—"],
+      ["Kart", `**** ${rakamlar(kart.no).slice(-4)} · ${kartIsmi}`],
+      ["Taksit", secilenTaksit === 1 ? "Tek çekim" : `${secilenTaksit} taksit × ${tl2(ozet.aylik)}`],
+      ["Tutar", tl2(tutar)],
+      ["Vade farkı", tl2(ozet.vade)],
+    ];
+    return (
+      <>
+        {baslik}
+        <section className={`bn-pop mx-auto max-w-xl p-5 text-center sm:p-7 ${CARD} hover:!translate-y-0`} aria-live="polite">
+          <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-[var(--success-soft)] text-[var(--success-text)]">
+            <I name="check" size={26} strokeWidth={2.4} />
+          </span>
+          <h2 className="mt-3 text-lg font-extrabold text-[var(--fg)]">Ödeme alındı</h2>
+          <p className="mt-1 text-[12.5px] text-[var(--muted)]">Karttan çekilen toplam</p>
+          <p className="mt-1 text-[28px] font-extrabold tabular-nums tracking-tight text-[var(--fg)]">{tl2(ozet.toplam)}</p>
+          <dl className="mt-4 divide-y divide-[var(--border)] rounded-2xl border border-[var(--border)] text-left text-[12.5px]">
+            {satirlar.map(([k, v]) => (
+              <div key={k} className="flex justify-between gap-4 px-4 py-2.5">
+                <dt className="text-[var(--muted)]">{k}</dt>
+                <dd className="text-right font-semibold tabular-nums text-[var(--fg)]">{v}</dd>
+              </div>
+            ))}
+          </dl>
+          {!kendiKarti && (
+            <p className="mt-3 flex items-start gap-2 rounded-xl bg-[var(--warning-soft)] px-3 py-2 text-left text-[12px] font-medium text-[var(--warning-text)]">
+              <I name="info" size={15} className="mt-px shrink-0" />
+              Bu işlemin faturasını Raporlar › Fatura Yükleme Detay ekranından yüklemeyi unutmayın.
+            </p>
+          )}
+          <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={yeniOdeme}
+              className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-[var(--brand)] px-5 text-[13px] font-bold text-white transition hover:brightness-110 ${FOCUS}`}
+            >
+              <I name="plus" size={15} />
+              Yeni Ödeme
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigate("/raporlar/islem-detaylari")}
+              className={`inline-flex h-10 items-center justify-center rounded-full border border-[var(--border-strong)] px-5 text-[13px] font-semibold text-[var(--fg-2)] transition hover:border-[var(--brand)] hover:text-[var(--brand-text)] ${FOCUS}`}
+            >
+              İşlem Detayları
+            </button>
+          </div>
+        </section>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {baslik}
+      <form id="bn-manuel" noValidate onSubmit={gonder} className="grid grid-cols-1 gap-3 lg:grid-cols-3 lg:items-start">
+        <div className="flex flex-col gap-3 lg:col-span-2">
+          {/* 1 — müşteri */}
+          <FormBolum no={1} i={0} baslik="Müşteri" aciklama="Müşteri türünü seçin; tanımlı müşteriler listeden gelir.">
+            <div role="radiogroup" aria-label="Müşteri türü" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-0.5">
+              {turler.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  role="radio"
+                  aria-checked={tur === t}
+                  onClick={() => turDegis(t)}
+                  className={`inline-flex h-9 shrink-0 items-center rounded-full px-3.5 text-[12.5px] transition ${
+                    tur === t ? "bg-[var(--brand)] font-bold text-white" : "bg-[var(--soft)] font-semibold text-[var(--fg-2)] hover:text-[var(--brand-text)]"
+                  } ${FOCUS}`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {LISTELI.has(tur) && (
+                <Alan id="bn-musteri" etiket={tur === "Düzenli Müşteri" ? "Tanımlı müşteri" : tur} hata={h("musteri")} className="sm:col-span-2">
+                  <MusteriSecici key={tur} id="bn-musteri" secenekler={secenekler} secili={secili} onSec={setSecili} hata={h("musteri")} />
+                </Alan>
+              )}
+
+              {LISTELI.has(tur) && secili && (
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-xl bg-[var(--soft)] p-3 text-[12px] sm:col-span-2 sm:grid-cols-4">
+                  {[
+                    ["Cari No", secili.cari],
+                    ["Vergi No", secili.vergiNo],
+                    ["Telefon", secili.telefon],
+                    ["E-posta", secili.email],
+                  ].map(([k, v]) => (
+                    <div key={k} className="min-w-0">
+                      <dt className="text-[11px] text-[var(--muted)]">{k}</dt>
+                      <dd className="truncate font-semibold tabular-nums text-[var(--fg)]">{v}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+
+              {(tur === "Düzensiz Müşteri" || tur === "Müşteri Kartı") && (
+                <>
+                  <Alan id="bn-ad" etiket="Ad soyad / Unvan" hata={h("ad")}>
+                    <input
+                      id="bn-ad"
+                      value={kisi.ad}
+                      onChange={(e) => setKisi({ ...kisi, ad: e.target.value })}
+                      aria-invalid={h("ad") ? true : undefined}
+                      autoComplete="name"
+                      className={inputCls(h("ad"))}
+                    />
+                  </Alan>
+                  {tur === "Düzensiz Müşteri" && (
+                    <Alan id="bn-vkn" etiket="TCKN / VKN" hata={h("vkn")}>
+                      <input
+                        id="bn-vkn"
+                        inputMode="numeric"
+                        maxLength={11}
+                        value={kisi.vkn}
+                        onChange={(e) => setKisi({ ...kisi, vkn: rakamlar(e.target.value) })}
+                        aria-invalid={h("vkn") ? true : undefined}
+                        className={`${inputCls(h("vkn"))} tabular-nums`}
+                      />
+                    </Alan>
+                  )}
+                  <Alan id="bn-tel" etiket="Telefon" hata={h("tel")}>
+                    <input
+                      id="bn-tel"
+                      type="tel"
+                      inputMode="tel"
+                      placeholder="05XX XXX XX XX"
+                      value={kisi.tel}
+                      onChange={(e) => setKisi({ ...kisi, tel: e.target.value })}
+                      aria-invalid={h("tel") ? true : undefined}
+                      autoComplete="tel"
+                      className={`${inputCls(h("tel"))} tabular-nums`}
+                    />
+                  </Alan>
+                  <Alan id="bn-eposta" etiket="E-posta (isteğe bağlı)">
+                    <input
+                      id="bn-eposta"
+                      type="email"
+                      value={kisi.email}
+                      onChange={(e) => setKisi({ ...kisi, email: e.target.value })}
+                      autoComplete="email"
+                      className={inputCls()}
+                    />
+                  </Alan>
+                  {tur === "Düzensiz Müşteri" && (
+                    <p className="flex items-start gap-1.5 text-[11.5px] text-[var(--muted)] sm:col-span-2">
+                      <I name="info" size={13} className="mt-px shrink-0" />
+                      Düzensiz müşteride bilgiler bu alanlarla sınırlıdır; müşteri tanımı oluşturulmaz.
+                    </p>
+                  )}
+                </>
+              )}
+
+              {kendiKarti && (
+                <fieldset className="sm:col-span-2" aria-describedby={h("kendi") ? "bn-kendi-hata" : undefined}>
+                  <legend className="mb-1 block text-[12px] font-semibold text-[var(--fg-2)]">Kart sahibi</legend>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    {kendiSecenekleri.map((o) => (
+                      <label
+                        key={o.ad}
+                        className={`flex cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-2.5 transition ${
+                          kendi === o.ad ? "border-[var(--brand)] bg-[var(--brand-soft)]" : "border-[var(--border-strong)] hover:border-[var(--brand)]"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="bn-kendi"
+                          value={o.ad}
+                          checked={kendi === o.ad}
+                          onChange={() => setKendi(o.ad)}
+                          aria-invalid={h("kendi") ? true : undefined}
+                          className="h-4 w-4 accent-[var(--brand)]"
+                        />
+                        <span className="min-w-0 leading-tight">
+                          <span className="block truncate text-[12.5px] font-bold text-[var(--fg)]">{o.ad}</span>
+                          <span className="block text-[11px] text-[var(--muted)]">{o.rol}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  {h("kendi") && (
+                    <p id="bn-kendi-hata" className="mt-1 text-[11.5px] font-semibold text-[var(--danger-text)]">
+                      {h("kendi")}
+                    </p>
+                  )}
+                </fieldset>
+              )}
+
+              <Alan
+                id="bn-cari"
+                etiket={TAHSILAT_CARISI[role]}
+                ipucu={role === ROLES.ANA_FIRMA ? "Ödemenin alınacağı üye işyeri." : "Ödemenin aktarılacağı cari."}
+                className="sm:col-span-2"
+              >
+                <select id="bn-cari" value={cari} onChange={(e) => setCari(e.target.value)} className={inputCls()}>
+                  {cariler.map((c) => (
+                    <option key={c.cari} value={c.cari}>
+                      {c.ad} — {c.cari}
+                    </option>
+                  ))}
+                </select>
+              </Alan>
+            </div>
+          </FormBolum>
+
+          {/* 2 — tutar ve taksit */}
+          <FormBolum
+            no={2}
+            i={1}
+            baslik="Tutar ve Taksit"
+            aciklama={kayit ? "Taksit seçenekleri bayi tanımındaki taksit sınırına göre gösterilir." : "Bayiden tahsilatta o bayinin vade farkı profili uygulanır."}
+          >
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Alan id="bn-tutar" etiket="Tutar" hata={h("tutar")} ipucu={limit ? `İşlem bazlı ödeme limiti: ₺ ${limit.toLocaleString("tr-TR")}` : undefined}>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[13px] font-bold text-[var(--muted)]">₺</span>
+                  <input
+                    id="bn-tutar"
+                    inputMode="decimal"
+                    placeholder="0,00"
+                    value={tutarMetni}
+                    onChange={(e) => setTutarMetni(e.target.value.replace(/[^\d.,]/g, ""))}
+                    onBlur={() => gecerliTutar && setTutarMetni(tutar.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }))}
+                    aria-invalid={h("tutar") ? true : undefined}
+                    className={`${inputCls(h("tutar"))} pl-7 text-[15px] font-bold tabular-nums`}
+                  />
+                </div>
+              </Alan>
+              <Alan id="bn-aciklama" etiket="Açıklama (isteğe bağlı)">
+                <input id="bn-aciklama" value={aciklama} onChange={(e) => setAciklama(e.target.value)} placeholder="Örn. Eylül faturası" className={inputCls()} />
+              </Alan>
+            </div>
+
+            <div role="radiogroup" aria-label="Taksit" className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+              {taksitler.map((n) => {
+                const x = hesap(n);
+                const secik = secilenTaksit === n;
+                return (
+                  <button
+                    key={n}
+                    type="button"
+                    role="radio"
+                    aria-checked={secik}
+                    onClick={() => setTaksit(n)}
+                    className={`rounded-xl border px-3 py-2.5 text-left transition ${
+                      secik ? "border-[var(--brand)] bg-[var(--brand-soft)]" : "border-[var(--border-strong)] hover:border-[var(--brand)]"
+                    } ${FOCUS}`}
+                  >
+                    <span className={`block text-[12.5px] font-bold ${secik ? "text-[var(--brand-text)]" : "text-[var(--fg)]"}`}>
+                      {n === 1 ? "Tek Çekim" : `${n} Taksit`}
+                    </span>
+                    <span className="mt-0.5 block text-[11px] tabular-nums text-[var(--muted)]">
+                      {gecerliTutar ? (n === 1 ? tl2(x.toplam) : `${tl2(x.aylik)} / ay`) : "—"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </FormBolum>
+
+          {/* 3 — kart */}
+          <FormBolum no={3} i={2} baslik="Kart Bilgileri" aciklama="Bu bir mockup'tır; kart bilgisi hiçbir yere gönderilmez.">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <Alan
+                id="bn-kart-isim"
+                etiket="Kart üzerindeki isim"
+                hata={h("isim")}
+                ipucu={kendiKarti ? "Kendi kartında seçilen kişiden otomatik gelir, değiştirilemez." : undefined}
+                className="col-span-2"
+              >
+                <div className="relative">
+                  <input
+                    id="bn-kart-isim"
+                    value={kartIsmi}
+                    readOnly={kendiKarti}
+                    onChange={(e) => setKart({ ...kart, isim: e.target.value })}
+                    aria-invalid={h("isim") ? true : undefined}
+                    autoComplete="cc-name"
+                    className={`${inputCls(h("isim"))} ${kendiKarti ? "pr-9" : ""}`}
+                  />
+                  {kendiKarti && <I name="lock" size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" />}
+                </div>
+              </Alan>
+              <Alan id="bn-kart-no" etiket="Kart numarası" hata={h("no")} className="col-span-2">
+                <div className="relative">
+                  <I name="card" size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" />
+                  <input
+                    id="bn-kart-no"
+                    inputMode="numeric"
+                    placeholder="0000 0000 0000 0000"
+                    value={kart.no}
+                    onChange={(e) =>
+                      setKart({
+                        ...kart,
+                        no: rakamlar(e.target.value)
+                          .slice(0, 16)
+                          .replace(/(\d{4})(?=\d)/g, "$1 "),
+                      })
+                    }
+                    aria-invalid={h("no") ? true : undefined}
+                    autoComplete="cc-number"
+                    className={`${inputCls(h("no"))} pl-9 tabular-nums`}
+                  />
+                </div>
+              </Alan>
+              <Alan id="bn-skt" etiket="Son kullanma" hata={h("skt")}>
+                <input
+                  id="bn-skt"
+                  inputMode="numeric"
+                  placeholder="AA/YY"
+                  value={kart.skt}
+                  onChange={(e) => {
+                    const r = rakamlar(e.target.value).slice(0, 4);
+                    setKart({ ...kart, skt: r.length > 2 ? `${r.slice(0, 2)}/${r.slice(2)}` : r });
+                  }}
+                  aria-invalid={h("skt") ? true : undefined}
+                  autoComplete="cc-exp"
+                  className={`${inputCls(h("skt"))} tabular-nums`}
+                />
+              </Alan>
+              <Alan id="bn-cvv" etiket="Güvenlik kodu" hata={h("cvv")}>
+                <input
+                  id="bn-cvv"
+                  inputMode="numeric"
+                  placeholder="CVV"
+                  value={kart.cvv}
+                  onChange={(e) => setKart({ ...kart, cvv: rakamlar(e.target.value).slice(0, 3) })}
+                  aria-invalid={h("cvv") ? true : undefined}
+                  autoComplete="cc-csc"
+                  className={`${inputCls(h("cvv"))} tabular-nums`}
+                />
+              </Alan>
+            </div>
+          </FormBolum>
+        </div>
+
+        {/* özet + onay */}
+        <aside style={{ "--i": 3 }} className={`bn-rise p-4 sm:p-5 lg:sticky lg:top-[76px] ${CARD} hover:!translate-y-0`} aria-label="Ödeme özeti">
+          <h2 className="text-sm font-bold text-[var(--fg)]">Ödeme Özeti</h2>
+          <dl className="mt-3 space-y-2 text-[12.5px]">
+            {[
+              ["Müşteri", musteriAdi || "—"],
+              ["Müşteri türü", tur],
+              [TAHSILAT_CARISI[role], cariAdi ? cariAdi.ad : "—"],
+              ["Vade profili", profil ? `${profil.ad.replace("Vade Farkı ", "")} · %${profil.oran.toLocaleString("tr-TR")}` : "—"],
+            ].map(([k, v]) => (
+              <div key={k} className="flex justify-between gap-3">
+                <dt className="shrink-0 text-[var(--muted)]">{k}</dt>
+                <dd className="truncate text-right font-semibold text-[var(--fg)]">{v}</dd>
+              </div>
+            ))}
+          </dl>
+          <dl className="mt-3 space-y-2 border-t border-[var(--border)] pt-3 text-[12.5px]">
+            {[
+              ["Tutar", gecerliTutar ? tl2(tutar) : "—"],
+              ["Taksit", secilenTaksit === 1 ? "Tek çekim" : `${secilenTaksit} × ${gecerliTutar ? tl2(ozet.aylik) : "—"}`],
+              ["Vade farkı", gecerliTutar ? tl2(ozet.vade) : "—"],
+            ].map(([k, v]) => (
+              <div key={k} className="flex justify-between gap-3">
+                <dt className="text-[var(--muted)]">{k}</dt>
+                <dd className="text-right font-semibold tabular-nums text-[var(--fg)]">{v}</dd>
+              </div>
+            ))}
+          </dl>
+          <div className="mt-3 flex items-baseline justify-between gap-3 rounded-xl bg-[var(--brand-soft)] px-3 py-2.5">
+            <span className="text-[12px] font-semibold text-[var(--brand-text)]">Karttan çekilecek</span>
+            <span className="text-[18px] font-extrabold tabular-nums text-[var(--fg)]">{gecerliTutar ? tl2(ozet.toplam) : "—"}</span>
+          </div>
+
+          {!kendiKarti && (
+            <div className="mt-3">
+              <label className={`flex cursor-pointer items-start gap-2 rounded-xl border p-3 text-[12px] leading-snug ${h("beyan") ? "border-[var(--danger)]" : "border-[var(--border-strong)]"}`}>
+                <input
+                  type="checkbox"
+                  checked={beyan}
+                  onChange={(e) => setBeyan(e.target.checked)}
+                  aria-invalid={h("beyan") ? true : undefined}
+                  aria-describedby={h("beyan") ? "bn-beyan-hata" : undefined}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--brand)]"
+                />
+                <span className="text-[var(--fg-2)]">
+                  Kart müşteriye aittir. Kart sahibi ile aramızdaki faturayı <b className="font-bold">Fatura Yükleme</b> ekranından yükleyeceğimi beyan ederim.
+                </span>
+              </label>
+              {h("beyan") && (
+                <p id="bn-beyan-hata" className="mt-1 text-[11.5px] font-semibold text-[var(--danger-text)]">
+                  {h("beyan")}
+                </p>
+              )}
+            </div>
+          )}
+
+          {denendi && Object.keys(hatalar).length > 0 && (
+            <p role="alert" className="mt-3 rounded-xl bg-[var(--danger-soft)] px-3 py-2 text-[12px] font-semibold text-[var(--danger-text)]">
+              {Object.keys(hatalar).length} alanı kontrol edin.
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={durum === "isleniyor"}
+            className={`mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[var(--brand)] text-[13.5px] font-bold text-white transition [box-shadow:0_10px_22px_-12px_rgba(12,52,231,0.9)] hover:brightness-110 active:scale-[0.99] disabled:cursor-wait disabled:opacity-70 ${FOCUS}`}
+          >
+            {durum === "isleniyor" ? (
+              <>
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white motion-reduce:animate-none" aria-hidden="true" />
+                İşleniyor…
+              </>
+            ) : (
+              <>
+                <I name="lock" size={15} />
+                Ödemeyi Al
+              </>
+            )}
+          </button>
+        </aside>
+      </form>
+    </>
+  );
+}
+
 // Ana Sayfa: KPI blokları, haftalık hacim, bakiye, son işlemler.
-function Dashboard({ role, meta, onSeeAll }) {
+function Dashboard({ role, meta, onNavigate }) {
   const stats = kpis[role];
   const toplam = stats.find((s) => s.key === "toplam") || stats[0];
   const basarili = stats.find((s) => s.key === "basarili");
@@ -1369,6 +2110,7 @@ function Dashboard({ role, meta, onSeeAll }) {
           </button>
           <button
             type="button"
+            onClick={() => onNavigate("/odeme/manuel")}
             className={`inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--brand)] px-4 text-[12.5px] font-bold text-white transition [box-shadow:0_8px_18px_-10px_rgba(12,52,231,0.8)] active:scale-[0.97] hover:brightness-110 ${FOCUS}`}
           >
             <I name="plus" size={14} />
@@ -1400,9 +2142,9 @@ function Dashboard({ role, meta, onSeeAll }) {
       </div>
 
       <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <TransactionsCard role={role} onSeeAll={onSeeAll} />
+        <TransactionsCard role={role} onSeeAll={() => onNavigate("/raporlar/islem-detaylari")} />
         <div className="flex flex-col gap-3">
-          <QuickCard />
+          <QuickCard onNavigate={onNavigate} />
           <DistributionCard stats={stats} />
         </div>
       </div>
@@ -1552,8 +2294,10 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
         <main key={`${role}-${current}`} className="mx-auto w-full max-w-[1280px] flex-1 py-4">
           {current === "/raporlar/islem-detaylari" ? (
             <IslemDetaylari role={role} meta={meta} onHome={() => navigate(HOME)} />
+          ) : current === "/odeme/manuel" ? (
+            <ManuelOdeme role={role} meta={meta} onNavigate={navigate} />
           ) : (
-            <Dashboard role={role} meta={meta} onSeeAll={() => navigate("/raporlar/islem-detaylari")} />
+            <Dashboard role={role} meta={meta} onNavigate={navigate} />
           )}
         </main>
       </div>
