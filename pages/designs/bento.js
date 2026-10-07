@@ -7,7 +7,7 @@ import { useRole } from "@/components/RoleContext";
 import { ROLES, ROLE_META, ROLE_ORDER } from "@/lib/roles";
 import { getNav } from "@/lib/nav";
 import CompanyLogo from "@/components/CompanyLogo";
-import { kpis, islemler, bakiyeOzet, anaFirma } from "@/lib/mockData";
+import { kpis, islemler, bakiyeOzet, anaFirma, bayiler, altBayiler } from "@/lib/mockData";
 
 // N Kolay Bayim paneli — seçilen tasarım: Bento (Tasarım 03). Diğer tasarımlar arsiv/ klasöründe.
 // Lavanta zemin üzerinde yüzen yuvarlak paneller, renkli KPI blokları.
@@ -162,6 +162,25 @@ function pillTone(durum) {
   if (durum === "Başarılı") return "bg-[var(--success-soft)] text-[var(--success-text)]";
   if (durum === "Başarısız") return "bg-[var(--danger-soft)] text-[var(--danger-text)]";
   return "bg-[var(--warning-soft)] text-[var(--warning-text)]"; // İptal / İade
+}
+
+// Şartname (Rapor): ana firma tüm bayi / alt bayi işlemlerini, bayi kendisinin ve alt bayilerinin,
+// alt bayi yalnızca kendi işlemlerini görür. (Örnek veride alt bayiler Ankara Lastik Bayi'ye bağlıdır.)
+function rolIslemleri(role) {
+  const firma = ROLE_META[role].company;
+  if (role === ROLES.ANA_FIRMA) return islemler;
+  if (role === ROLES.BAYI) {
+    const altlar = new Set(altBayiler.map((a) => a.unvan));
+    return islemler.filter((t) => t.yapan === firma || altlar.has(t.yapan));
+  }
+  return islemler.filter((t) => t.yapan === firma);
+}
+
+// Çekimi yapan firmanın ağdaki yeri
+function firmaTuru(ad) {
+  if (ad === anaFirma.ad) return "Ana Firma";
+  if (bayiler.some((b) => b.unvan === ad)) return "Bayi";
+  return "Alt Bayi";
 }
 
 // "₺ 4.284.900" → 4284900
@@ -961,7 +980,7 @@ function BalanceCard({ role }) {
   );
 }
 
-function TransactionsCard({ onSeeAll }) {
+function TransactionsCard({ role, onSeeAll }) {
   return (
     <section style={{ "--i": 7 }} className={`bn-rise overflow-hidden lg:col-span-2 ${CARD} hover:!translate-y-0`} aria-labelledby="bn-tx-title">
       <div className="flex items-center justify-between gap-3 px-4 py-3">
@@ -993,7 +1012,7 @@ function TransactionsCard({ onSeeAll }) {
             </tr>
           </thead>
           <tbody>
-            {islemler.slice(0, 6).map((t, i) => (
+            {rolIslemleri(role).slice(0, 6).map((t, i) => (
               <tr key={t.id} className={`transition-colors hover:bg-[var(--soft)] ${i > 0 ? "border-t border-[var(--border)]" : ""}`}>
                 <td className="whitespace-nowrap px-4 py-2.5 font-bold text-[var(--brand-text)]">{t.id}</td>
                 <td className="whitespace-nowrap px-4 py-2.5">
@@ -1081,29 +1100,55 @@ function DistributionCard({ stats }) {
 // ---- Raporlar › İşlem Detayları ------------------------------------------------------------
 const DURUMLAR = ["Tümü", "Başarılı", "Başarısız", "İptal", "İade"];
 const TIPLER = ["Tümü", "Manuel", "Link"];
+const MUSTERI_TURLERI = ["Bayi", "Alt Bayi", "Düzenli Müşteri", "Düzensiz Müşteri", "Kendi Kartı"];
+const KAPSAM = {
+  [ROLES.ANA_FIRMA]: "Tüm bayi ve alt bayi işlemleri",
+  [ROLES.BAYI]: "Kendi ve alt bayi işlemleri",
+  [ROLES.ALT_BAYI]: "Kendi işlemleri",
+};
 
-function IslemDetaylari({ meta, onHome }) {
+function musteriTuruTone(tur) {
+  if (tur === "Bayi" || tur === "Alt Bayi") return "bg-[var(--brand-soft)] text-[var(--brand-text)]";
+  if (tur === "Kendi Kartı") return "bg-[var(--success-soft)] text-[var(--success-text)]";
+  if (tur === "Düzensiz Müşteri") return "bg-[var(--warning-soft)] text-[var(--warning-text)]";
+  return "bg-[var(--soft-2)] text-[var(--fg-2)]";
+}
+
+function IslemDetaylari({ role, meta, onHome }) {
   const [arama, setArama] = useState("");
   const [durum, setDurum] = useState("Tümü");
   const [tip, setTip] = useState("Tümü");
+  const [tur, setTur] = useState("Tümü");
+
+  const kaynak = rolIslemleri(role);
+  // alt bayi yalnızca kendi işlemlerini gördüğü için "çekim yapan" sütunu ona gösterilmez
+  const yapanGoster = role !== ROLES.ALT_BAYI;
+  const turler = MUSTERI_TURLERI.filter((m) => kaynak.some((t) => t.musteriTuru === m));
 
   const kucuk = (x) => x.toLocaleLowerCase("tr-TR");
   const aranan = kucuk(arama.trim());
-  // durum sekmelerindeki adetler arama ve tip filtresine göre güncellenir
-  const adaylar = islemler.filter(
-    (t) => (tip === "Tümü" || t.tip === tip) && (!aranan || [t.id, t.musteri, t.cari, t.kart].some((f) => kucuk(f).includes(aranan)))
+  // durum sekmelerindeki adetler diğer filtrelere göre güncellenir
+  const adaylar = kaynak.filter(
+    (t) =>
+      (tip === "Tümü" || t.tip === tip) &&
+      (tur === "Tümü" || t.musteriTuru === tur) &&
+      (!aranan || [t.id, t.musteri, t.cari, t.vergiNo, t.kart, t.yapan].some((f) => kucuk(f).includes(aranan)))
   );
   const satirlar = adaylar.filter((t) => durum === "Tümü" || t.durum === durum);
   const adet = (d) => (d === "Tümü" ? adaylar.length : adaylar.filter((t) => t.durum === d).length);
   const toplamTutar = satirlar.reduce((a, t) => a + parseAmount(t.tutar), 0);
   const basariliTutar = satirlar.filter((t) => t.durum === "Başarılı").reduce((a, t) => a + parseAmount(t.tutar), 0);
-  const filtreVar = arama !== "" || durum !== "Tümü" || tip !== "Tümü";
+  const filtreVar = arama !== "" || durum !== "Tümü" || tip !== "Tümü" || tur !== "Tümü";
   const temizle = () => {
     setArama("");
     setDurum("Tümü");
     setTip("Tümü");
+    setTur("Tümü");
   };
   const tl = (n) => `₺ ${n.toLocaleString("tr-TR")}`;
+  const selectCls = `h-9 rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-[12.5px] font-medium text-[var(--fg-2)] ${FOCUS}`;
+  const th = "whitespace-nowrap px-4 py-2";
+  const td = "whitespace-nowrap px-4 py-2.5";
 
   return (
     <>
@@ -1121,7 +1166,9 @@ function IslemDetaylari({ meta, onHome }) {
             </span>
           </nav>
           <h1 className="text-xl font-extrabold tracking-tight text-[var(--fg)]">İşlem Detayları</h1>
-          <p className="mt-0.5 text-[12.5px] text-[var(--muted)]">{meta.company} · Tüm ödeme işlemleri</p>
+          <p className="mt-0.5 text-[12.5px] text-[var(--muted)]">
+            {meta.company} · {KAPSAM[role]}
+          </p>
         </div>
         <button
           type="button"
@@ -1148,7 +1195,7 @@ function IslemDetaylari({ meta, onHome }) {
 
       <section style={{ "--i": 3 }} className={`bn-rise mt-3 overflow-hidden ${CARD} hover:!translate-y-0`} aria-label="İşlem listesi">
         {/* filtreler */}
-        <div className="flex flex-col gap-3 p-3 sm:p-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-3 p-3 sm:p-4 xl:flex-row xl:items-center xl:justify-between">
           <div role="group" aria-label="Durum" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-0.5">
             {DURUMLAR.map((d) => (
               <button
@@ -1171,8 +1218,8 @@ function IslemDetaylari({ meta, onHome }) {
               </button>
             ))}
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <label className="relative block sm:w-64">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <label className="relative block sm:w-60">
               <span className="sr-only">İşlem ara</span>
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]">
                 <I name="search" size={14} />
@@ -1181,16 +1228,19 @@ function IslemDetaylari({ meta, onHome }) {
                 type="search"
                 value={arama}
                 onChange={(e) => setArama(e.target.value)}
-                placeholder="İşlem no, müşteri, cari, kart"
+                placeholder="İşlem no, unvan, cari, vergi no"
                 className="h-9 w-full rounded-full border border-[var(--border-strong)] bg-[var(--surface)] pl-8 pr-3 text-[12.5px] text-[var(--fg)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--brand)]"
               />
             </label>
-            <select
-              aria-label="Ödeme tipi"
-              value={tip}
-              onChange={(e) => setTip(e.target.value)}
-              className={`h-9 rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-[12.5px] font-medium text-[var(--fg-2)] ${FOCUS}`}
-            >
+            <select aria-label="Müşteri türü" value={tur} onChange={(e) => setTur(e.target.value)} className={selectCls}>
+              <option value="Tümü">Tüm müşteri türleri</option>
+              {turler.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+            <select aria-label="Ödeme tipi" value={tip} onChange={(e) => setTip(e.target.value)} className={selectCls}>
               {TIPLER.map((t) => (
                 <option key={t} value={t}>
                   {t === "Tümü" ? "Tüm ödeme tipleri" : t === "Link" ? "Link ile ödeme" : "Manuel ödeme"}
@@ -1204,35 +1254,47 @@ function IslemDetaylari({ meta, onHome }) {
           <table className="min-w-full text-[12.5px]">
             <thead>
               <tr className="border-y border-[var(--border)] bg-[var(--soft)] text-left text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                <th scope="col" className="whitespace-nowrap px-4 py-2">İşlem No</th>
-                <th scope="col" className="whitespace-nowrap px-4 py-2">Tarih</th>
-                <th scope="col" className="whitespace-nowrap px-4 py-2">Müşteri</th>
-                <th scope="col" className="whitespace-nowrap px-4 py-2">Kart</th>
-                <th scope="col" className="whitespace-nowrap px-4 py-2">Tip</th>
-                <th scope="col" className="whitespace-nowrap px-4 py-2">Taksit</th>
-                <th scope="col" className="whitespace-nowrap px-4 py-2 text-right">Tutar</th>
-                <th scope="col" className="whitespace-nowrap px-4 py-2">Durum</th>
+                <th scope="col" className={th}>İşlem No</th>
+                <th scope="col" className={th}>Tarih</th>
+                {yapanGoster && <th scope="col" className={th}>Çekim Yapan</th>}
+                <th scope="col" className={th}>Müşteri Türü</th>
+                <th scope="col" className={th}>Unvan / Cari No</th>
+                <th scope="col" className={th}>Vergi No</th>
+                <th scope="col" className={th}>Ödeme</th>
+                <th scope="col" className={`${th} text-right`}>Tutar</th>
+                <th scope="col" className={th}>Durum</th>
               </tr>
             </thead>
             <tbody>
               {satirlar.map((t, i) => (
                 <tr key={t.id} className={`transition-colors hover:bg-[var(--soft)] ${i > 0 ? "border-t border-[var(--border)]" : ""}`}>
-                  <td className="whitespace-nowrap px-4 py-2.5 font-bold text-[var(--brand-text)]">{t.id}</td>
-                  <td className="whitespace-nowrap px-4 py-2.5 tabular-nums text-[var(--muted)]">{t.tarih}</td>
-                  <td className="whitespace-nowrap px-4 py-2.5">
+                  <td className={`${td} font-bold text-[var(--brand-text)]`}>{t.id}</td>
+                  <td className={`${td} tabular-nums text-[var(--muted)]`}>{t.tarih}</td>
+                  {yapanGoster && (
+                    <td className={td}>
+                      <span className="block font-semibold text-[var(--fg-2)]">{t.yapan}</span>
+                      <span className="block text-[11px] text-[var(--muted)]">{firmaTuru(t.yapan)}</span>
+                    </td>
+                  )}
+                  <td className={td}>
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${musteriTuruTone(t.musteriTuru)}`}>{t.musteriTuru}</span>
+                  </td>
+                  <td className={td}>
                     <span className="block font-semibold text-[var(--fg)]">{t.musteri}</span>
                     <span className="block text-[11px] tabular-nums text-[var(--muted)]">{t.cari}</span>
                   </td>
-                  <td className="whitespace-nowrap px-4 py-2.5 tabular-nums text-[var(--fg-2)]">{t.kart}</td>
-                  <td className="whitespace-nowrap px-4 py-2.5">
-                    <span className="inline-flex items-center gap-1 text-[var(--fg-2)]">
+                  <td className={`${td} tabular-nums text-[var(--fg-2)]`}>{t.vergiNo}</td>
+                  <td className={td}>
+                    <span className="flex items-center gap-1 tabular-nums text-[var(--fg-2)]">
                       <I name={t.tip === "Link" ? "link" : "wallet"} size={13} className="text-[var(--muted)]" />
-                      {t.tip}
+                      {t.kart}
+                    </span>
+                    <span className="block text-[11px] text-[var(--muted)]">
+                      {t.tip} · {t.taksit === "Tek Çekim" ? "Tek çekim" : `${t.taksit} taksit`}
                     </span>
                   </td>
-                  <td className="whitespace-nowrap px-4 py-2.5 text-[var(--fg-2)]">{t.taksit}</td>
-                  <td className="whitespace-nowrap px-4 py-2.5 text-right font-bold tabular-nums text-[var(--fg)]">{t.tutar}</td>
-                  <td className="whitespace-nowrap px-4 py-2.5">
+                  <td className={`${td} text-right font-bold tabular-nums text-[var(--fg)]`}>{t.tutar}</td>
+                  <td className={td}>
                     <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${pillTone(t.durum)}`}>{t.durum}</span>
                   </td>
                 </tr>
@@ -1254,7 +1316,7 @@ function IslemDetaylari({ meta, onHome }) {
 
         <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-2.5 text-[11.5px] text-[var(--muted)]">
           <span>
-            {islemler.length} işlemden <b className="font-bold text-[var(--fg-2)]">{satirlar.length}</b> tanesi gösteriliyor
+            {kaynak.length} işlemden <b className="font-bold text-[var(--fg-2)]">{satirlar.length}</b> tanesi gösteriliyor
           </span>
           {filtreVar && satirlar.length > 0 && (
             <button type="button" onClick={temizle} className={`rounded-full font-bold text-[var(--brand-text)] hover:underline ${FOCUS}`}>
@@ -1338,7 +1400,7 @@ function Dashboard({ role, meta, onSeeAll }) {
       </div>
 
       <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <TransactionsCard onSeeAll={onSeeAll} />
+        <TransactionsCard role={role} onSeeAll={onSeeAll} />
         <div className="flex flex-col gap-3">
           <QuickCard />
           <DistributionCard stats={stats} />
@@ -1489,7 +1551,7 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
         {/* key: rol ya da ekran değişince giriş animasyonları yeniden oynar */}
         <main key={`${role}-${current}`} className="mx-auto w-full max-w-[1280px] flex-1 py-4">
           {current === "/raporlar/islem-detaylari" ? (
-            <IslemDetaylari meta={meta} onHome={() => navigate(HOME)} />
+            <IslemDetaylari role={role} meta={meta} onHome={() => navigate(HOME)} />
           ) : (
             <Dashboard role={role} meta={meta} onSeeAll={() => navigate("/raporlar/islem-detaylari")} />
           )}
