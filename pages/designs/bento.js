@@ -115,9 +115,9 @@ const TREND = {
   iade: { txt: "%1,2", up: false, good: true },
 };
 
-// Renkli KPI blokları (toplam bloğu ayrı çizilir)
+// Renkli KPI blokları (başarılı bloğu büyük ve ayrı çizilir)
 const TILE = {
-  basarili: { wrap: "bg-[var(--success-soft)]", ink: "text-[var(--success-text)]", fill: "bg-[var(--success)]" },
+  toplam: { wrap: "border border-[var(--border)] bg-[var(--surface)]", ink: "text-[var(--brand-text)]", fill: "bg-[var(--brand)]", badge: "bg-[var(--soft-2)]" },
   basarisiz: { wrap: "bg-[var(--danger-soft)]", ink: "text-[var(--danger-text)]", fill: "bg-[var(--danger)]" },
   iptal: { wrap: "bg-[var(--warning-soft)]", ink: "text-[var(--warning-text)]", fill: "bg-[var(--warning)]" },
   iade: { wrap: "bg-[var(--brand-soft)]", ink: "text-[var(--brand-text)]", fill: "bg-[var(--chart-from)]" },
@@ -473,39 +473,58 @@ function UserMenu({ meta, isDark, onToggleTheme, onLogout }) {
 }
 
 // ---- pano blokları -----------------------------------------------------------------------
-function HeroTile({ s }) {
-  const tr = TREND.toplam;
+// Başarılı işlemler: bakışın ilk düştüğü, en büyük blok (masaüstünde 2×2).
+// Koyu yeşil zemin, beyaz yazıda okunurluğu korur (kontrast ≥ 4.5:1).
+function SuccessTile({ s, total }) {
+  const tr = TREND.basarili;
+  const rate = total ? (s.count / total) * 100 : 0;
+  const line = smoothPath(HERO_SERIES, 400, 80, 4);
   return (
     <div
       style={{ "--i": 0 }}
-      className="bn-rise relative overflow-hidden rounded-2xl bg-[#0C34E7] p-4 text-white transition-[transform,box-shadow] duration-200 [box-shadow:0_14px_30px_-16px_rgba(12,52,231,0.75)] hover:-translate-y-0.5 motion-reduce:transform-none col-span-2"
+      className="bn-rise relative col-span-2 flex flex-col overflow-hidden rounded-2xl bg-[linear-gradient(135deg,#078350,#04603A)] p-5 text-white transition-[transform,box-shadow] duration-200 [box-shadow:0_16px_34px_-16px_rgba(4,96,58,0.75)] hover:-translate-y-0.5 motion-reduce:transform-none lg:row-span-2 lg:p-6"
     >
-      <div className="pointer-events-none absolute -right-10 -top-14 h-40 w-40 rounded-full bg-[#D4D1FC] opacity-25 blur-2xl" aria-hidden="true" />
+      <div className="pointer-events-none absolute -right-12 -top-16 h-48 w-48 rounded-full bg-[#7CE3B1] opacity-25 blur-3xl" aria-hidden="true" />
       <div className="relative flex items-center justify-between gap-2">
-        <p className="flex items-center gap-2 text-[12.5px] font-semibold text-white/85">
-          <span className="grid h-6 w-6 place-items-center rounded-lg bg-white/15">
-            <I name="trendingUp" size={13} />
+        <p className="flex items-center gap-2 text-[13.5px] font-semibold">
+          <span className="grid h-7 w-7 place-items-center rounded-lg bg-white/15">
+            <I name="check" size={15} />
           </span>
-          {s.label}
+          {s.label} İşlemler
         </p>
-        <span className="rounded-full bg-white/15 px-2 py-0.5 text-[10.5px] font-bold">{s.count} adet</span>
+        <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-bold tabular-nums">{s.count.toLocaleString("tr-TR")} adet</span>
       </div>
-      <div className="relative mt-3 flex items-end justify-between gap-3">
-        <div>
-          <p className="text-[26px] font-extrabold leading-none tracking-tight tabular-nums">
-            <Money value={s.value} />
-          </p>
-          <p className="mt-2 flex items-center gap-1 text-[11.5px] text-white/75">
-            <span className="inline-flex items-center gap-0.5 font-bold text-white">
-              <TrendArrow up={tr.up} />
-              {tr.txt}
-            </span>
-            düne göre
-          </p>
+
+      <p className="relative mt-4 text-[32px] font-extrabold leading-none tracking-tight tabular-nums sm:text-[38px] lg:text-[44px]">
+        <Money value={s.value} />
+      </p>
+      <p className="relative mt-2 flex items-center gap-1 text-[12px] text-white/85">
+        <span className="inline-flex items-center gap-0.5 font-bold text-white">
+          <TrendArrow up={tr.up} />
+          {tr.txt}
+        </span>
+        düne göre
+      </p>
+
+      <svg viewBox="0 0 400 80" preserveAspectRatio="none" className="relative mt-4 h-14 w-full lg:mt-auto lg:h-20" fill="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="bn-success-area" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.28" />
+            <stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d={`${line} L 396 80 L 4 80 Z`} fill="url(#bn-success-area)" />
+        <path className="bn-draw" pathLength="1" d={line} stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+
+      <div className="relative mt-4">
+        <div className="flex items-baseline justify-between text-[12px]">
+          <span className="font-semibold text-white/85">Başarı oranı</span>
+          <span className="text-[15px] font-extrabold tabular-nums">%{rate.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}</span>
         </div>
-        <svg viewBox="0 0 120 40" className="h-10 w-[120px] shrink-0" fill="none" aria-hidden="true">
-          <path className="bn-draw" pathLength="1" d={smoothPath(HERO_SERIES, 120, 40, 4)} stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-white/20" aria-hidden="true">
+          <div className="bn-fill h-full rounded-full bg-white" style={{ width: `${rate}%` }} />
+        </div>
       </div>
     </div>
   );
@@ -522,7 +541,9 @@ function SoftTile({ s, index, total }) {
     >
       <div className="flex items-center justify-between gap-2">
         <p className={`text-[12.5px] font-semibold ${t.ink}`}>{s.label}</p>
-        <span className={`rounded-full bg-[var(--surface)] px-1.5 py-px text-[10.5px] font-bold tabular-nums ${t.ink}`}>{s.count} adet</span>
+        <span className={`shrink-0 whitespace-nowrap rounded-full px-1.5 py-px text-[10.5px] font-bold tabular-nums ${t.badge || "bg-[var(--surface)]"} ${t.ink}`}>
+          {s.count.toLocaleString("tr-TR")} adet
+        </span>
       </div>
       <p className="mt-2.5 text-[19px] font-extrabold leading-none tracking-tight tabular-nums text-[var(--fg)]">
         <Money value={s.value} />
@@ -777,7 +798,8 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
   const meta = ROLE_META[role];
   const stats = kpis[role];
   const toplam = stats.find((s) => s.key === "toplam") || stats[0];
-  const others = stats.filter((s) => s.key !== "toplam");
+  const basarili = stats.find((s) => s.key === "basarili");
+  const others = stats.filter((s) => s.key !== "basarili");
 
   useEffect(() => {
     try {
@@ -930,9 +952,9 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
             </div>
           </div>
 
-          {/* KPI bento blokları */}
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
-            <HeroTile s={toplam} />
+          {/* KPI bento blokları — başarılı büyük blok solda, diğer dördü sağda 2×2 */}
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <SuccessTile s={basarili} total={toplam.count} />
             {others.map((s, i) => (
               <SoftTile key={s.key} s={s} index={i + 1} total={toplam.count} />
             ))}
