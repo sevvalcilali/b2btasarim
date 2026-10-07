@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Head from "next/head";
 import { useRouter } from "next/router";
@@ -7,7 +7,7 @@ import { useRole } from "@/components/RoleContext";
 import { ROLES, ROLE_META, ROLE_ORDER } from "@/lib/roles";
 import { getNav } from "@/lib/nav";
 import CompanyLogo from "@/components/CompanyLogo";
-import { kpis, islemler, bakiyeOzet, anaFirma, bayiler, altBayiler, musteriler, vadeFarkiProfilleri, odemeLinkleri } from "@/lib/mockData";
+import { kpis, islemler, bakiyeOzet, anaFirma, bayiler, altBayiler, musteriler, vadeFarkiProfilleri, odemeLinkleri, iptalIadeTalepleri } from "@/lib/mockData";
 
 // N Kolay Bayim paneli — seçilen tasarım: Bento (Tasarım 03). Diğer tasarımlar arsiv/ klasöründe.
 // Lavanta zemin üzerinde yüzen yuvarlak paneller, renkli KPI blokları.
@@ -149,6 +149,8 @@ const HOME = "/dashboard";
 const SAYFALAR = {
   "manuel-odeme": "/odeme/manuel",
   "link-odeme": "/odeme/link",
+  "iptal-iade-onay": "/iptal-iade/onay",
+  "iptal-iade-takip": "/iptal-iade/takip",
   "islem-detaylari": "/raporlar/islem-detaylari",
 };
 const isReady = (href) => href === HOME || Object.values(SAYFALAR).includes(href);
@@ -283,9 +285,11 @@ function Logo({ onBrand, compact }) {
 }
 
 // ---- sol menü ----------------------------------------------------------------------------
-function NavGroup({ entry, open, onToggle, current, onNavigate }) {
+function NavGroup({ entry, open, onToggle, current, onNavigate, rozetler = {} }) {
   const id = `bn-grp-${entry.icon}`;
   const hasActive = entry.items.some((i) => i.href === current);
+  // bekleyen iş sayısı (ör. onay bekleyen iptal / iade); grup kapalıyken başlıkta toplamı görünür
+  const rozet = entry.items.reduce((a, i) => a + (rozetler[i.href] || 0), 0);
   return (
     <div>
       <button
@@ -299,6 +303,11 @@ function NavGroup({ entry, open, onToggle, current, onNavigate }) {
       >
         <I name={entry.icon} size={16} className={`transition-colors ${open || hasActive ? "" : "text-[var(--muted)] group-hover:text-[var(--brand-text)]"}`} />
         <span className="flex-1 text-left">{entry.label}</span>
+        {rozet > 0 && !open && (
+          <span className="rounded-full bg-[var(--danger)] px-1.5 text-[10.5px] font-bold tabular-nums text-white" aria-label={`${rozet} bekleyen`}>
+            {rozet}
+          </span>
+        )}
         <I
           name="chevronRight"
           size={13}
@@ -324,7 +333,12 @@ function NavGroup({ entry, open, onToggle, current, onNavigate }) {
                     i.href === current ? "bg-[var(--soft)] font-bold text-[var(--brand-text)]" : "font-medium text-[var(--muted)]"
                   } ${FOCUS}`}
                 >
-                  {i.label}
+                  <span className="flex-1">{i.label}</span>
+                  {rozetler[i.href] > 0 && (
+                    <span className="rounded-full bg-[var(--danger)] px-1.5 text-[10.5px] font-bold tabular-nums text-white" aria-label={`${rozetler[i.href]} bekleyen`}>
+                      {rozetler[i.href]}
+                    </span>
+                  )}
                 </button>
               </li>
             ))}
@@ -335,7 +349,7 @@ function NavGroup({ entry, open, onToggle, current, onNavigate }) {
   );
 }
 
-function NavSection({ label, entries, openGroup, setOpenGroup, current, onNavigate }) {
+function NavSection({ label, entries, openGroup, setOpenGroup, current, onNavigate, rozetler }) {
   if (entries.length === 0) return null;
   return (
     <div>
@@ -350,6 +364,7 @@ function NavSection({ label, entries, openGroup, setOpenGroup, current, onNaviga
               onToggle={() => setOpenGroup((g) => (g === entry.label ? null : entry.label))}
               current={current}
               onNavigate={onNavigate}
+              rozetler={rozetler}
             />
           ) : (
             <button
@@ -377,17 +392,13 @@ function NavSection({ label, entries, openGroup, setOpenGroup, current, onNaviga
   );
 }
 
-function Sidebar({ role, desktopOpen, mobileOpen, hidden, onClose, onLogout, current, onNavigate }) {
+function Sidebar({ role, desktopOpen, mobileOpen, hidden, onClose, onLogout, current, onNavigate, rozetler }) {
   const nav = getNav(role);
   const meta = ROLE_META[role];
   const main = nav.filter((e) => !MANAGE_ICONS.has(e.icon));
   const manage = nav.filter((e) => MANAGE_ICONS.has(e.icon));
-  // aynı anda tek grup açık kalır; açılan ekranın grubu kendiliğinden açılır
-  const [openGroup, setOpenGroup] = useState("Ödeme Al");
-  useEffect(() => {
-    const group = nav.find((e) => e.items?.some((i) => i.href === current));
-    if (group) setOpenGroup(group.label);
-  }, [current, role]);
+  // tüm gruplar kapalı başlar; aynı anda tek grup açık kalır. Açık ekranın grubu kapalıyken de başlığı vurgulanır.
+  const [openGroup, setOpenGroup] = useState(null);
 
   return (
     <>
@@ -429,8 +440,8 @@ function Sidebar({ role, desktopOpen, mobileOpen, hidden, onClose, onLogout, cur
         )}
 
         <nav className="flex-1 overflow-y-auto overscroll-contain px-3 pb-3 [scrollbar-color:transparent_transparent] [scrollbar-width:thin] hover:[scrollbar-color:var(--border-strong)_transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[var(--border-strong)] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:w-1.5">
-          <NavSection label="İşlemler" entries={main} openGroup={openGroup} setOpenGroup={setOpenGroup} current={current} onNavigate={onNavigate} />
-          <NavSection label="Yönetim" entries={manage} openGroup={openGroup} setOpenGroup={setOpenGroup} current={current} onNavigate={onNavigate} />
+          <NavSection label="İşlemler" entries={main} openGroup={openGroup} setOpenGroup={setOpenGroup} current={current} onNavigate={onNavigate} rozetler={rozetler} />
+          <NavSection label="Yönetim" entries={manage} openGroup={openGroup} setOpenGroup={setOpenGroup} current={current} onNavigate={onNavigate} rozetler={rozetler} />
         </nav>
 
         {/* kullanıcı */}
@@ -697,13 +708,13 @@ function ChartCard() {
       {type === "bar" ? <BarChart /> : <LineChart />}
 
       {expanded && (
-        <ChartModal onClose={close} subtitle={subtitle}>
+        <Pencere baslik="Haftalık İşlem Hacmi" altBaslik={subtitle} onClose={close}>
           <div className="flex flex-wrap items-center gap-2">
             <TrendBadge />
             <ChartTypeToggle type={type} onChange={choose} />
           </div>
           {type === "bar" ? <BarChart large /> : <LineChart large />}
-        </ChartModal>
+        </Pencere>
       )}
     </section>
   );
@@ -740,10 +751,11 @@ function ChartTypeToggle({ type, onChange }) {
   );
 }
 
-// Büyütülmüş grafik penceresi. Temanın renk değişkenleri için sayfanın kök öğesine (#bn-root) taşınır;
-// kart üzerine gelince oluşan transform, sabit konumlu pencereyi bozmasın diye de karttan dışarıda çizilir.
-function ChartModal({ onClose, subtitle, children }) {
+// Ortak pencere (modal): büyütülmüş grafik, iptal/iade talebi, red gerekçesi. Temanın renk değişkenleri için
+// sayfanın kök öğesine (#bn-root) taşınır; kart üzerine gelince oluşan transform da sabit konumu bozmaz.
+function Pencere({ baslik, altBaslik, onClose, genislik = "max-w-5xl", children }) {
   const closeRef = useRef(null);
+  const baslikId = `bn-pencere-${useId().replace(/:/g, "")}`;
 
   useEffect(() => {
     closeRef.current?.focus();
@@ -766,15 +778,15 @@ function ChartModal({ onClose, subtitle, children }) {
       <div
         role="dialog"
         aria-modal="true"
-        aria-labelledby="bn-chart-modal-title"
-        className="bn-pop relative w-full max-w-5xl rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 [box-shadow:var(--pop-shadow)] sm:p-6"
+        aria-labelledby={baslikId}
+        className={`bn-pop relative max-h-[calc(100vh-24px)] w-full overflow-y-auto rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 [box-shadow:var(--pop-shadow)] sm:p-6 ${genislik}`}
       >
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
-            <h2 id="bn-chart-modal-title" className="text-base font-bold text-[var(--fg)] sm:text-lg">
-              Haftalık İşlem Hacmi
+            <h2 id={baslikId} className="text-base font-bold text-[var(--fg)] sm:text-lg">
+              {baslik}
             </h2>
-            <p className="mt-0.5 text-xs text-[var(--muted)]">{subtitle}</p>
+            {altBaslik && <p className="mt-0.5 text-xs text-[var(--muted)]">{altBaslik}</p>}
           </div>
           <button
             ref={closeRef}
@@ -2588,6 +2600,470 @@ function LinkOdeme({ role, meta, onNavigate }) {
   );
 }
 
+// ---- İptal / İade › Onay · Takip ---------------------------------------------------------
+// Şartname s.8 (onay zinciri) ve s.7 (takip raporu: onayında olanlar, üst onaya iletilenler, onaylananlar,
+// reddedilenler; raporun yanında onay / red). Talepler panel düzeyinde tutulur: rol değiştirerek zincir izlenebilir.
+function talepTone(durum) {
+  if (durum === "Onaylandı") return "bg-[var(--success-soft)] text-[var(--success-text)]";
+  if (durum === "Reddedildi") return "bg-[var(--danger-soft)] text-[var(--danger-text)]";
+  if (durum === "Bayi Onayında") return "bg-[var(--warning-soft)] text-[var(--warning-text)]";
+  return "bg-[var(--brand-soft)] text-[var(--brand-text)]"; // Ana Firma Onayında
+}
+
+// Talep bu rolün onayını mı bekliyor?
+function onayimda(role, t) {
+  if (role === ROLES.ANA_FIRMA) return t.durum === "Ana Firma Onayında";
+  if (role === ROLES.BAYI) return t.durum === "Bayi Onayında" && altBayiler.some((a) => a.unvan === t.giren);
+  return false;
+}
+
+const TAKIP_SEKMELERI = {
+  [ROLES.ANA_FIRMA]: [
+    { ad: "Tümü", f: () => true },
+    { ad: "Onayımda", f: (t) => t.durum === "Ana Firma Onayında" },
+    { ad: "Onaylanan", f: (t) => t.durum === "Onaylandı" },
+    { ad: "Reddedilen", f: (t) => t.durum === "Reddedildi" },
+  ],
+  [ROLES.BAYI]: [
+    { ad: "Tümü", f: () => true },
+    { ad: "Onayımda", f: (t) => t.durum === "Bayi Onayında" },
+    { ad: "Üst onaya iletilen", f: (t) => t.durum === "Ana Firma Onayında" },
+    { ad: "Onaylanan", f: (t) => t.durum === "Onaylandı" },
+    { ad: "Reddedilen", f: (t) => t.durum === "Reddedildi" },
+  ],
+  [ROLES.ALT_BAYI]: [
+    { ad: "Tümü", f: () => true },
+    { ad: "Onay bekleyen", f: (t) => t.durum === "Bayi Onayında" || t.durum === "Ana Firma Onayında" },
+    { ad: "Onaylanan", f: (t) => t.durum === "Onaylandı" },
+    { ad: "Reddedilen", f: (t) => t.durum === "Reddedildi" },
+  ],
+};
+
+const TALEP_AKISI = {
+  [ROLES.ANA_FIRMA]: "Kendi işlemleriniz için girdiğiniz iptal / iade onay gerektirmeden sonuçlanır.",
+  [ROLES.BAYI]: "Talebiniz ana firma onayına düşer; sonuçlandığında e-posta ile bilgilendirilirsiniz.",
+  [ROLES.ALT_BAYI]: "Talebiniz önce bayinizin, ardından ana firmanın onayına düşer; onaylandığında e-posta ile bilgilendirilirsiniz.",
+};
+
+// Ekranın altında beliren kısa bilgi (toast)
+function Bildirim({ metin, onBitti }) {
+  useEffect(() => {
+    const z = setTimeout(onBitti, 3500);
+    return () => clearTimeout(z);
+  }, [metin, onBitti]);
+  const root = typeof document !== "undefined" ? document.getElementById("bn-root") : null;
+  if (!root) return null;
+  return createPortal(
+    <div role="status" className="bn-pop fixed inset-x-3 bottom-4 z-50 mx-auto flex max-w-md items-start gap-2.5 rounded-2xl bg-[var(--fg)] px-4 py-3 text-[12.5px] font-semibold text-[var(--bg)] [box-shadow:var(--pop-shadow)]">
+      <I name="check" size={16} className="mt-px shrink-0" />
+      {metin}
+    </div>,
+    root
+  );
+}
+
+function YeniTalep({ role, meta, talepler, onKaydet, onClose }) {
+  // talep girilebilecek işlemler: kendi çekimi, başarılı ve açık / onaylanmış talebi olmayan
+  const uygun = islemler.filter(
+    (t) => t.yapan === meta.company && t.durum === "Başarılı" && !talepler.some((x) => x.islemId === t.id && x.durum !== "Reddedildi")
+  );
+  const [islemId, setIslemId] = useState(uygun[0]?.id || "");
+  const [tur, setTur] = useState("İade");
+  const [tutarMetni, setTutarMetni] = useState("");
+  const [aciklama, setAciklama] = useState("");
+  const [denendi, setDenendi] = useState(false);
+  const islem = uygun.find((t) => t.id === islemId);
+  const islemTutari = islem ? parseAmount(islem.tutar) : 0;
+  const tutar = tur === "İptal" ? islemTutari : tutarCoz(tutarMetni);
+
+  const hatalar = {};
+  if (!islem) hatalar.islem = "İşlem seçin.";
+  if (tur === "İade" && !(tutar > 0 && tutar <= islemTutari)) hatalar.tutar = `0 ile ₺ ${islemTutari.toLocaleString("tr-TR")} arasında bir tutar girin.`;
+  if (!aciklama.trim()) hatalar.aciklama = "Açıklama girin.";
+  const h = (k) => (denendi ? hatalar[k] : undefined);
+
+  const kaydet = (e) => {
+    e.preventDefault();
+    setDenendi(true);
+    if (Object.keys(hatalar).length > 0) return;
+    onKaydet({ islem, tur, tutar, aciklama: aciklama.trim() });
+  };
+
+  return (
+    <Pencere baslik="Yeni İptal / İade Talebi" altBaslik={meta.company} onClose={onClose} genislik="max-w-lg">
+      {uygun.length === 0 ? (
+        <p className="rounded-xl bg-[var(--soft)] px-3 py-3 text-[12.5px] text-[var(--fg-2)]">Talep girilebilecek başarılı bir işleminiz yok.</p>
+      ) : (
+        <form noValidate onSubmit={kaydet} className="space-y-3">
+          <Alan id="bn-talep-islem" etiket="İşlem" hata={h("islem")}>
+            <select id="bn-talep-islem" value={islemId} onChange={(e) => setIslemId(e.target.value)} className={inputCls(h("islem"))}>
+              {uygun.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.id} · {t.musteri} · {t.tutar}
+                </option>
+              ))}
+            </select>
+          </Alan>
+          <div>
+            <p id="bn-talep-tur" className="mb-1 text-[12px] font-semibold text-[var(--fg-2)]">
+              Talep türü
+            </p>
+            <div role="radiogroup" aria-labelledby="bn-talep-tur" className="flex gap-1">
+              {["İade", "İptal"].map((x) => (
+                <button
+                  key={x}
+                  type="button"
+                  role="radio"
+                  aria-checked={tur === x}
+                  onClick={() => setTur(x)}
+                  className={`inline-flex h-9 items-center rounded-full px-4 text-[12.5px] transition ${
+                    tur === x ? "bg-[var(--brand)] font-bold text-white" : "bg-[var(--soft)] font-semibold text-[var(--fg-2)] hover:text-[var(--brand-text)]"
+                  } ${FOCUS}`}
+                >
+                  {x}
+                </button>
+              ))}
+            </div>
+          </div>
+          <Alan
+            id="bn-talep-tutar"
+            etiket={tur === "İptal" ? "Tutar (işlemin tamamı)" : "İade tutarı"}
+            hata={h("tutar")}
+            ipucu={tur === "İade" ? `Kısmi iade yapılabilir; işlem tutarı ₺ ${islemTutari.toLocaleString("tr-TR")}.` : "İptal, işlemin tamamı için yapılır."}
+          >
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[13px] font-bold text-[var(--muted)]">₺</span>
+              <input
+                id="bn-talep-tutar"
+                inputMode="decimal"
+                placeholder="0,00"
+                readOnly={tur === "İptal"}
+                value={tur === "İptal" ? islemTutari.toLocaleString("tr-TR") : tutarMetni}
+                onChange={(e) => setTutarMetni(e.target.value.replace(/[^\d.,]/g, ""))}
+                aria-invalid={h("tutar") ? true : undefined}
+                className={`${inputCls(h("tutar"))} pl-7 font-bold tabular-nums`}
+              />
+            </div>
+          </Alan>
+          <Alan id="bn-talep-aciklama" etiket="Açıklama" hata={h("aciklama")}>
+            <textarea
+              id="bn-talep-aciklama"
+              rows={2}
+              value={aciklama}
+              onChange={(e) => setAciklama(e.target.value)}
+              placeholder="Örn. Ürün iadesi"
+              aria-invalid={h("aciklama") ? true : undefined}
+              className={`${inputCls(h("aciklama"))} h-auto py-2`}
+            />
+          </Alan>
+          <p className="flex items-start gap-2 rounded-xl bg-[var(--soft)] px-3 py-2 text-[12px] text-[var(--fg-2)]">
+            <I name="info" size={14} className="mt-px shrink-0 text-[var(--brand-text)]" />
+            {TALEP_AKISI[role]}
+          </p>
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className={`inline-flex h-10 items-center rounded-full border border-[var(--border-strong)] px-4 text-[13px] font-semibold text-[var(--fg-2)] hover:border-[var(--brand)] ${FOCUS}`}
+            >
+              Vazgeç
+            </button>
+            <button type="submit" className={`inline-flex h-10 items-center rounded-full bg-[var(--brand)] px-5 text-[13px] font-bold text-white hover:brightness-110 ${FOCUS}`}>
+              {role === ROLES.ANA_FIRMA ? `${tur} Et` : "Talebi Gönder"}
+            </button>
+          </div>
+        </form>
+      )}
+    </Pencere>
+  );
+}
+
+function IptalIade({ role, meta, mod, talepler, setTalepler, onNavigate }) {
+  const onayModu = mod === "onay" && role !== ROLES.ALT_BAYI; // alt bayinin onay ekranı yoktur
+  const firma = meta.company;
+  const kapsam = talepler.filter((t) => kapsamda(role, t.giren));
+  const sekmeler = TAKIP_SEKMELERI[role];
+  const [sekme, setSekme] = useState(0);
+  const [acik, setAcik] = useState(null);
+  const [redTalep, setRedTalep] = useState(null);
+  const [gerekce, setGerekce] = useState("");
+  const [gerekceHata, setGerekceHata] = useState(false);
+  const [yeni, setYeni] = useState(false);
+  const [bildirim, setBildirim] = useState(null);
+  const bildirimBitti = useCallback(() => setBildirim(null), []);
+
+  const liste = onayModu ? kapsam.filter((t) => onayimda(role, t)) : kapsam.filter(sekmeler[sekme].f);
+  const girenGoster = role !== ROLES.ALT_BAYI;
+
+  const guncelle = (id, durum, olay) =>
+    setTalepler((l) => l.map((t) => (t.id === id ? { ...t, durum, gecmis: [...t.gecmis, { tarih: tarihSaat(new Date()), kim: firma, olay }] } : t)));
+
+  const onayla = (t) => {
+    if (role === ROLES.BAYI) {
+      guncelle(t.id, "Ana Firma Onayında", "Onayladı, ana firma onayına iletti");
+      setBildirim(`${t.id} onaylandı ve ana firma onayına iletildi.`);
+    } else {
+      guncelle(t.id, "Onaylandı", "Onayladı");
+      setBildirim(`${t.id} onaylandı. ${t.giren} e-posta ile bilgilendirildi.`);
+    }
+  };
+  const reddet = () => {
+    if (!gerekce.trim()) {
+      setGerekceHata(true);
+      return;
+    }
+    guncelle(redTalep.id, "Reddedildi", `Reddetti: ${gerekce.trim()}`);
+    setBildirim(`${redTalep.id} reddedildi. ${redTalep.giren} e-posta ile bilgilendirildi.`);
+    setRedTalep(null);
+  };
+  const talepKaydet = ({ islem, tur, tutar, aciklama }) => {
+    const no = Math.max(...talepler.map((t) => Number(t.id.slice(4)))) + 1;
+    const anaFirmaMi = role === ROLES.ANA_FIRMA;
+    const durum = anaFirmaMi ? "Onaylandı" : role === ROLES.BAYI ? "Ana Firma Onayında" : "Bayi Onayında";
+    const talep = {
+      id: `TLP-${no}`,
+      tarih: tarihSaat(new Date()),
+      islemId: islem.id,
+      giren: firma,
+      musteri: islem.musteri,
+      islemTutari: islem.tutar,
+      tutar: `₺ ${tutar.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}`,
+      tur,
+      aciklama,
+      durum,
+      gecmis: [{ tarih: tarihSaat(new Date()), kim: firma, olay: anaFirmaMi ? "Talep girildi — ana firma girişi, onay gerekmedi" : "Talep girildi" }],
+    };
+    setTalepler((l) => [talep, ...l]);
+    setYeni(false);
+    setSekme(0);
+    setBildirim(anaFirmaMi ? `${talep.id}: ${tur} işlemi tamamlandı.` : `${talep.id} ${durum === "Bayi Onayında" ? "bayi" : "ana firma"} onayına gönderildi.`);
+  };
+
+  const th = "whitespace-nowrap px-4 py-2";
+  const td = "whitespace-nowrap px-4 py-2.5 align-top";
+  const sutun = girenGoster ? 7 : 6;
+
+  return (
+    <>
+      <div className="bn-rise mb-4 flex flex-col gap-3 px-1 md:flex-row md:items-end md:justify-between">
+        <div>
+          <Konum onHome={() => onNavigate(HOME)} yol={["İptal / İade Takip", onayModu ? "Onay" : "Takip"]} />
+          <h1 className="text-xl font-extrabold tracking-tight text-[var(--fg)]">{onayModu ? "İptal / İade Onay" : "İptal / İade Takip"}</h1>
+          <p className="mt-0.5 text-[12.5px] text-[var(--muted)]">
+            {firma} · {onayModu ? "Onayınızda bekleyen talepler" : "Taleplerin onay durumu"}
+          </p>
+        </div>
+        {!onayModu && (
+          <button
+            type="button"
+            onClick={() => setYeni(true)}
+            className={`inline-flex h-9 items-center gap-1.5 self-start rounded-full bg-[var(--brand)] px-4 text-[12.5px] font-bold text-white transition [box-shadow:0_8px_18px_-10px_rgba(12,52,231,0.8)] hover:brightness-110 md:self-auto ${FOCUS}`}
+          >
+            <I name="plus" size={14} />
+            Yeni Talep
+          </button>
+        )}
+      </div>
+
+      {role !== ROLES.ALT_BAYI && (
+        <p className="bn-rise mb-3 flex items-start gap-2 rounded-2xl bg-[var(--brand-soft)] px-4 py-2.5 text-[12px] font-medium text-[var(--brand-text)]">
+          <I name="bell" size={14} className="mt-px shrink-0" />
+          {role === ROLES.BAYI
+            ? "Alt bayilerinizin talepleri önce sizin onayınıza düşer; onayladığınız talep ana firmaya iletilir. Kendi talepleriniz doğrudan ana firma onayına gider."
+            : "Bayi ve alt bayilerin talepleri onayınıza düşer; onayladığınızda talep sonuçlanır."}{" "}
+          Onayınıza talep düştüğünde e-posta ile bilgilendirilirsiniz.
+        </p>
+      )}
+
+      <section style={{ "--i": 1 }} className={`bn-rise overflow-hidden ${CARD} hover:!translate-y-0`} aria-label="İptal / iade talepleri">
+        {!onayModu && (
+          <div role="group" aria-label="Durum" className="flex gap-1 overflow-x-auto p-3 sm:p-4">
+            {sekmeler.map((s, i) => (
+              <button
+                key={s.ad}
+                type="button"
+                onClick={() => setSekme(i)}
+                aria-pressed={sekme === i}
+                className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[12px] transition ${
+                  sekme === i ? "bg-[var(--brand)] font-bold text-white" : "bg-[var(--soft)] font-semibold text-[var(--fg-2)] hover:text-[var(--brand-text)]"
+                } ${FOCUS}`}
+              >
+                {s.ad}
+                <span
+                  className={`rounded-full px-1.5 text-[10.5px] font-bold tabular-nums ${sekme === i ? "bg-white/20 text-white" : "bg-[var(--surface)] text-[var(--muted)]"}`}
+                >
+                  {kapsam.filter(s.f).length}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="relative overflow-x-auto">
+          <table className="min-w-full text-[12.5px]">
+            <thead>
+              <tr className="border-y border-[var(--border)] bg-[var(--soft)] text-left text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                <th scope="col" className={th}>Talep</th>
+                {girenGoster && <th scope="col" className={th}>Giren</th>}
+                <th scope="col" className={th}>İşlem / Müşteri</th>
+                <th scope="col" className={th}>Tür</th>
+                <th scope="col" className={`${th} text-right`}>Tutar</th>
+                <th scope="col" className={th}>Durum</th>
+                <th scope="col" className={th}>
+                  <span className="sr-only">İşlemler</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {liste.map((t, i) => {
+                const benim = onayimda(role, t);
+                const detay = acik === t.id;
+                return (
+                  <Fragment key={t.id}>
+                    <tr className={`transition-colors hover:bg-[var(--soft)] ${i > 0 ? "border-t border-[var(--border)]" : ""} ${benim ? "shadow-[inset_3px_0_0_var(--brand)]" : ""}`}>
+                      <td className={td}>
+                        <span className="block font-bold text-[var(--brand-text)]">{t.id}</span>
+                        <span className="block text-[11px] tabular-nums text-[var(--muted)]">{t.tarih}</span>
+                      </td>
+                      {girenGoster && (
+                        <td className={td}>
+                          <span className="block font-semibold text-[var(--fg-2)]">{t.giren}</span>
+                          <span className="block text-[11px] text-[var(--muted)]">{firmaTuru(t.giren)}</span>
+                        </td>
+                      )}
+                      <td className={td}>
+                        <span className="block font-semibold text-[var(--fg)]">{t.musteri}</span>
+                        <span className="block text-[11px] tabular-nums text-[var(--muted)]">{t.islemId}</span>
+                      </td>
+                      <td className={`${td} font-semibold text-[var(--fg-2)]`}>{t.tur}</td>
+                      <td className={`${td} text-right`}>
+                        <span className="block font-bold tabular-nums text-[var(--fg)]">{t.tutar}</span>
+                        <span className="block text-[11px] tabular-nums text-[var(--muted)]">işlem {t.islemTutari}</span>
+                      </td>
+                      <td className={td}>
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${talepTone(t.durum)}`}>{t.durum}</span>
+                      </td>
+                      <td className={`${td} text-right`}>
+                        <div className="flex items-center justify-end gap-1.5">
+                          {benim && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => onayla(t)}
+                                className={`inline-flex h-8 items-center gap-1 rounded-full bg-[var(--success)] px-3 text-[12px] font-bold text-white transition hover:brightness-110 ${FOCUS}`}
+                              >
+                                <I name="check" size={13} strokeWidth={2.4} />
+                                {role === ROLES.BAYI ? "Onayla ve İlet" : "Onayla"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setRedTalep(t);
+                                  setGerekce("");
+                                  setGerekceHata(false);
+                                }}
+                                className={`inline-flex h-8 items-center rounded-full border border-[var(--danger)] px-3 text-[12px] font-bold text-[var(--danger-text)] transition hover:bg-[var(--danger-soft)] ${FOCUS}`}
+                              >
+                                Reddet
+                              </button>
+                            </>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setAcik(detay ? null : t.id)}
+                            aria-expanded={detay}
+                            aria-controls={`bn-detay-${t.id}`}
+                            aria-label={`${t.id} detayı`}
+                            title="Detay ve geçmiş"
+                            className={`grid h-8 w-8 place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--soft-2)] hover:text-[var(--brand-text)] ${FOCUS}`}
+                          >
+                            <I name="chevronDown" size={15} className={`transition-transform duration-200 ${detay ? "rotate-180" : ""}`} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {detay && (
+                      <tr id={`bn-detay-${t.id}`} className="bg-[var(--soft)]">
+                        <td colSpan={sutun} className="px-4 py-3">
+                          <div className="grid gap-3 text-[12px] sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+                            <div>
+                              <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">Açıklama</p>
+                              <p className="mt-1 text-[var(--fg)]">{t.aciklama}</p>
+                            </div>
+                            <div>
+                              <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">Geçmiş</p>
+                              <ol className="mt-1.5 space-y-1.5 border-l-2 border-[var(--border-strong)] pl-3">
+                                {t.gecmis.map((g, j) => (
+                                  <li key={j} className="relative">
+                                    <span className="absolute -left-[17px] top-1.5 h-2 w-2 rounded-full bg-[var(--brand)] ring-2 ring-[var(--soft)]" aria-hidden="true" />
+                                    <span className="font-semibold text-[var(--fg)]">{g.kim}</span> <span className="text-[var(--fg-2)]">— {g.olay}</span>
+                                    <span className="block text-[11px] tabular-nums text-[var(--muted)]">{g.tarih}</span>
+                                  </li>
+                                ))}
+                              </ol>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+          {liste.length === 0 && (
+            <div className="flex flex-col items-center gap-2 px-4 py-12 text-center">
+              <span className="grid h-10 w-10 place-items-center rounded-full bg-[var(--success-soft)] text-[var(--success-text)]">
+                <I name="check" size={18} />
+              </span>
+              <p className="text-[13px] font-bold text-[var(--fg)]">{onayModu ? "Onayınızda bekleyen talep yok" : "Bu durumda talep yok"}</p>
+              {onayModu && (
+                <button
+                  type="button"
+                  onClick={() => onNavigate("/iptal-iade/takip")}
+                  className={`rounded-full text-[12.5px] font-bold text-[var(--brand-text)] hover:underline ${FOCUS}`}
+                >
+                  Tüm talepleri gör
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {redTalep && (
+        <Pencere baslik={`${redTalep.id} talebini reddet`} altBaslik={`${redTalep.giren} · ${redTalep.tur} · ${redTalep.tutar}`} onClose={() => setRedTalep(null)} genislik="max-w-md">
+          <Alan id="bn-gerekce" etiket="Red gerekçesi" hata={gerekceHata && !gerekce.trim() ? "Gerekçe girin; talebi girene e-posta ile iletilir." : undefined}>
+            <textarea
+              id="bn-gerekce"
+              rows={3}
+              value={gerekce}
+              onChange={(e) => setGerekce(e.target.value)}
+              aria-invalid={gerekceHata && !gerekce.trim() ? true : undefined}
+              className={`${inputCls(gerekceHata && !gerekce.trim())} h-auto py-2`}
+            />
+          </Alan>
+          <div className="mt-4 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setRedTalep(null)}
+              className={`inline-flex h-10 items-center rounded-full border border-[var(--border-strong)] px-4 text-[13px] font-semibold text-[var(--fg-2)] hover:border-[var(--brand)] ${FOCUS}`}
+            >
+              Vazgeç
+            </button>
+            <button type="button" onClick={reddet} className={`inline-flex h-10 items-center rounded-full bg-[var(--danger)] px-5 text-[13px] font-bold text-white hover:brightness-110 ${FOCUS}`}>
+              Reddet
+            </button>
+          </div>
+        </Pencere>
+      )}
+
+      {yeni && <YeniTalep role={role} meta={meta} talepler={talepler} onKaydet={talepKaydet} onClose={() => setYeni(false)} />}
+      {bildirim && <Bildirim metin={bildirim} onBitti={bildirimBitti} />}
+    </>
+  );
+}
+
 // Ana Sayfa: KPI blokları, haftalık hacim, bakiye, son işlemler.
 function Dashboard({ role, meta, onNavigate }) {
   const stats = kpis[role];
@@ -2676,6 +3152,10 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
   const [isDesktop, setIsDesktop] = useState(true);
   const meta = ROLE_META[role];
 
+  // iptal / iade talepleri panel düzeyinde: rol değiştirerek onay zinciri uçtan uca izlenebilir
+  const [talepler, setTalepler] = useState(iptalIadeTalepleri);
+  const bekleyenOnay = talepler.filter((t) => kapsamda(role, t.giren) && onayimda(role, t)).length;
+
   // açık ekran adres çubuğunda (?sayfa=) tutulur: yenileme ve geri tuşu çalışır
   const router = useRouter();
   const slug = typeof router.query.sayfa === "string" ? router.query.sayfa : null;
@@ -2724,6 +3204,7 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
         onLogout={onLogout}
         current={current}
         onNavigate={navigate}
+        rozetler={{ "/iptal-iade/onay": bekleyenOnay }}
       />
 
       <div className="flex min-w-0 flex-1 flex-col px-3 lg:px-4">
@@ -2816,6 +3297,15 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
             <ManuelOdeme role={role} meta={meta} onNavigate={navigate} />
           ) : current === "/odeme/link" ? (
             <LinkOdeme role={role} meta={meta} onNavigate={navigate} />
+          ) : current === "/iptal-iade/onay" || current === "/iptal-iade/takip" ? (
+            <IptalIade
+              role={role}
+              meta={meta}
+              mod={current === "/iptal-iade/onay" ? "onay" : "takip"}
+              talepler={talepler}
+              setTalepler={setTalepler}
+              onNavigate={navigate}
+            />
           ) : (
             <Dashboard role={role} meta={meta} onNavigate={navigate} />
           )}
