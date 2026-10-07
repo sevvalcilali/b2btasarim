@@ -1,2 +1,2 @@
-// Ana adres doğrudan tasarım galerisini gösterir (/designs ile aynı sayfa).
-export { default } from "./designs/index";
+// Ana adres seçilen tasarımı (Bento) açar; /designs/bento ile aynı sayfa.
+export { default } from "./designs/bento";

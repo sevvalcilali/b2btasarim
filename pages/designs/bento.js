@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import Head from "next/head";
-import Link from "next/link";
 import I from "@/components/DesignIcons";
 import { useRole } from "@/components/RoleContext";
 import { ROLES, ROLE_META, ROLE_ORDER } from "@/lib/roles";
@@ -8,7 +7,8 @@ import { getNav } from "@/lib/nav";
 import CompanyLogo from "@/components/CompanyLogo";
 import { kpis, islemler, bakiyeOzet, anaFirma } from "@/lib/mockData";
 
-// Tasarım 03 — Bento: lavanta zemin üzerinde yüzen yuvarlak paneller, renkli KPI blokları.
+// N Kolay Bayim paneli — seçilen tasarım: Bento (Tasarım 03). Diğer tasarımlar arsiv/ klasöründe.
+// Lavanta zemin üzerinde yüzen yuvarlak paneller, renkli KPI blokları.
 // Açılır kapanır sol menü, ince yüzen üst bar, giriş animasyonları, açık / koyu mod.
 
 const light = {
@@ -824,9 +824,6 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
             >
               <I name="panel" size={16} />
             </button>
-            <Link href="/designs" aria-label="Tasarımlara dön" title="Tasarımlara dön" className={GHOST}>
-              <I name="arrowLeft" size={16} />
-            </Link>
 
             {/* menü kapalıyken marka üst barda görünür */}
             <div
@@ -965,9 +962,6 @@ function LoginView({ isDark, onToggleTheme, onLogin }) {
   return (
     <div className="relative flex flex-1 items-center justify-center px-4 py-16 sm:px-6">
       {/* küçük kontroller */}
-      <Link href="/designs" aria-label="Tasarımlara dön" title="Tasarımlara dön" className={`${GHOST} absolute left-4 top-4 bg-[var(--surface)]`}>
-        <I name="arrowLeft" size={16} />
-      </Link>
       <button
         type="button"
         onClick={onToggleTheme}
@@ -1089,7 +1083,7 @@ export default function BentoDesign() {
   return (
     <>
       <Head>
-        <title>Tasarım 03 · Bento — N Kolay Bayim</title>
+        <title>N Kolay Bayim</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
       <style dangerouslySetInnerHTML={{ __html: MOTION_CSS }} />
