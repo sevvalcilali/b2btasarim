@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Head from "next/head";
+import { useRouter } from "next/router";
 import I from "@/components/DesignIcons";
 import { useRole } from "@/components/RoleContext";
 import { ROLES, ROLE_META, ROLE_ORDER } from "@/lib/roles";
@@ -142,6 +143,14 @@ const QUICK = [
 // Menüde "Yönetim" bölümüne giren öğeler
 const MANAGE_ICONS = new Set(["dealer", "settings", "megaphone"]);
 
+// Hazır ekranlar: ?sayfa=<anahtar> → menüdeki href. Ana Sayfa (/dashboard) parametresizdir.
+// Burada olmayan menü öğeleri henüz bir ekrana gitmez.
+const HOME = "/dashboard";
+const SAYFALAR = {
+  "islem-detaylari": "/raporlar/islem-detaylari",
+};
+const isReady = (href) => href === HOME || Object.values(SAYFALAR).includes(href);
+
 const CARD =
   "rounded-2xl border border-[var(--border)] bg-[var(--surface)] [box-shadow:var(--shadow)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:[box-shadow:var(--shadow-hover)] motion-reduce:transform-none";
 const FOCUS =
@@ -252,8 +261,9 @@ function Logo({ onBrand, compact }) {
 }
 
 // ---- sol menü ----------------------------------------------------------------------------
-function NavGroup({ entry, open, onToggle }) {
+function NavGroup({ entry, open, onToggle, current, onNavigate }) {
   const id = `bn-grp-${entry.icon}`;
+  const hasActive = entry.items.some((i) => i.href === current);
   return (
     <div>
       <button
@@ -262,10 +272,10 @@ function NavGroup({ entry, open, onToggle }) {
         aria-expanded={open}
         aria-controls={id}
         className={`group flex h-9 w-full items-center gap-2.5 rounded-xl px-2.5 text-[13px] font-semibold transition-colors hover:bg-[var(--soft)] ${
-          open ? "text-[var(--brand-text)]" : "text-[var(--fg-2)]"
+          open || hasActive ? "text-[var(--brand-text)]" : "text-[var(--fg-2)]"
         } ${FOCUS}`}
       >
-        <I name={entry.icon} size={16} className={`transition-colors ${open ? "" : "text-[var(--muted)] group-hover:text-[var(--brand-text)]"}`} />
+        <I name={entry.icon} size={16} className={`transition-colors ${open || hasActive ? "" : "text-[var(--muted)] group-hover:text-[var(--brand-text)]"}`} />
         <span className="flex-1 text-left">{entry.label}</span>
         <I
           name="chevronRight"
@@ -286,7 +296,11 @@ function NavGroup({ entry, open, onToggle }) {
                 <button
                   type="button"
                   tabIndex={open ? 0 : -1}
-                  className={`flex h-8 w-full items-center rounded-lg px-2.5 text-left text-[12.5px] font-medium text-[var(--muted)] transition-colors hover:bg-[var(--soft)] hover:text-[var(--brand-text)] ${FOCUS}`}
+                  onClick={isReady(i.href) ? () => onNavigate(i.href) : undefined}
+                  aria-current={i.href === current ? "page" : undefined}
+                  className={`flex h-8 w-full items-center rounded-lg px-2.5 text-left text-[12.5px] transition-colors hover:bg-[var(--soft)] hover:text-[var(--brand-text)] ${
+                    i.href === current ? "bg-[var(--soft)] font-bold text-[var(--brand-text)]" : "font-medium text-[var(--muted)]"
+                  } ${FOCUS}`}
                 >
                   {i.label}
                 </button>
@@ -299,7 +313,7 @@ function NavGroup({ entry, open, onToggle }) {
   );
 }
 
-function NavSection({ label, entries, openGroup, setOpenGroup }) {
+function NavSection({ label, entries, openGroup, setOpenGroup, current, onNavigate }) {
   if (entries.length === 0) return null;
   return (
     <div>
@@ -312,14 +326,17 @@ function NavSection({ label, entries, openGroup, setOpenGroup }) {
               entry={entry}
               open={openGroup === entry.label}
               onToggle={() => setOpenGroup((g) => (g === entry.label ? null : entry.label))}
+              current={current}
+              onNavigate={onNavigate}
             />
           ) : (
             <button
               key={entry.label}
               type="button"
-              aria-current={entry.href === "/dashboard" ? "page" : undefined}
+              onClick={isReady(entry.href) ? () => onNavigate(entry.href) : undefined}
+              aria-current={entry.href === current ? "page" : undefined}
               className={`group flex h-9 w-full items-center gap-2.5 rounded-xl px-2.5 text-[13px] font-semibold transition-colors ${
-                entry.href === "/dashboard"
+                entry.href === current
                   ? "bg-[var(--brand)] text-white shadow-[0_8px_16px_-8px_rgba(12,52,231,0.75)]"
                   : "text-[var(--fg-2)] hover:bg-[var(--soft)]"
               } ${FOCUS}`}
@@ -327,7 +344,7 @@ function NavSection({ label, entries, openGroup, setOpenGroup }) {
               <I
                 name={entry.icon}
                 size={16}
-                className={entry.href === "/dashboard" ? "" : "text-[var(--muted)] transition-colors group-hover:text-[var(--brand-text)]"}
+                className={entry.href === current ? "" : "text-[var(--muted)] transition-colors group-hover:text-[var(--brand-text)]"}
               />
               <span>{entry.label}</span>
             </button>
@@ -338,13 +355,17 @@ function NavSection({ label, entries, openGroup, setOpenGroup }) {
   );
 }
 
-function Sidebar({ role, desktopOpen, mobileOpen, hidden, onClose, onLogout }) {
+function Sidebar({ role, desktopOpen, mobileOpen, hidden, onClose, onLogout, current, onNavigate }) {
   const nav = getNav(role);
   const meta = ROLE_META[role];
   const main = nav.filter((e) => !MANAGE_ICONS.has(e.icon));
   const manage = nav.filter((e) => MANAGE_ICONS.has(e.icon));
-  // aynı anda tek grup açık kalır
+  // aynı anda tek grup açık kalır; açılan ekranın grubu kendiliğinden açılır
   const [openGroup, setOpenGroup] = useState("Ödeme Al");
+  useEffect(() => {
+    const group = nav.find((e) => e.items?.some((i) => i.href === current));
+    if (group) setOpenGroup(group.label);
+  }, [current, role]);
 
   return (
     <>
@@ -386,8 +407,8 @@ function Sidebar({ role, desktopOpen, mobileOpen, hidden, onClose, onLogout }) {
         )}
 
         <nav className="flex-1 overflow-y-auto overscroll-contain px-3 pb-3 [scrollbar-color:transparent_transparent] [scrollbar-width:thin] hover:[scrollbar-color:var(--border-strong)_transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[var(--border-strong)] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:w-1.5">
-          <NavSection label="İşlemler" entries={main} openGroup={openGroup} setOpenGroup={setOpenGroup} />
-          <NavSection label="Yönetim" entries={manage} openGroup={openGroup} setOpenGroup={setOpenGroup} />
+          <NavSection label="İşlemler" entries={main} openGroup={openGroup} setOpenGroup={setOpenGroup} current={current} onNavigate={onNavigate} />
+          <NavSection label="Yönetim" entries={manage} openGroup={openGroup} setOpenGroup={setOpenGroup} current={current} onNavigate={onNavigate} />
         </nav>
 
         {/* kullanıcı */}
@@ -940,7 +961,7 @@ function BalanceCard({ role }) {
   );
 }
 
-function TransactionsCard() {
+function TransactionsCard({ onSeeAll }) {
   return (
     <section style={{ "--i": 7 }} className={`bn-rise overflow-hidden lg:col-span-2 ${CARD} hover:!translate-y-0`} aria-labelledby="bn-tx-title">
       <div className="flex items-center justify-between gap-3 px-4 py-3">
@@ -952,6 +973,7 @@ function TransactionsCard() {
         </div>
         <button
           type="button"
+          onClick={onSeeAll}
           className={`group inline-flex h-8 items-center gap-1 rounded-full bg-[var(--soft)] px-3 text-xs font-bold text-[var(--brand-text)] transition-colors hover:bg-[var(--soft-2)] ${FOCUS}`}
         >
           Tümünü Gör
@@ -1056,17 +1078,292 @@ function DistributionCard({ stats }) {
   );
 }
 
-function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
-  const [desktopOpen, setDesktopOpen] = useState(true);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [isDesktop, setIsDesktop] = useState(true);
-  const meta = ROLE_META[role];
+// ---- Raporlar › İşlem Detayları ------------------------------------------------------------
+const DURUMLAR = ["Tümü", "Başarılı", "Başarısız", "İptal", "İade"];
+const TIPLER = ["Tümü", "Manuel", "Link"];
+
+function IslemDetaylari({ meta, onHome }) {
+  const [arama, setArama] = useState("");
+  const [durum, setDurum] = useState("Tümü");
+  const [tip, setTip] = useState("Tümü");
+
+  const kucuk = (x) => x.toLocaleLowerCase("tr-TR");
+  const aranan = kucuk(arama.trim());
+  // durum sekmelerindeki adetler arama ve tip filtresine göre güncellenir
+  const adaylar = islemler.filter(
+    (t) => (tip === "Tümü" || t.tip === tip) && (!aranan || [t.id, t.musteri, t.cari, t.kart].some((f) => kucuk(f).includes(aranan)))
+  );
+  const satirlar = adaylar.filter((t) => durum === "Tümü" || t.durum === durum);
+  const adet = (d) => (d === "Tümü" ? adaylar.length : adaylar.filter((t) => t.durum === d).length);
+  const toplamTutar = satirlar.reduce((a, t) => a + parseAmount(t.tutar), 0);
+  const basariliTutar = satirlar.filter((t) => t.durum === "Başarılı").reduce((a, t) => a + parseAmount(t.tutar), 0);
+  const filtreVar = arama !== "" || durum !== "Tümü" || tip !== "Tümü";
+  const temizle = () => {
+    setArama("");
+    setDurum("Tümü");
+    setTip("Tümü");
+  };
+  const tl = (n) => `₺ ${n.toLocaleString("tr-TR")}`;
+
+  return (
+    <>
+      <div className="bn-rise mb-4 flex flex-col gap-3 px-1 md:flex-row md:items-end md:justify-between">
+        <div>
+          <nav aria-label="Konum" className="mb-1 flex items-center gap-1 text-[11.5px] font-medium text-[var(--muted)]">
+            <button type="button" onClick={onHome} className={`rounded hover:text-[var(--brand-text)] ${FOCUS}`}>
+              Ana Sayfa
+            </button>
+            <I name="chevronRight" size={11} />
+            <span>Raporlar</span>
+            <I name="chevronRight" size={11} />
+            <span aria-current="page" className="font-semibold text-[var(--fg-2)]">
+              İşlem Detayları
+            </span>
+          </nav>
+          <h1 className="text-xl font-extrabold tracking-tight text-[var(--fg)]">İşlem Detayları</h1>
+          <p className="mt-0.5 text-[12.5px] text-[var(--muted)]">{meta.company} · Tüm ödeme işlemleri</p>
+        </div>
+        <button
+          type="button"
+          className={`inline-flex h-9 items-center gap-1.5 self-start rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 text-[12.5px] font-semibold text-[var(--fg-2)] transition active:scale-[0.97] hover:border-[var(--brand)] hover:text-[var(--brand-text)] md:self-auto ${FOCUS}`}
+        >
+          <I name="download" size={14} />
+          Dışa Aktar
+        </button>
+      </div>
+
+      {/* filtrelenen işlemlerin özeti */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: "İşlem", value: satirlar.length.toLocaleString("tr-TR"), ink: "text-[var(--brand-text)]", wrap: "bg-[var(--brand-soft)]" },
+          { label: "Toplam tutar", value: tl(toplamTutar), ink: "text-[var(--brand-text)]", wrap: "border border-[var(--border)] bg-[var(--surface)]" },
+          { label: "Başarılı tutar", value: tl(basariliTutar), ink: "text-[var(--success-text)]", wrap: "bg-[var(--success-soft)]" },
+        ].map((k, i) => (
+          <div key={k.label} style={{ "--i": i }} className={`bn-rise rounded-2xl p-3 sm:p-4 ${k.wrap}`}>
+            <p className={`text-[11.5px] font-semibold sm:text-[12.5px] ${k.ink}`}>{k.label}</p>
+            <p className="mt-1.5 text-[15px] font-extrabold leading-none tracking-tight tabular-nums text-[var(--fg)] sm:text-[19px]">{k.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <section style={{ "--i": 3 }} className={`bn-rise mt-3 overflow-hidden ${CARD} hover:!translate-y-0`} aria-label="İşlem listesi">
+        {/* filtreler */}
+        <div className="flex flex-col gap-3 p-3 sm:p-4 lg:flex-row lg:items-center lg:justify-between">
+          <div role="group" aria-label="Durum" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-0.5">
+            {DURUMLAR.map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setDurum(d)}
+                aria-pressed={durum === d}
+                className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[12px] transition ${
+                  durum === d ? "bg-[var(--brand)] font-bold text-white" : "bg-[var(--soft)] font-semibold text-[var(--fg-2)] hover:text-[var(--brand-text)]"
+                } ${FOCUS}`}
+              >
+                {d}
+                <span
+                  className={`rounded-full px-1.5 text-[10.5px] font-bold tabular-nums ${
+                    durum === d ? "bg-white/20 text-white" : "bg-[var(--surface)] text-[var(--muted)]"
+                  }`}
+                >
+                  {adet(d)}
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <label className="relative block sm:w-64">
+              <span className="sr-only">İşlem ara</span>
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]">
+                <I name="search" size={14} />
+              </span>
+              <input
+                type="search"
+                value={arama}
+                onChange={(e) => setArama(e.target.value)}
+                placeholder="İşlem no, müşteri, cari, kart"
+                className="h-9 w-full rounded-full border border-[var(--border-strong)] bg-[var(--surface)] pl-8 pr-3 text-[12.5px] text-[var(--fg)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--brand)]"
+              />
+            </label>
+            <select
+              aria-label="Ödeme tipi"
+              value={tip}
+              onChange={(e) => setTip(e.target.value)}
+              className={`h-9 rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-[12.5px] font-medium text-[var(--fg-2)] ${FOCUS}`}
+            >
+              {TIPLER.map((t) => (
+                <option key={t} value={t}>
+                  {t === "Tümü" ? "Tüm ödeme tipleri" : t === "Link" ? "Link ile ödeme" : "Manuel ödeme"}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-[12.5px]">
+            <thead>
+              <tr className="border-y border-[var(--border)] bg-[var(--soft)] text-left text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                <th scope="col" className="whitespace-nowrap px-4 py-2">İşlem No</th>
+                <th scope="col" className="whitespace-nowrap px-4 py-2">Tarih</th>
+                <th scope="col" className="whitespace-nowrap px-4 py-2">Müşteri</th>
+                <th scope="col" className="whitespace-nowrap px-4 py-2">Kart</th>
+                <th scope="col" className="whitespace-nowrap px-4 py-2">Tip</th>
+                <th scope="col" className="whitespace-nowrap px-4 py-2">Taksit</th>
+                <th scope="col" className="whitespace-nowrap px-4 py-2 text-right">Tutar</th>
+                <th scope="col" className="whitespace-nowrap px-4 py-2">Durum</th>
+              </tr>
+            </thead>
+            <tbody>
+              {satirlar.map((t, i) => (
+                <tr key={t.id} className={`transition-colors hover:bg-[var(--soft)] ${i > 0 ? "border-t border-[var(--border)]" : ""}`}>
+                  <td className="whitespace-nowrap px-4 py-2.5 font-bold text-[var(--brand-text)]">{t.id}</td>
+                  <td className="whitespace-nowrap px-4 py-2.5 tabular-nums text-[var(--muted)]">{t.tarih}</td>
+                  <td className="whitespace-nowrap px-4 py-2.5">
+                    <span className="block font-semibold text-[var(--fg)]">{t.musteri}</span>
+                    <span className="block text-[11px] tabular-nums text-[var(--muted)]">{t.cari}</span>
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-2.5 tabular-nums text-[var(--fg-2)]">{t.kart}</td>
+                  <td className="whitespace-nowrap px-4 py-2.5">
+                    <span className="inline-flex items-center gap-1 text-[var(--fg-2)]">
+                      <I name={t.tip === "Link" ? "link" : "wallet"} size={13} className="text-[var(--muted)]" />
+                      {t.tip}
+                    </span>
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-2.5 text-[var(--fg-2)]">{t.taksit}</td>
+                  <td className="whitespace-nowrap px-4 py-2.5 text-right font-bold tabular-nums text-[var(--fg)]">{t.tutar}</td>
+                  <td className="whitespace-nowrap px-4 py-2.5">
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${pillTone(t.durum)}`}>{t.durum}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {satirlar.length === 0 && (
+            <div className="flex flex-col items-center gap-2 px-4 py-12 text-center">
+              <span className="grid h-10 w-10 place-items-center rounded-full bg-[var(--soft)] text-[var(--muted)]">
+                <I name="search" size={16} />
+              </span>
+              <p className="text-[13px] font-bold text-[var(--fg)]">Bu filtrelere uyan işlem yok</p>
+              <button type="button" onClick={temizle} className={`rounded-full text-[12.5px] font-bold text-[var(--brand-text)] hover:underline ${FOCUS}`}>
+                Filtreleri temizle
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-2.5 text-[11.5px] text-[var(--muted)]">
+          <span>
+            {islemler.length} işlemden <b className="font-bold text-[var(--fg-2)]">{satirlar.length}</b> tanesi gösteriliyor
+          </span>
+          {filtreVar && satirlar.length > 0 && (
+            <button type="button" onClick={temizle} className={`rounded-full font-bold text-[var(--brand-text)] hover:underline ${FOCUS}`}>
+              Filtreleri temizle
+            </button>
+          )}
+        </div>
+      </section>
+    </>
+  );
+}
+
+// Ana Sayfa: KPI blokları, haftalık hacim, bakiye, son işlemler.
+function Dashboard({ role, meta, onSeeAll }) {
   const stats = kpis[role];
   const toplam = stats.find((s) => s.key === "toplam") || stats[0];
   const basarili = stats.find((s) => s.key === "basarili");
   const others = stats.filter((s) => s.key !== "basarili" && s.key !== "toplam");
   const ortalama = toplam.count ? parseAmount(toplam.value) / toplam.count : 0;
   const basariOrani = toplam.count ? (basarili.count / toplam.count) * 100 : 0;
+  const selectCls = `h-9 rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-[12.5px] font-medium text-[var(--fg-2)] ${FOCUS}`;
+
+  return (
+    <>
+      <div className="bn-rise mb-4 flex flex-col gap-3 px-1 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 className="text-xl font-extrabold tracking-tight text-[var(--fg)]">Ana Sayfa</h1>
+          <p className="mt-0.5 text-[12.5px] text-[var(--muted)]">{meta.company} · Bugünkü işlem özeti</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {role === ROLES.BAYI && (
+            <select aria-label="Ana firma cari seçimi" defaultValue="" className={selectCls}>
+              <option value="">Ana Firma Cari Seçimi</option>
+              <option>Brisa A.Ş. — 320.00.001</option>
+              <option>Brisa Perakende — 320.00.002</option>
+            </select>
+          )}
+          {role === ROLES.ALT_BAYI && (
+            <select aria-label="Bayi cari seçimi" defaultValue="" className={selectCls}>
+              <option value="">Bayi Cari Seçimi</option>
+              <option>Ankara Lastik Bayi — 320.01.001</option>
+            </select>
+          )}
+          <button
+            type="button"
+            className={`inline-flex h-9 items-center gap-1.5 rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 text-[12.5px] font-semibold text-[var(--fg-2)] transition active:scale-[0.97] hover:border-[var(--brand)] hover:text-[var(--brand-text)] ${FOCUS}`}
+          >
+            <I name="download" size={14} />
+            Dışa Aktar
+          </button>
+          <button
+            type="button"
+            className={`inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--brand)] px-4 text-[12.5px] font-bold text-white transition [box-shadow:0_8px_18px_-10px_rgba(12,52,231,0.8)] active:scale-[0.97] hover:brightness-110 ${FOCUS}`}
+          >
+            <I name="plus" size={14} />
+            Ödeme Al
+          </button>
+        </div>
+      </div>
+
+      {/* KPI bento blokları — üstte eşit iki büyük blok (başarılı, toplam), altta üç küçük blok */}
+      <div className="grid grid-cols-6 gap-3">
+        <BigTile
+          s={basarili}
+          index={0}
+          footer={{ label: "Başarı oranı", value: `%${basariOrani.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}`, bar: basariOrani }}
+        />
+        <BigTile
+          s={toplam}
+          index={1}
+          footer={{ label: "Ortalama işlem tutarı", value: `₺ ${Math.round(ortalama).toLocaleString("tr-TR")}` }}
+        />
+        {others.map((s, i) => (
+          <SoftTile key={s.key} s={s} index={i + 2} total={toplam.count} />
+        ))}
+      </div>
+
+      <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
+        <ChartCard />
+        <BalanceCard role={role} />
+      </div>
+
+      <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
+        <TransactionsCard onSeeAll={onSeeAll} />
+        <div className="flex flex-col gap-3">
+          <QuickCard />
+          <DistributionCard stats={stats} />
+        </div>
+      </div>
+    </>
+  );
+}
+
+function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
+  const [desktopOpen, setDesktopOpen] = useState(true);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(true);
+  const meta = ROLE_META[role];
+
+  // açık ekran adres çubuğunda (?sayfa=) tutulur: yenileme ve geri tuşu çalışır
+  const router = useRouter();
+  const slug = typeof router.query.sayfa === "string" ? router.query.sayfa : null;
+  const current = SAYFALAR[slug] || HOME;
+  const navigate = (href) => {
+    const sayfa = Object.keys(SAYFALAR).find((k) => SAYFALAR[k] === href);
+    const { sayfa: _eski, ...query } = router.query;
+    router.push({ pathname: router.pathname, query: sayfa ? { ...query, sayfa } : query }, undefined, { shallow: true });
+    setMobileOpen(false);
+  };
 
   useEffect(() => {
     try {
@@ -1093,11 +1390,19 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
   const closeMenu = () => (isDesktop ? setDesktop(false) : setMobileOpen(false));
   const menuVisible = isDesktop ? desktopOpen : mobileOpen;
 
-  const selectCls = `h-9 rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-[12.5px] font-medium text-[var(--fg-2)] ${FOCUS}`;
 
   return (
     <div className="flex flex-1">
-      <Sidebar role={role} desktopOpen={desktopOpen} mobileOpen={mobileOpen} hidden={!menuVisible} onClose={closeMenu} onLogout={onLogout} />
+      <Sidebar
+        role={role}
+        desktopOpen={desktopOpen}
+        mobileOpen={mobileOpen}
+        hidden={!menuVisible}
+        onClose={closeMenu}
+        onLogout={onLogout}
+        current={current}
+        onNavigate={navigate}
+      />
 
       <div className="flex min-w-0 flex-1 flex-col px-3 lg:px-4">
         {/* yüzen üst bar */}
@@ -1181,73 +1486,13 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
           </header>
         </div>
 
-        {/* key={role}: rol değişince giriş animasyonları yeniden oynar */}
-        <main key={role} className="mx-auto w-full max-w-[1280px] flex-1 py-4">
-          <div className="bn-rise mb-4 flex flex-col gap-3 px-1 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h1 className="text-xl font-extrabold tracking-tight text-[var(--fg)]">Ana Sayfa</h1>
-              <p className="mt-0.5 text-[12.5px] text-[var(--muted)]">{meta.company} · Bugünkü işlem özeti</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {role === ROLES.BAYI && (
-                <select aria-label="Ana firma cari seçimi" defaultValue="" className={selectCls}>
-                  <option value="">Ana Firma Cari Seçimi</option>
-                  <option>Brisa A.Ş. — 320.00.001</option>
-                  <option>Brisa Perakende — 320.00.002</option>
-                </select>
-              )}
-              {role === ROLES.ALT_BAYI && (
-                <select aria-label="Bayi cari seçimi" defaultValue="" className={selectCls}>
-                  <option value="">Bayi Cari Seçimi</option>
-                  <option>Ankara Lastik Bayi — 320.01.001</option>
-                </select>
-              )}
-              <button
-                type="button"
-                className={`inline-flex h-9 items-center gap-1.5 rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 text-[12.5px] font-semibold text-[var(--fg-2)] transition active:scale-[0.97] hover:border-[var(--brand)] hover:text-[var(--brand-text)] ${FOCUS}`}
-              >
-                <I name="download" size={14} />
-                Dışa Aktar
-              </button>
-              <button
-                type="button"
-                className={`inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--brand)] px-4 text-[12.5px] font-bold text-white transition [box-shadow:0_8px_18px_-10px_rgba(12,52,231,0.8)] active:scale-[0.97] hover:brightness-110 ${FOCUS}`}
-              >
-                <I name="plus" size={14} />
-                Ödeme Al
-              </button>
-            </div>
-          </div>
-
-          {/* KPI bento blokları — üstte eşit iki büyük blok (başarılı, toplam), altta üç küçük blok */}
-          <div className="grid grid-cols-6 gap-3">
-            <BigTile
-              s={basarili}
-              index={0}
-              footer={{ label: "Başarı oranı", value: `%${basariOrani.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}`, bar: basariOrani }}
-            />
-            <BigTile
-              s={toplam}
-              index={1}
-              footer={{ label: "Ortalama işlem tutarı", value: `₺ ${Math.round(ortalama).toLocaleString("tr-TR")}` }}
-            />
-            {others.map((s, i) => (
-              <SoftTile key={s.key} s={s} index={i + 2} total={toplam.count} />
-            ))}
-          </div>
-
-          <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
-            <ChartCard />
-            <BalanceCard role={role} />
-          </div>
-
-          <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
-            <TransactionsCard />
-            <div className="flex flex-col gap-3">
-              <QuickCard />
-              <DistributionCard stats={stats} />
-            </div>
-          </div>
+        {/* key: rol ya da ekran değişince giriş animasyonları yeniden oynar */}
+        <main key={`${role}-${current}`} className="mx-auto w-full max-w-[1280px] flex-1 py-4">
+          {current === "/raporlar/islem-detaylari" ? (
+            <IslemDetaylari meta={meta} onHome={() => navigate(HOME)} />
+          ) : (
+            <Dashboard role={role} meta={meta} onSeeAll={() => navigate("/raporlar/islem-detaylari")} />
+          )}
         </main>
       </div>
     </div>
