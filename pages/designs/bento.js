@@ -81,14 +81,16 @@ const MOTION_CSS = `
 @keyframes bn-grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 @keyframes bn-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @keyframes bn-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes bn-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
 @keyframes bn-pop { from { opacity: 0; transform: translateY(-4px) scale(0.97); } to { opacity: 1; transform: none; } }
 .bn-rise { animation: bn-rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) backwards; animation-delay: calc(var(--i, 0) * 55ms); }
 .bn-grow { transform-origin: bottom; animation: bn-grow 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; animation-delay: calc(var(--i, 0) * 60ms + 180ms); }
 .bn-fill { transform-origin: left; animation: bn-fill 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; animation-delay: 0.3s; }
 .bn-draw { stroke-dasharray: 1; animation: bn-draw 1.1s ease-out backwards; animation-delay: 0.35s; }
+.bn-wipe { animation: bn-wipe 1s cubic-bezier(0.3, 0.7, 0.2, 1) backwards; }
 .bn-pop { animation: bn-pop 0.16s ease-out backwards; }
 @media (prefers-reduced-motion: reduce) {
-  .bn-rise, .bn-grow, .bn-fill, .bn-draw, .bn-pop { animation: none; }
+  .bn-rise, .bn-grow, .bn-fill, .bn-draw, .bn-wipe, .bn-pop { animation: none; }
 }
 `;
 
@@ -155,13 +157,17 @@ function parseAmount(value) {
   return Number(String(value).replace(/[^\d]/g, "")) || 0;
 }
 
-// Noktalardan yumuşak (yatay teğetli) bir eğri yolu üretir.
+// Değerleri w×h alana (min–max aralığına) yayıp yumuşak bir eğri yolu üretir.
 function smoothPath(values, w, h, pad) {
   const max = Math.max(...values);
   const min = Math.min(...values);
   const range = max - min || 1;
   const step = (w - pad * 2) / (values.length - 1);
-  const pts = values.map((v, i) => [pad + i * step, h - pad - ((v - min) / range) * (h - pad * 2)]);
+  return curveThrough(values.map((v, i) => [pad + i * step, h - pad - ((v - min) / range) * (h - pad * 2)]));
+}
+
+// [x, y] noktalarından geçen yumuşak (yatay teğetli) bir eğri yolu üretir.
+function curveThrough(pts) {
   let d = `M ${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
   for (let i = 1; i < pts.length; i++) {
     const [px, py] = pts[i - 1];
@@ -583,9 +589,30 @@ function SoftTile({ s, index, total }) {
   );
 }
 
+const CHART_TYPES = [
+  { key: "bar", label: "Sütun", icon: "report" },
+  { key: "line", label: "Çizgi", icon: "trendingUp" },
+];
+
+// Haftalık hacim kartı: kullanıcı sütun ya da çizgi grafiği seçer; seçim tarayıcıda hatırlanır.
 function ChartCard() {
-  const maxK = Math.max(...WEEK.map((w) => w.k));
+  const [type, setType] = useState("bar");
   const total = WEEK.reduce((a, w) => a + w.k, 0);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("nkb-bento-chart");
+      if (saved === "bar" || saved === "line") setType(saved);
+    } catch (e) {}
+  }, []);
+
+  const choose = (next) => {
+    setType(next);
+    try {
+      localStorage.setItem("nkb-bento-chart", next);
+    } catch (e) {}
+  };
+
   return (
     <section style={{ "--i": 5 }} className={`bn-rise p-4 lg:col-span-2 ${CARD}`} aria-labelledby="bn-chart-title">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -595,12 +622,42 @@ function ChartCard() {
           </h2>
           <p className="mt-0.5 text-xs text-[var(--muted)]">Son 7 gün · toplam ₺ {(total / 1000).toFixed(2).replace(".", ",")}M</p>
         </div>
-        <span className="inline-flex items-center gap-1 rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[11px] font-bold text-[var(--success-text)]">
-          <TrendArrow up />
-          %12,4 geçen haftaya göre
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1 rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[11px] font-bold text-[var(--success-text)]">
+            <TrendArrow up />
+            %12,4 geçen haftaya göre
+          </span>
+          <div role="group" aria-label="Grafik türü" className="flex items-center rounded-full bg-[var(--soft)] p-0.5 ring-1 ring-[var(--border)]">
+            {CHART_TYPES.map((c) => (
+              <button
+                key={c.key}
+                type="button"
+                onClick={() => choose(c.key)}
+                aria-pressed={type === c.key}
+                title={`${c.label} grafik`}
+                className={`inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-[11.5px] transition ${
+                  type === c.key
+                    ? "bg-[var(--surface)] font-bold text-[var(--brand-text)] shadow-sm"
+                    : "font-semibold text-[var(--muted)] hover:text-[var(--fg)]"
+                } ${FOCUS}`}
+              >
+                <I name={c.icon} size={13} />
+                {c.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
+      {type === "bar" ? <BarChart /> : <LineChart />}
+    </section>
+  );
+}
+
+function BarChart() {
+  const maxK = Math.max(...WEEK.map((w) => w.k));
+  return (
+    <>
       <div className="relative mt-6 h-40">
         <div className="pointer-events-none absolute inset-0 flex flex-col justify-between" aria-hidden="true">
           {[0, 1, 2, 3].map((i) => (
@@ -637,7 +694,96 @@ function ChartCard() {
           </span>
         ))}
       </div>
-    </section>
+    </>
+  );
+}
+
+// Tasarım 04'teki (Nova) alan grafiği: gün gün okunur; boşta en yüksek gün seçilidir.
+function LineChart() {
+  const W = 640;
+  const H = 200;
+  const values = WEEK.map((w) => w.k);
+  const max = Math.max(...values);
+  const step = (W - 24) / (values.length - 1);
+  const pts = values.map((v, i) => [12 + i * step, H - 12 - (v / max) * (H - 52)]);
+  const line = curveThrough(pts);
+  const area = `${line} L ${pts[pts.length - 1][0].toFixed(1)} ${H} L ${pts[0][0].toFixed(1)} ${H} Z`;
+  const maxI = values.indexOf(max);
+  const [active, setActive] = useState(maxI);
+  const ax = (pts[active][0] / W) * 100;
+  const ay = (pts[active][1] / H) * 100;
+
+  return (
+    <>
+      <div className="relative mt-6 h-40" onMouseLeave={() => setActive(maxI)}>
+        <div className="bn-wipe absolute inset-0">
+          <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full" role="img" aria-label="Haftalık işlem hacmi çizgi grafiği">
+            <defs>
+              <linearGradient id="bn-line-fill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--chart-from)" stopOpacity="0.28" />
+                <stop offset="100%" stopColor="var(--chart-from)" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            {[0.25, 0.5, 0.75].map((g) => (
+              <line key={g} x1="0" x2={W} y1={g * H} y2={g * H} stroke="var(--border)" strokeWidth="1" strokeDasharray="4 6" vectorEffect="non-scaling-stroke" />
+            ))}
+            <line x1="0" x2={W} y1={H - 0.5} y2={H - 0.5} stroke="var(--border-strong)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+            <path d={area} fill="url(#bn-line-fill)" />
+            <path d={line} fill="none" stroke="var(--chart-from)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+          </svg>
+          {pts.map((p, i) => (
+            <span
+              key={WEEK[i].d}
+              aria-hidden="true"
+              className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-[var(--surface)] bg-[var(--chart-from)] transition-all duration-200 ${
+                i === active ? "h-4 w-4" : "h-2.5 w-2.5"
+              }`}
+              style={{ left: `${(p[0] / W) * 100}%`, top: `${(p[1] / H) * 100}%` }}
+            />
+          ))}
+        </div>
+
+        {/* seçili gün: kılavuz çizgisi + etiket */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute bottom-0 w-px -translate-x-1/2 bg-[var(--border-strong)] transition-[left,top] duration-200 motion-reduce:transition-none"
+          style={{ left: `${ax}%`, top: `${ay}%` }}
+        />
+        {/* uçtaki günlerde etiket kart dışına taşmasın diye içeri hizalanır */}
+        <span
+          className={`pointer-events-none absolute -translate-y-full whitespace-nowrap rounded-full bg-[var(--fg)] px-2 py-0.5 text-[10.5px] font-bold tabular-nums text-[var(--bg)] transition-[left,top] duration-200 motion-reduce:transition-none ${
+            active === 0 ? "-translate-x-2" : active === pts.length - 1 ? "-translate-x-[calc(100%-8px)]" : "-translate-x-1/2"
+          }`}
+          style={{ left: `${ax}%`, top: `calc(${ay}% - 12px)` }}
+        >
+          {WEEK[active].d} · ₺ {WEEK[active].k}K
+        </span>
+
+        {/* gün gün okuma alanları */}
+        {pts.map((p, i) => (
+          <button
+            key={WEEK[i].d}
+            type="button"
+            aria-label={`${WEEK[i].d}: ₺ ${WEEK[i].k}K`}
+            onMouseEnter={() => setActive(i)}
+            onFocus={() => setActive(i)}
+            className="absolute inset-y-0 -translate-x-1/2 cursor-default rounded-lg focus:outline-none focus-visible:bg-[var(--soft)]"
+            style={{ left: `${(p[0] / W) * 100}%`, width: `${(step / W) * 100}%` }}
+          />
+        ))}
+      </div>
+      <div className="relative mt-2 h-4 text-[11px]">
+        {pts.map((p, i) => (
+          <span
+            key={WEEK[i].d}
+            className={`absolute -translate-x-1/2 transition-colors ${i === active ? "font-bold text-[var(--brand-text)]" : "font-medium text-[var(--muted)]"}`}
+            style={{ left: `${(p[0] / W) * 100}%` }}
+          >
+            {WEEK[i].d}
+          </span>
+        ))}
+      </div>
+    </>
   );
 }
 
