@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Head from "next/head";
 import I from "@/components/DesignIcons";
 import { useRole } from "@/components/RoleContext";
@@ -82,15 +83,17 @@ const MOTION_CSS = `
 @keyframes bn-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @keyframes bn-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 @keyframes bn-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes bn-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes bn-pop { from { opacity: 0; transform: translateY(-4px) scale(0.97); } to { opacity: 1; transform: none; } }
 .bn-rise { animation: bn-rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) backwards; animation-delay: calc(var(--i, 0) * 55ms); }
 .bn-grow { transform-origin: bottom; animation: bn-grow 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; animation-delay: calc(var(--i, 0) * 60ms + 180ms); }
 .bn-fill { transform-origin: left; animation: bn-fill 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; animation-delay: 0.3s; }
 .bn-draw { stroke-dasharray: 1; animation: bn-draw 1.1s ease-out backwards; animation-delay: 0.35s; }
 .bn-wipe { animation: bn-wipe 1s cubic-bezier(0.3, 0.7, 0.2, 1) backwards; }
+.bn-fade { animation: bn-fade 0.18s ease-out backwards; }
 .bn-pop { animation: bn-pop 0.16s ease-out backwards; }
 @media (prefers-reduced-motion: reduce) {
-  .bn-rise, .bn-grow, .bn-fill, .bn-draw, .bn-wipe, .bn-pop { animation: none; }
+  .bn-rise, .bn-grow, .bn-fill, .bn-draw, .bn-wipe, .bn-fade, .bn-pop { animation: none; }
 }
 `;
 
@@ -595,8 +598,11 @@ const CHART_TYPES = [
 ];
 
 // Haftalık hacim kartı: kullanıcı sütun ya da çizgi grafiği seçer; seçim tarayıcıda hatırlanır.
+// Büyüt düğmesi grafiği ekranın ortasında büyük bir pencerede açar.
 function ChartCard() {
   const [type, setType] = useState("bar");
+  const [expanded, setExpanded] = useState(false);
+  const expandRef = useRef(null);
   const total = WEEK.reduce((a, w) => a + w.k, 0);
 
   useEffect(() => {
@@ -613,6 +619,13 @@ function ChartCard() {
     } catch (e) {}
   };
 
+  const close = () => {
+    setExpanded(false);
+    expandRef.current?.focus();
+  };
+
+  const subtitle = `Son 7 gün · toplam ₺ ${(total / 1000).toFixed(2).replace(".", ",")}M`;
+
   return (
     <section style={{ "--i": 5 }} className={`bn-rise p-4 lg:col-span-2 ${CARD}`} aria-labelledby="bn-chart-title">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -620,45 +633,130 @@ function ChartCard() {
           <h2 id="bn-chart-title" className="text-sm font-bold text-[var(--fg)]">
             Haftalık İşlem Hacmi
           </h2>
-          <p className="mt-0.5 text-xs text-[var(--muted)]">Son 7 gün · toplam ₺ {(total / 1000).toFixed(2).replace(".", ",")}M</p>
+          <p className="mt-0.5 text-xs text-[var(--muted)]">{subtitle}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1 rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[11px] font-bold text-[var(--success-text)]">
-            <TrendArrow up />
-            %12,4 geçen haftaya göre
-          </span>
-          <div role="group" aria-label="Grafik türü" className="flex items-center rounded-full bg-[var(--soft)] p-0.5 ring-1 ring-[var(--border)]">
-            {CHART_TYPES.map((c) => (
-              <button
-                key={c.key}
-                type="button"
-                onClick={() => choose(c.key)}
-                aria-pressed={type === c.key}
-                title={`${c.label} grafik`}
-                className={`inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-[11.5px] transition ${
-                  type === c.key
-                    ? "bg-[var(--surface)] font-bold text-[var(--brand-text)] shadow-sm"
-                    : "font-semibold text-[var(--muted)] hover:text-[var(--fg)]"
-                } ${FOCUS}`}
-              >
-                <I name={c.icon} size={13} />
-                {c.label}
-              </button>
-            ))}
-          </div>
+          <TrendBadge />
+          <ChartTypeToggle type={type} onChange={choose} />
+          <button
+            ref={expandRef}
+            type="button"
+            onClick={() => setExpanded(true)}
+            aria-label="Grafiği büyüt"
+            title="Büyüt"
+            className={`grid h-8 w-8 place-items-center rounded-full bg-[var(--soft)] text-[var(--muted)] ring-1 ring-[var(--border)] transition hover:text-[var(--brand-text)] ${FOCUS}`}
+          >
+            <I name="maximize" size={14} />
+          </button>
         </div>
       </div>
 
       {type === "bar" ? <BarChart /> : <LineChart />}
+
+      {expanded && (
+        <ChartModal onClose={close} subtitle={subtitle}>
+          <div className="flex flex-wrap items-center gap-2">
+            <TrendBadge />
+            <ChartTypeToggle type={type} onChange={choose} />
+          </div>
+          {type === "bar" ? <BarChart large /> : <LineChart large />}
+        </ChartModal>
+      )}
     </section>
   );
 }
 
-function BarChart() {
+function TrendBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[11px] font-bold text-[var(--success-text)]">
+      <TrendArrow up />
+      %12,4 geçen haftaya göre
+    </span>
+  );
+}
+
+function ChartTypeToggle({ type, onChange }) {
+  return (
+    <div role="group" aria-label="Grafik türü" className="flex items-center rounded-full bg-[var(--soft)] p-0.5 ring-1 ring-[var(--border)]">
+      {CHART_TYPES.map((c) => (
+        <button
+          key={c.key}
+          type="button"
+          onClick={() => onChange(c.key)}
+          aria-pressed={type === c.key}
+          title={`${c.label} grafik`}
+          className={`inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-[11.5px] transition ${
+            type === c.key ? "bg-[var(--surface)] font-bold text-[var(--brand-text)] shadow-sm" : "font-semibold text-[var(--muted)] hover:text-[var(--fg)]"
+          } ${FOCUS}`}
+        >
+          <I name={c.icon} size={13} />
+          {c.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Büyütülmüş grafik penceresi. Temanın renk değişkenleri için sayfanın kök öğesine (#bn-root) taşınır;
+// kart üzerine gelince oluşan transform, sabit konumlu pencereyi bozmasın diye de karttan dışarıda çizilir.
+function ChartModal({ onClose, subtitle, children }) {
+  const closeRef = useRef(null);
+
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKey = (e) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, []);
+
+  const root = typeof document !== "undefined" ? document.getElementById("bn-root") : null;
+  if (!root) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6">
+      <div className="bn-fade absolute inset-0 bg-[rgba(15,18,40,0.55)] backdrop-blur-[2px]" onClick={onClose} aria-hidden="true" />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="bn-chart-modal-title"
+        className="bn-pop relative w-full max-w-5xl rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 [box-shadow:var(--pop-shadow)] sm:p-6"
+      >
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <h2 id="bn-chart-modal-title" className="text-base font-bold text-[var(--fg)] sm:text-lg">
+              Haftalık İşlem Hacmi
+            </h2>
+            <p className="mt-0.5 text-xs text-[var(--muted)]">{subtitle}</p>
+          </div>
+          <button
+            ref={closeRef}
+            type="button"
+            onClick={onClose}
+            aria-label="Kapat"
+            title="Kapat (Esc)"
+            className={`grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--soft)] text-[var(--fg-2)] ring-1 ring-[var(--border)] transition hover:text-[var(--brand-text)] ${FOCUS}`}
+          >
+            <I name="x" size={16} />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>,
+    root
+  );
+}
+
+// large: büyütülmüş pencerede daha yüksek alan, daha geniş sütunlar ve tüm günlerin tutarı görünür
+function BarChart({ large = false }) {
   const maxK = Math.max(...WEEK.map((w) => w.k));
   return (
     <>
-      <div className="relative mt-6 h-40">
+      <div className={`relative ${large ? "mt-10 h-[min(52vh,440px)] min-h-[220px]" : "mt-6 h-40"}`}>
         <div className="pointer-events-none absolute inset-0 flex flex-col justify-between" aria-hidden="true">
           {[0, 1, 2, 3].map((i) => (
             <span key={i} className="border-t border-dashed border-[var(--border)]" />
@@ -668,7 +766,7 @@ function BarChart() {
         <div className="relative flex h-full items-end justify-around gap-2">
           {WEEK.map((w, i) => (
             <div key={w.d} className="group flex h-full flex-1 items-end justify-center">
-              <div className="relative w-full max-w-[32px]" style={{ height: `${(w.k / AXIS_MAX) * 100}%` }}>
+              <div className={`relative w-full ${large ? "max-w-[64px]" : "max-w-[32px]"}`} style={{ height: `${(w.k / AXIS_MAX) * 100}%` }}>
                 <div
                   style={{ "--i": i }}
                   className={`bn-grow h-full w-full rounded-t-[10px] bg-[linear-gradient(180deg,var(--chart-to),var(--chart-from))] transition-opacity duration-200 group-hover:opacity-100 ${
@@ -677,7 +775,7 @@ function BarChart() {
                 />
                 <span
                   className={`absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-[var(--fg)] px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-[var(--bg)] transition-all duration-200 ${
-                    w.k === maxK ? "opacity-100" : "translate-y-1 opacity-0 group-hover:translate-y-0 group-hover:opacity-100"
+                    large || w.k === maxK ? "opacity-100" : "translate-y-1 opacity-0 group-hover:translate-y-0 group-hover:opacity-100"
                   }`}
                 >
                   ₺ {w.k}K
@@ -699,7 +797,7 @@ function BarChart() {
 }
 
 // Tasarım 04'teki (Nova) alan grafiği: gün gün okunur; boşta en yüksek gün seçilidir.
-function LineChart() {
+function LineChart({ large = false }) {
   const W = 640;
   const H = 200;
   const values = WEEK.map((w) => w.k);
@@ -712,14 +810,16 @@ function LineChart() {
   const [active, setActive] = useState(maxI);
   const ax = (pts[active][0] / W) * 100;
   const ay = (pts[active][1] / H) * 100;
+  // aynı anda kartta ve pencerede çizildiğinde gradyan kimlikleri çakışmasın
+  const fillId = `bn-line-fill-${useId().replace(/:/g, "")}`;
 
   return (
     <>
-      <div className="relative mt-6 h-40" onMouseLeave={() => setActive(maxI)}>
+      <div className={`relative ${large ? "mt-10 h-[min(52vh,440px)] min-h-[220px]" : "mt-6 h-40"}`} onMouseLeave={() => setActive(maxI)}>
         <div className="bn-wipe absolute inset-0">
           <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full" role="img" aria-label="Haftalık işlem hacmi çizgi grafiği">
             <defs>
-              <linearGradient id="bn-line-fill" x1="0" y1="0" x2="0" y2="1">
+              <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="var(--chart-from)" stopOpacity="0.28" />
                 <stop offset="100%" stopColor="var(--chart-from)" stopOpacity="0" />
               </linearGradient>
@@ -728,7 +828,7 @@ function LineChart() {
               <line key={g} x1="0" x2={W} y1={g * H} y2={g * H} stroke="var(--border)" strokeWidth="1" strokeDasharray="4 6" vectorEffect="non-scaling-stroke" />
             ))}
             <line x1="0" x2={W} y1={H - 0.5} y2={H - 0.5} stroke="var(--border-strong)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-            <path d={area} fill="url(#bn-line-fill)" />
+            <path d={area} fill={`url(#${fillId})`} />
             <path d={line} fill="none" stroke="var(--chart-from)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
           </svg>
           {pts.map((p, i) => (
@@ -1286,6 +1386,7 @@ export default function BentoDesign() {
       </Head>
       <style dangerouslySetInnerHTML={{ __html: MOTION_CSS }} />
       <div
+        id="bn-root"
         style={{ ...(isDark ? dark : light), fontFamily: "'Plus Jakarta Sans', sans-serif" }}
         className="flex min-h-screen flex-col bg-[var(--bg)] text-[var(--fg)] transition-colors"
       >
