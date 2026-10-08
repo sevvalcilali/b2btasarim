@@ -1,34 +1,26 @@
+// Ödeme Al › Link ile Ödeme. Şartname s.6: müşteri seçimi manuel ödemeyle aynı yapıda ilerler.
+// Veri: GET /odeme/taksit-secenekleri · POST /odeme-linkleri · GET /odeme-linkleri
 import { useEffect, useRef, useState } from "react";
 import { ROLES } from "@/lib/roles";
-import { odemeLinkleri } from "@/lib/mockData";
 import I from "@/components/DesignIcons";
-import { kapsamda } from "../ag";
-import { TAHSILAT_CARISI, useMusteriSecimi, odemeKosullari, vadeHesabi, MusteriBolumu } from "../odeme";
+import { ApiHatasi } from "@/lib/api/hata";
+import { kurusCoz, tarih, tarihSaat, tl, tl2, yuzde } from "@/lib/bicim";
+import { durumTonu, etiket } from "@/lib/etiketler";
+import { useOdemeLinkiOlustur, useOdemeLinkleri, useTaksitSecenekleri } from "@/lib/sorgular/odeme";
+import { BosDurum, HataKutusu, Yukleniyor } from "../durumlar";
+import { LISTELI, MusteriBolumu, hataBaglayici, useMusteriSecimi } from "../odeme";
 import { Konum, inputCls, Alan, FormBolum, KopyalaDugmesi } from "../ortak";
 import { HOME } from "../sayfalar";
 import { CARD, FOCUS } from "../tema";
-import { tutarCoz, tl2, rakamlar, tarihSaat } from "../yardimci";
+import { rakamlar } from "../yardimci";
 
-// ---- Ödeme Al › Link ile Ödeme ------------------------------------------------------------
-// Şartname s.6: link oluşturulurken müşteri türü ve müşteri seçimi manuel ödemeyle aynı yapıda ilerler.
-const KANALLAR = ["SMS", "E-posta", "Sadece link"];
-
+const KANALLAR = ["SMS", "EPOSTA", "LINK"];
 const GECERLILIK = [1, 3, 7, 30];
-
-const LINK_ADRESI = "https://link.nkolayislem.com.tr/b2b/";
-
-function linkTone(durum) {
-  if (durum === "Ödendi") return "bg-[var(--success-soft)] text-[var(--success-text)]";
-  if (durum === "Bekliyor") return "bg-[var(--brand-soft)] text-[var(--brand-text)]";
-  if (durum === "İptal Edildi") return "bg-[var(--danger-soft)] text-[var(--danger-text)]";
-  return "bg-[var(--soft-2)] text-[var(--muted)]"; // Süresi Doldu
-}
+const taksitMetni = (liste) => liste.map((n) => (n === 1 ? "Tek çekim" : `${n}`)).join(", ") + (liste.some((n) => n > 1) ? " taksit" : "");
 
 export function LinkOdeme({ role, meta, onNavigate }) {
-  const m = useMusteriSecimi(role, meta);
-  const { kayit, tur, secili, kendiKarti, cariAdi } = m;
-  const { taksitler, limit, profil } = odemeKosullari(kayit, tur, secili);
-
+  const m = useMusteriSecimi(role);
+  const { tur, secili, kendiKarti, cariAdi } = m;
   const [tutarMetni, setTutarMetni] = useState("");
   const [kapali, setKapali] = useState([]); // müşteriye gösterilmeyecek taksitler
   const [gun, setGun] = useState(3);
@@ -37,55 +29,66 @@ export function LinkOdeme({ role, meta, onNavigate }) {
   const [aciklama, setAciklama] = useState("");
   const [beyan, setBeyan] = useState(false);
   const [denendi, setDenendi] = useState(false);
+  const [sunucuHatalari, setSunucuHatalari] = useState({});
+  const [sunucuMesaji, setSunucuMesaji] = useState(null);
   const [olusan, setOlusan] = useState(null);
-  const [yeniler, setYeniler] = useState([]);
+  const [yeniler, setYeniler] = useState([]); // bu oturumda oluşturulan link numaraları ("Yeni" etiketi)
   const listeRef = useRef(null);
+  const linkler = useOdemeLinkleri();
+  const olustur = useOdemeLinkiOlustur();
 
   // müşteri değişince gönderim bilgisi yeniden müşteriden önerilir
   useEffect(() => setHedef({ tel: null, email: null }), [m.ad, tur]);
   const tel = hedef.tel ?? m.iletisim.tel;
   const email = hedef.email ?? m.iletisim.email;
 
+  const tutarKurus = kurusCoz(tutarMetni);
+  const gecerliTutar = Number.isFinite(tutarKurus) && tutarKurus > 0;
+  const kosul = useTaksitSecenekleri({ tutarKurus: gecerliTutar ? tutarKurus : undefined, musteriTuru: tur, musteriCariNo: LISTELI.has(tur) ? secili?.cariNo : undefined });
+  const taksitler = kosul.data?.taksitler || [];
+  const limit = kosul.data?.limitKurus || null;
+  const profil = kosul.data?.vadeProfil || null;
+  const secenek = (n) => kosul.data?.secenekler.find((s) => s.taksit === n) || { toplamKurus: 0, aylikKurus: 0 };
   const acikTaksitler = taksitler.filter((n) => !kapali.includes(n));
-  const tutar = tutarCoz(tutarMetni);
-  const gecerliTutar = Number.isFinite(tutar) && tutar > 0;
   const sonTarih = new Date(Date.now() + gun * 86400000);
 
   const hatalar = { ...m.hatalar };
-  if (!gecerliTutar) hatalar.tutar = "Tutar girin.";
-  else if (limit && tutar > limit) hatalar.tutar = `İşlem bazlı ödeme limiti ₺ ${limit.toLocaleString("tr-TR")}.`;
-  if (acikTaksitler.length === 0) hatalar.taksit = "En az bir taksit seçeneği açık olmalı.";
-  if (kanal === "SMS" && rakamlar(tel).length < 10) hatalar.hedefTel = "Linkin gönderileceği telefonu girin.";
-  if (kanal === "E-posta" && !/^\S+@\S+\.\S+$/.test(email)) hatalar.hedefEmail = "Linkin gönderileceği e-postayı girin.";
-  if (!kendiKarti && !beyan) hatalar.beyan = "Müşteri kartıyla ödemede beyanı onaylayın.";
-  const h = (k) => (denendi ? hatalar[k] : undefined);
+  if (!gecerliTutar) hatalar.tutarKurus = "Tutar girin.";
+  else if (limit && tutarKurus > limit) hatalar.tutarKurus = `İşlem bazlı ödeme limiti ${tl(limit)}.`;
+  if (taksitler.length && acikTaksitler.length === 0) hatalar.taksitler = "En az bir taksit seçeneği açık olmalı.";
+  if (kanal === "SMS" && rakamlar(tel).length < 10) hatalar.hedef = "Linkin gönderileceği telefonu girin.";
+  if (kanal === "EPOSTA" && !/^\S+@\S+\.\S+$/.test(email)) hatalar.hedef = "Linkin gönderileceği e-postayı girin.";
+  if (!kendiKarti && !beyan) hatalar.faturaBeyani = "Müşteri kartıyla ödemede beyanı onaylayın.";
+  const h = hataBaglayici(denendi, hatalar, sunucuHatalari);
 
-  const taksitMetni = (liste) => liste.map((n) => (n === 1 ? "Tek çekim" : `${n}`)).join(", ") + (liste.some((n) => n > 1) ? " taksit" : "");
-
-  const olustur = (e) => {
+  const gonder = async (e) => {
     e.preventDefault();
     setDenendi(true);
+    setSunucuMesaji(null);
+    setSunucuHatalari({});
     if (Object.keys(hatalar).length > 0) {
       requestAnimationFrame(() => document.querySelector('#bn-link [aria-invalid="true"]')?.focus());
       return;
     }
-    const id = `LNK-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-    const link = {
-      id,
-      olusturma: tarihSaat(new Date()),
-      sonGecerlilik: tarihSaat(sonTarih),
-      yapan: meta.company,
-      musteriTuru: tur,
-      musteri: m.ad,
-      tutar: tl2(tutar),
-      kanal,
-      durum: "Bekliyor",
-      hedef: kanal === "SMS" ? tel : kanal === "E-posta" ? email : null,
-      taksitler: acikTaksitler,
-      cari: cariAdi,
-    };
-    setYeniler((l) => [link, ...l]);
-    setOlusan(link);
+    try {
+      const link = await olustur.mutateAsync({
+        ...m.govde(),
+        tutarKurus,
+        taksitler: acikTaksitler,
+        kanal,
+        hedef: kanal === "SMS" ? tel.trim() : kanal === "EPOSTA" ? email.trim() : undefined,
+        gecerlilikGun: gun,
+        aciklama: aciklama.trim() || undefined,
+        faturaBeyani: kendiKarti ? undefined : beyan,
+      });
+      setYeniler((l) => [link.linkNo, ...l]);
+      setOlusan(link);
+    } catch (err) {
+      if (err instanceof ApiHatasi && Object.keys(err.alanlar).length) {
+        setSunucuHatalari(err.alanlar);
+        requestAnimationFrame(() => document.querySelector('#bn-link [aria-invalid="true"]')?.focus());
+      } else setSunucuMesaji(err?.message || "Link oluşturulamadı.");
+    }
   };
   const yeniLink = () => {
     m.sifirla();
@@ -96,10 +99,12 @@ export function LinkOdeme({ role, meta, onNavigate }) {
     setAciklama("");
     setBeyan(false);
     setDenendi(false);
+    setSunucuHatalari({});
+    setSunucuMesaji(null);
     setOlusan(null);
   };
 
-  const satirlar = [...yeniler, ...odemeLinkleri.filter((l) => kapsamda(role, l.yapan))];
+  const satirlar = linkler.data?.kayitlar || [];
   const olusturanGoster = role !== ROLES.ALT_BAYI;
   const th = "whitespace-nowrap px-4 py-2";
   const td = "whitespace-nowrap px-4 py-2.5";
@@ -112,34 +117,31 @@ export function LinkOdeme({ role, meta, onNavigate }) {
         <p className="mt-0.5 text-[12.5px] text-[var(--muted)]">{meta.company} · Müşteriye ödeme linki gönderin</p>
       </div>
 
-      {olusan ? (
+      {m.hata ? (
+        <div className={`${CARD} hover:!translate-y-0`}>
+          <HataKutusu hata={m.hata} />
+        </div>
+      ) : olusan ? (
         <section className={`bn-pop mx-auto max-w-xl p-5 text-center sm:p-7 ${CARD} hover:!translate-y-0`} aria-live="polite">
           <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-[var(--success-soft)] text-[var(--success-text)]">
             <I name="link" size={24} strokeWidth={2.2} />
           </span>
           <h2 className="mt-3 text-lg font-extrabold text-[var(--fg)]">Ödeme linki oluşturuldu</h2>
           <p className="mt-1 text-[12.5px] text-[var(--muted)]">
-            {olusan.kanal === "SMS"
-              ? `SMS ile ${olusan.hedef} numarasına gönderildi.`
-              : olusan.kanal === "E-posta"
-                ? `E-posta ile ${olusan.hedef} adresine gönderildi.`
-                : "Linki kopyalayıp müşterinize iletebilirsiniz."}
+            {olusan.kanal === "SMS" ? `SMS ile ${olusan.hedef} numarasına gönderildi.` : olusan.kanal === "EPOSTA" ? `E-posta ile ${olusan.hedef} adresine gönderildi.` : "Linki kopyalayıp müşterinize iletebilirsiniz."}
           </p>
           <div className="mt-4 flex items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--soft)] p-1.5 pl-3">
-            <span className="min-w-0 flex-1 truncate text-left text-[12.5px] font-semibold tabular-nums text-[var(--fg)]">
-              {LINK_ADRESI}
-              {olusan.id.slice(4)}
-            </span>
-            <KopyalaDugmesi metin={`${LINK_ADRESI}${olusan.id.slice(4)}`} />
+            <span className="min-w-0 flex-1 truncate text-left text-[12.5px] font-semibold tabular-nums text-[var(--fg)]">{olusan.url}</span>
+            <KopyalaDugmesi metin={olusan.url} />
           </div>
           <dl className="mt-4 divide-y divide-[var(--border)] rounded-2xl border border-[var(--border)] text-left text-[12.5px]">
             {[
-              ["Link No", olusan.id],
-              ["Müşteri", `${olusan.musteri} · ${olusan.musteriTuru}`],
-              ["Tutar", olusan.tutar],
-              ["Taksit seçenekleri", taksitMetni(olusan.taksitler)],
-              [TAHSILAT_CARISI[role], olusan.cari ? `${olusan.cari.ad} — ${olusan.cari.cari}` : "—"],
-              ["Son geçerlilik", olusan.sonGecerlilik],
+              ["Link No", olusan.linkNo],
+              ["Müşteri", `${olusan.musteriUnvan} · ${etiket("musteriTuru", olusan.musteriTuru)}`],
+              ["Tutar", tl2(olusan.tutarKurus)],
+              ["Taksit seçenekleri", taksitMetni(olusan.taksitler || [])],
+              [m.cariEtiketi, olusan.tahsilatCarisi ? `${olusan.tahsilatCarisi.ad} — ${olusan.tahsilatCarisi.cariNo}` : "—"],
+              ["Son geçerlilik", tarihSaat(olusan.sonGecerlilik)],
             ].map(([k, v]) => (
               <div key={k} className="flex justify-between gap-4 px-4 py-2.5">
                 <dt className="text-[var(--muted)]">{k}</dt>
@@ -148,11 +150,7 @@ export function LinkOdeme({ role, meta, onNavigate }) {
             ))}
           </dl>
           <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
-            <button
-              type="button"
-              onClick={yeniLink}
-              className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-[var(--brand)] px-5 text-[13px] font-bold text-white transition hover:brightness-110 ${FOCUS}`}
-            >
+            <button type="button" onClick={yeniLink} className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-[var(--brand)] px-5 text-[13px] font-bold text-white transition hover:brightness-110 ${FOCUS}`}>
               <I name="plus" size={15} />
               Yeni Link
             </button>
@@ -166,7 +164,7 @@ export function LinkOdeme({ role, meta, onNavigate }) {
           </div>
         </section>
       ) : (
-        <form id="bn-link" noValidate onSubmit={olustur} className="grid grid-cols-1 gap-3 lg:grid-cols-3 lg:items-start">
+        <form id="bn-link" noValidate onSubmit={gonder} className="grid grid-cols-1 gap-3 lg:grid-cols-3 lg:items-start" aria-busy={olustur.isPending}>
           <div className="flex flex-col gap-3 lg:col-span-2">
             <FormBolum no={1} i={0} baslik="Müşteri" aciklama="Manuel ödemeyle aynı: müşteri türünü seçin, tanımlı müşteriler listeden gelir.">
               <MusteriBolumu role={role} m={m} h={h} />
@@ -174,7 +172,7 @@ export function LinkOdeme({ role, meta, onNavigate }) {
 
             <FormBolum no={2} i={1} baslik="Tutar ve Taksit" aciklama="Müşteri, ödeme sayfasında yalnızca açık bıraktığınız taksitleri görür.">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Alan id="bn-tutar" etiket="Tutar" hata={h("tutar")} ipucu={limit ? `İşlem bazlı ödeme limiti: ₺ ${limit.toLocaleString("tr-TR")}` : undefined}>
+                <Alan id="bn-tutar" etiket="Tutar" hata={h("tutarKurus")} ipucu={limit ? `İşlem bazlı ödeme limiti: ${tl(limit)}` : undefined}>
                   <div className="relative">
                     <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[13px] font-bold text-[var(--muted)]">₺</span>
                     <input
@@ -183,9 +181,9 @@ export function LinkOdeme({ role, meta, onNavigate }) {
                       placeholder="0,00"
                       value={tutarMetni}
                       onChange={(e) => setTutarMetni(e.target.value.replace(/[^\d.,]/g, ""))}
-                      onBlur={() => gecerliTutar && setTutarMetni(tutar.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }))}
-                      aria-invalid={h("tutar") ? true : undefined}
-                      className={`${inputCls(h("tutar"))} pl-7 text-[15px] font-bold tabular-nums`}
+                      onBlur={() => gecerliTutar && setTutarMetni(tl(tutarKurus, { kurusGoster: true, isaret: false }))}
+                      aria-invalid={h("tutarKurus") ? true : undefined}
+                      className={`${inputCls(h("tutarKurus"))} pl-7 text-[15px] font-bold tabular-nums`}
                     />
                   </div>
                 </Alan>
@@ -194,39 +192,27 @@ export function LinkOdeme({ role, meta, onNavigate }) {
                 </Alan>
               </div>
 
-              <fieldset className="mt-4" aria-describedby={h("taksit") ? "bn-taksit-hata" : undefined}>
+              <fieldset className="mt-4" aria-describedby={h("taksitler") ? "bn-taksit-hata" : undefined} aria-busy={kosul.isFetching}>
                 <legend className="mb-1.5 text-[12px] font-semibold text-[var(--fg-2)]">Müşteriye açık taksitler</legend>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+                <div className={`grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6 transition-opacity ${kosul.isFetching ? "opacity-70" : ""}`}>
+                  {kosul.isPending && [1, 2, 3].map((i) => <div key={i} className="h-[62px] animate-pulse rounded-xl bg-[var(--soft)] motion-reduce:animate-none" />)}
                   {taksitler.map((n) => {
                     const acik = !kapali.includes(n);
-                    const x = vadeHesabi(gecerliTutar ? tutar : 0, n, profil);
+                    const x = secenek(n);
                     return (
-                      <label
-                        key={n}
-                        className={`flex cursor-pointer items-start gap-2 rounded-xl border px-3 py-2.5 transition ${
-                          acik ? "border-[var(--brand)] bg-[var(--brand-soft)]" : "border-[var(--border-strong)] hover:border-[var(--brand)]"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={acik}
-                          onChange={() => setKapali((k) => (acik ? [...k, n] : k.filter((x) => x !== n)))}
-                          aria-invalid={h("taksit") ? true : undefined}
-                          className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--brand)]"
-                        />
+                      <label key={n} className={`flex cursor-pointer items-start gap-2 rounded-xl border px-3 py-2.5 transition ${acik ? "border-[var(--brand)] bg-[var(--brand-soft)]" : "border-[var(--border-strong)] hover:border-[var(--brand)]"}`}>
+                        <input type="checkbox" checked={acik} onChange={() => setKapali((k) => (acik ? [...k, n] : k.filter((x) => x !== n)))} aria-invalid={h("taksitler") ? true : undefined} className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--brand)]" />
                         <span className="min-w-0 leading-tight">
                           <span className={`block text-[12.5px] font-bold ${acik ? "text-[var(--brand-text)]" : "text-[var(--fg)]"}`}>{n === 1 ? "Tek Çekim" : `${n} Taksit`}</span>
-                          <span className="mt-0.5 block text-[11px] tabular-nums text-[var(--muted)]">
-                            {gecerliTutar ? (n === 1 ? tl2(x.toplam) : `${tl2(x.aylik)} / ay`) : "—"}
-                          </span>
+                          <span className="mt-0.5 block text-[11px] tabular-nums text-[var(--muted)]">{gecerliTutar ? (n === 1 ? tl2(x.toplamKurus) : `${tl2(x.aylikKurus)} / ay`) : "—"}</span>
                         </span>
                       </label>
                     );
                   })}
                 </div>
-                {h("taksit") && (
+                {h("taksitler") && (
                   <p id="bn-taksit-hata" className="mt-1 text-[11.5px] font-semibold text-[var(--danger-text)]">
-                    {h("taksit")}
+                    {h("taksitler")}
                   </p>
                 )}
               </fieldset>
@@ -246,11 +232,9 @@ export function LinkOdeme({ role, meta, onNavigate }) {
                         role="radio"
                         aria-checked={kanal === k}
                         onClick={() => setKanal(k)}
-                        className={`inline-flex h-9 items-center rounded-full px-3.5 text-[12.5px] transition ${
-                          kanal === k ? "bg-[var(--brand)] font-bold text-white" : "bg-[var(--soft)] font-semibold text-[var(--fg-2)] hover:text-[var(--brand-text)]"
-                        } ${FOCUS}`}
+                        className={`inline-flex h-9 items-center rounded-full px-3.5 text-[12.5px] transition ${kanal === k ? "bg-[var(--brand)] font-bold text-white" : "bg-[var(--soft)] font-semibold text-[var(--fg-2)] hover:text-[var(--brand-text)]"} ${FOCUS}`}
                       >
-                        {k}
+                        {etiket("kanal", k)}
                       </button>
                     ))}
                   </div>
@@ -267,9 +251,7 @@ export function LinkOdeme({ role, meta, onNavigate }) {
                         role="radio"
                         aria-checked={gun === g}
                         onClick={() => setGun(g)}
-                        className={`inline-flex h-9 items-center rounded-full px-3.5 text-[12.5px] transition ${
-                          gun === g ? "bg-[var(--brand)] font-bold text-white" : "bg-[var(--soft)] font-semibold text-[var(--fg-2)] hover:text-[var(--brand-text)]"
-                        } ${FOCUS}`}
+                        className={`inline-flex h-9 items-center rounded-full px-3.5 text-[12.5px] transition ${gun === g ? "bg-[var(--brand)] font-bold text-white" : "bg-[var(--soft)] font-semibold text-[var(--fg-2)] hover:text-[var(--brand-text)]"} ${FOCUS}`}
                       >
                         {g} gün
                       </button>
@@ -277,29 +259,13 @@ export function LinkOdeme({ role, meta, onNavigate }) {
                   </div>
                 </div>
                 {kanal === "SMS" && (
-                  <Alan id="bn-hedef-tel" etiket="Gönderilecek telefon" hata={h("hedefTel")} ipucu={m.iletisim.tel ? "Müşterinin kayıtlı telefonu önerildi." : undefined}>
-                    <input
-                      id="bn-hedef-tel"
-                      type="tel"
-                      inputMode="tel"
-                      placeholder="05XX XXX XX XX"
-                      value={tel}
-                      onChange={(e) => setHedef({ ...hedef, tel: e.target.value })}
-                      aria-invalid={h("hedefTel") ? true : undefined}
-                      className={`${inputCls(h("hedefTel"))} tabular-nums`}
-                    />
+                  <Alan id="bn-hedef-tel" etiket="Gönderilecek telefon" hata={h("hedef")} ipucu={m.iletisim.tel ? "Müşterinin kayıtlı telefonu önerildi." : undefined}>
+                    <input id="bn-hedef-tel" type="tel" inputMode="tel" placeholder="05XX XXX XX XX" value={tel} onChange={(e) => setHedef({ ...hedef, tel: e.target.value })} aria-invalid={h("hedef") ? true : undefined} className={`${inputCls(h("hedef"))} tabular-nums`} />
                   </Alan>
                 )}
-                {kanal === "E-posta" && (
-                  <Alan id="bn-hedef-eposta" etiket="Gönderilecek e-posta" hata={h("hedefEmail")} ipucu={m.iletisim.email ? "Müşterinin kayıtlı e-postası önerildi." : undefined}>
-                    <input
-                      id="bn-hedef-eposta"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setHedef({ ...hedef, email: e.target.value })}
-                      aria-invalid={h("hedefEmail") ? true : undefined}
-                      className={inputCls(h("hedefEmail"))}
-                    />
+                {kanal === "EPOSTA" && (
+                  <Alan id="bn-hedef-eposta" etiket="Gönderilecek e-posta" hata={h("hedef")} ipucu={m.iletisim.email ? "Müşterinin kayıtlı e-postası önerildi." : undefined}>
+                    <input id="bn-hedef-eposta" type="email" value={email} onChange={(e) => setHedef({ ...hedef, email: e.target.value })} aria-invalid={h("hedef") ? true : undefined} className={inputCls(h("hedef"))} />
                   </Alan>
                 )}
               </div>
@@ -312,9 +278,9 @@ export function LinkOdeme({ role, meta, onNavigate }) {
             <dl className="mt-3 space-y-2 text-[12.5px]">
               {[
                 ["Müşteri", m.ad || "—"],
-                ["Müşteri türü", tur],
-                [TAHSILAT_CARISI[role], cariAdi ? cariAdi.ad : "—"],
-                ["Vade profili", profil ? `${profil.ad.replace("Vade Farkı ", "")} · %${profil.oran.toLocaleString("tr-TR")}` : "—"],
+                ["Müşteri türü", etiket("musteriTuru", tur)],
+                [m.cariEtiketi, cariAdi ? cariAdi.ad : "—"],
+                ["Vade profili", profil ? `${profil.ad.replace("Vade Farkı ", "")} · ${yuzde(profil.oranYuzde, 2)}` : "—"],
               ].map(([k, v]) => (
                 <div key={k} className="flex justify-between gap-3">
                   <dt className="shrink-0 text-[var(--muted)]">{k}</dt>
@@ -325,8 +291,8 @@ export function LinkOdeme({ role, meta, onNavigate }) {
             <dl className="mt-3 space-y-2 border-t border-[var(--border)] pt-3 text-[12.5px]">
               {[
                 ["Taksit seçenekleri", acikTaksitler.length ? taksitMetni(acikTaksitler) : "—"],
-                ["Gönderim", kanal === "SMS" ? tel || "SMS" : kanal === "E-posta" ? email || "E-posta" : "Link kopyalanacak"],
-                ["Son geçerlilik", tarihSaat(sonTarih).slice(0, 10)],
+                ["Gönderim", kanal === "SMS" ? tel || "SMS" : kanal === "EPOSTA" ? email || "E-posta" : "Link kopyalanacak"],
+                ["Son geçerlilik", tarih(sonTarih.toISOString())],
               ].map(([k, v]) => (
                 <div key={k} className="flex justify-between gap-3">
                   <dt className="shrink-0 text-[var(--muted)]">{k}</dt>
@@ -336,101 +302,102 @@ export function LinkOdeme({ role, meta, onNavigate }) {
             </dl>
             <div className="mt-3 flex items-baseline justify-between gap-3 rounded-xl bg-[var(--brand-soft)] px-3 py-2.5">
               <span className="text-[12px] font-semibold text-[var(--brand-text)]">Link tutarı</span>
-              <span className="text-[18px] font-extrabold tabular-nums text-[var(--fg)]">{gecerliTutar ? tl2(tutar) : "—"}</span>
+              <span className="text-[18px] font-extrabold tabular-nums text-[var(--fg)]">{gecerliTutar ? tl2(tutarKurus) : "—"}</span>
             </div>
             <p className="mt-2 text-[11.5px] text-[var(--muted)]">Vade farkı, müşterinin seçtiği taksite göre ödeme sayfasında eklenir.</p>
 
             {!kendiKarti && (
               <div className="mt-3">
-                <label className={`flex cursor-pointer items-start gap-2 rounded-xl border p-3 text-[12px] leading-snug ${h("beyan") ? "border-[var(--danger)]" : "border-[var(--border-strong)]"}`}>
-                  <input
-                    type="checkbox"
-                    checked={beyan}
-                    onChange={(e) => setBeyan(e.target.checked)}
-                    aria-invalid={h("beyan") ? true : undefined}
-                    aria-describedby={h("beyan") ? "bn-beyan-hata" : undefined}
-                    className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--brand)]"
-                  />
+                <label className={`flex cursor-pointer items-start gap-2 rounded-xl border p-3 text-[12px] leading-snug ${h("faturaBeyani") ? "border-[var(--danger)]" : "border-[var(--border-strong)]"}`}>
+                  <input type="checkbox" checked={beyan} onChange={(e) => setBeyan(e.target.checked)} aria-invalid={h("faturaBeyani") ? true : undefined} aria-describedby={h("faturaBeyani") ? "bn-beyan-hata" : undefined} className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--brand)]" />
                   <span className="text-[var(--fg-2)]">
                     Link müşteri kartıyla ödenecek. Kart sahibi ile aramızdaki faturayı <b className="font-bold">Fatura Yükleme</b> ekranından yükleyeceğimi beyan ederim.
                   </span>
                 </label>
-                {h("beyan") && (
+                {h("faturaBeyani") && (
                   <p id="bn-beyan-hata" className="mt-1 text-[11.5px] font-semibold text-[var(--danger-text)]">
-                    {h("beyan")}
+                    {h("faturaBeyani")}
                   </p>
                 )}
               </div>
             )}
 
-            {denendi && Object.keys(hatalar).length > 0 && (
+            {(sunucuMesaji || (denendi && Object.keys(hatalar).length > 0)) && (
               <p role="alert" className="mt-3 rounded-xl bg-[var(--danger-soft)] px-3 py-2 text-[12px] font-semibold text-[var(--danger-text)]">
-                {Object.keys(hatalar).length} alanı kontrol edin.
+                {sunucuMesaji || `${Object.keys(hatalar).length} alanı kontrol edin.`}
               </p>
             )}
 
             <button
               type="submit"
-              className={`mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[var(--brand)] text-[13.5px] font-bold text-white transition [box-shadow:0_10px_22px_-12px_rgba(12,52,231,0.9)] hover:brightness-110 active:scale-[0.99] ${FOCUS}`}
+              disabled={olustur.isPending}
+              className={`mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[var(--brand)] text-[13.5px] font-bold text-white transition [box-shadow:0_10px_22px_-12px_rgba(12,52,231,0.9)] hover:brightness-110 active:scale-[0.99] disabled:cursor-wait disabled:opacity-70 ${FOCUS}`}
             >
               <I name="link" size={15} />
-              {kanal === "Sadece link" ? "Link Oluştur" : `Link Oluştur ve ${kanal} Gönder`}
+              {olustur.isPending ? "Oluşturuluyor…" : kanal === "LINK" ? "Link Oluştur" : `Link Oluştur ve ${etiket("kanal", kanal)} Gönder`}
             </button>
           </aside>
         </form>
       )}
 
-      {/* son linkler */}
-      <section ref={listeRef} style={{ "--i": 4 }} className={`bn-rise mt-3 scroll-mt-20 overflow-hidden ${CARD} hover:!translate-y-0`} aria-labelledby="bn-linkler-title">
+      {/* son linkler — GET /odeme-linkleri */}
+      <section ref={listeRef} style={{ "--i": 4 }} className={`bn-rise mt-3 scroll-mt-20 overflow-hidden ${CARD} hover:!translate-y-0`} aria-labelledby="bn-linkler-title" aria-busy={linkler.isFetching}>
         <div className="px-4 py-3">
           <h2 id="bn-linkler-title" className="text-sm font-bold text-[var(--fg)]">
             Son Ödeme Linkleri
           </h2>
-          <p className="mt-0.5 text-xs text-[var(--muted)]">{satirlar.length} link · bekleyen linkleri yeniden kopyalayabilirsiniz</p>
+          <p className="mt-0.5 text-xs text-[var(--muted)]">{linkler.data ? `${satirlar.length} link · bekleyen linkleri yeniden kopyalayabilirsiniz` : "Yükleniyor…"}</p>
         </div>
-        <div className="relative overflow-x-auto">
-          <table className="min-w-full text-[12.5px]">
-            <thead>
-              <tr className="border-y border-[var(--border)] bg-[var(--soft)] text-left text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                <th scope="col" className={th}>Link No</th>
-                <th scope="col" className={th}>Oluşturma / Son Geçerlilik</th>
-                {olusturanGoster && <th scope="col" className={th}>Oluşturan</th>}
-                <th scope="col" className={th}>Müşteri</th>
-                <th scope="col" className={`${th} text-right`}>Tutar</th>
-                <th scope="col" className={th}>Kanal</th>
-                <th scope="col" className={th}>Durum</th>
-                <th scope="col" className={th}>
-                  <span className="sr-only">İşlem</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {satirlar.map((l, i) => (
-                <tr key={l.id} className={`transition-colors hover:bg-[var(--soft)] ${i > 0 ? "border-t border-[var(--border)]" : ""}`}>
-                  <td className={`${td} font-bold text-[var(--brand-text)]`}>
-                    {l.id}
-                    {yeniler.includes(l) && <span className="ml-1.5 rounded-full bg-[var(--success-soft)] px-1.5 py-px text-[10px] font-bold text-[var(--success-text)]">Yeni</span>}
-                  </td>
-                  <td className={`${td} tabular-nums`}>
-                    <span className="block text-[var(--fg-2)]">{l.olusturma}</span>
-                    <span className="block text-[11px] text-[var(--muted)]">son {l.sonGecerlilik}</span>
-                  </td>
-                  {olusturanGoster && <td className={`${td} text-[var(--fg-2)]`}>{l.yapan}</td>}
-                  <td className={td}>
-                    <span className="block font-semibold text-[var(--fg)]">{l.musteri}</span>
-                    <span className="block text-[11px] text-[var(--muted)]">{l.musteriTuru}</span>
-                  </td>
-                  <td className={`${td} text-right font-bold tabular-nums text-[var(--fg)]`}>{l.tutar}</td>
-                  <td className={`${td} text-[var(--fg-2)]`}>{l.kanal}</td>
-                  <td className={td}>
-                    <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${linkTone(l.durum)}`}>{l.durum}</span>
-                  </td>
-                  <td className={`${td} text-right`}>{l.durum === "Bekliyor" && <KopyalaDugmesi kucuk metin={`${LINK_ADRESI}${l.id.slice(4)}`} />}</td>
+        {linkler.isPending ? (
+          <Yukleniyor satir={4} baslik={false} />
+        ) : linkler.isError ? (
+          <HataKutusu hata={linkler.error} onTekrar={() => linkler.refetch()} />
+        ) : (
+          <div className="relative overflow-x-auto">
+            <table className="min-w-full text-[12.5px]">
+              <thead>
+                <tr className="border-y border-[var(--border)] bg-[var(--soft)] text-left text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                  <th scope="col" className={th}>Link No</th>
+                  <th scope="col" className={th}>Oluşturma / Son Geçerlilik</th>
+                  {olusturanGoster && <th scope="col" className={th}>Oluşturan</th>}
+                  <th scope="col" className={th}>Müşteri</th>
+                  <th scope="col" className={`${th} text-right`}>Tutar</th>
+                  <th scope="col" className={th}>Kanal</th>
+                  <th scope="col" className={th}>Durum</th>
+                  <th scope="col" className={th}>
+                    <span className="sr-only">İşlem</span>
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {satirlar.map((l, i) => (
+                  <tr key={l.linkNo} className={`transition-colors hover:bg-[var(--soft)] ${i > 0 ? "border-t border-[var(--border)]" : ""}`}>
+                    <td className={`${td} font-bold text-[var(--brand-text)]`}>
+                      {l.linkNo}
+                      {yeniler.includes(l.linkNo) && <span className="ml-1.5 rounded-full bg-[var(--success-soft)] px-1.5 py-px text-[10px] font-bold text-[var(--success-text)]">Yeni</span>}
+                    </td>
+                    <td className={`${td} tabular-nums`}>
+                      <span className="block text-[var(--fg-2)]">{tarihSaat(l.olusturma)}</span>
+                      <span className="block text-[11px] text-[var(--muted)]">son {tarihSaat(l.sonGecerlilik)}</span>
+                    </td>
+                    {olusturanGoster && <td className={`${td} text-[var(--fg-2)]`}>{l.olusturan?.unvan}</td>}
+                    <td className={td}>
+                      <span className="block font-semibold text-[var(--fg)]">{l.musteriUnvan}</span>
+                      <span className="block text-[11px] text-[var(--muted)]">{etiket("musteriTuru", l.musteriTuru)}</span>
+                    </td>
+                    <td className={`${td} text-right font-bold tabular-nums text-[var(--fg)]`}>{tl(l.tutarKurus)}</td>
+                    <td className={`${td} text-[var(--fg-2)]`}>{etiket("kanal", l.kanal)}</td>
+                    <td className={td}>
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${l.durum === "BEKLIYOR" ? "bg-[var(--brand-soft)] text-[var(--brand-text)]" : durumTonu(l.durum)}`}>{etiket("linkDurumu", l.durum)}</span>
+                    </td>
+                    <td className={`${td} text-right`}>{l.durum === "BEKLIYOR" && <KopyalaDugmesi kucuk metin={l.url} />}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {satirlar.length === 0 && <BosDurum baslik="Henüz ödeme linki yok" />}
+          </div>
+        )}
       </section>
     </>
   );

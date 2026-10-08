@@ -99,6 +99,81 @@ export function kosulHatalari(g, ust) {
   return h;
 }
 
+const ANA_FIRMA_TAKSITLER = [1, 2, 3, 6, 9, 12];
+
+/**
+ * Ödeme koşulları (şartname s.4–5): taksitler ve limit oturum firmasının tanımından; vade profili firmanın kendi
+ * profili, ana firma bir bayiden tahsilat yapıyorsa o bayinin profili, aksi halde Profil 1.
+ */
+export function odemeKosullari(kim, musteriTuru, musteriCariNo) {
+  const f = firma(kim.firmaId);
+  const profiller = depo.tablo("vadeFarkiProfilleri");
+  let profilId = f?.vadeProfilId;
+  if (kim.rol === "ANA_FIRMA") {
+    const bayi = musteriTuru === "BAYI" && musteriCariNo ? depo.tablo("firmalar").find((x) => x.cariNo === musteriCariNo) : null;
+    profilId = bayi?.vadeProfilId || 1;
+  }
+  const profil = profiller.find((p) => p.id === profilId) || profiller[0];
+  return {
+    taksitler: kim.rol === "ANA_FIRMA" ? ANA_FIRMA_TAKSITLER : f?.taksitler || [1],
+    limitKurus: kim.rol === "ANA_FIRMA" ? null : f?.islemLimitiKurus || null,
+    profil: { id: profil.id, ad: profil.ad, oranYuzde: profil.oranYuzde },
+  };
+}
+
+/**
+ * Vade farkı — DEMO VARSAYIMI: tutar × aylık oran × (taksit − 1); gerçek formülü backend ekibi belirleyecek.
+ * Dönüş kuruş cinsinden tam sayılar.
+ */
+export function taksitHesabi(tutarKurus, taksit, oranYuzde) {
+  const vade = taksit > 1 ? Math.round((tutarKurus * oranYuzde * (taksit - 1)) / 100) : 0;
+  const toplam = tutarKurus + vade;
+  return { taksit, vadeFarkiKurus: vade, toplamKurus: toplam, aylikKurus: Math.round(toplam / taksit) };
+}
+
+/** Müşteri türüne göre müşteri kaydını doğrular; { musteri: {...}, hata? } */
+export function musteriCoz(kim, g) {
+  const tur = g.musteriTuru;
+  if (tur === "BAYI" || tur === "ALT_BAYI") {
+    const f = depo.tablo("firmalar").find((x) => x.tur === tur && x.cariNo === g.musteri?.cariNo && x.durum === "AKTIF");
+    if (!f) return { hata: { musteriCariNo: "Listeden bir müşteri seçin." } };
+    if (tur === "ALT_BAYI" && f.bagliFirmaId !== kim.firmaId) return { hata: { musteriCariNo: "Bu alt bayi size bağlı değil." } };
+    return { musteri: { unvan: f.unvan, cariNo: f.cariNo, vergiNo: f.vergiNo } };
+  }
+  if (tur === "DUZENLI_MUSTERI") {
+    const m = depo.tablo("musteriler").find((x) => x.sahipFirmaId === kim.firmaId && x.cariNo === g.musteri?.cariNo);
+    if (!m) return { hata: { musteriCariNo: "Listeden bir müşteri seçin." } };
+    return { musteri: { unvan: m.unvan, cariNo: m.cariNo, vergiNo: m.vergiNo } };
+  }
+  if (tur === "KENDI_KARTI") {
+    const f = firma(kim.firmaId);
+    const sahip = g.kartSahibi;
+    if (!sahip || ![f.unvan, ...(f.ortaklar || [])].includes(sahip)) return { hata: { kartSahibi: "Kartın kime ait olduğunu seçin." } };
+    return { musteri: { unvan: sahip, cariNo: f.cariNo, vergiNo: f.vergiNo } };
+  }
+  // DUZENSIZ_MUSTERI, MUSTERI_KARTI: kısıtlı bilgi, tanım oluşturulmaz
+  const h = {};
+  const ad = String(g.musteri?.unvan || "").trim();
+  if (!ad) h.musteriUnvan = "Ad soyad ya da unvan girin.";
+  if (String(g.musteri?.telefon || "").replace(/\D/g, "").length < 10) h.musteriTelefon = "Geçerli bir telefon numarası girin.";
+  const kimlik = String(g.musteri?.kimlikNo || "").replace(/\D/g, "");
+  if (tur === "DUZENSIZ_MUSTERI" && ![10, 11].includes(kimlik.length)) h.musteriKimlikNo = "10 haneli VKN ya da 11 haneli TCKN girin.";
+  if (Object.keys(h).length) return { hata: h };
+  return { musteri: { unvan: ad, cariNo: null, vergiNo: kimlik || null, telefon: g.musteri.telefon, email: g.musteri.email || null } };
+}
+
+/** Tahsilat carisi doğrulaması: oturumun görebildiği cariler arasında olmalı */
+export function tahsilatCarileri(kim) {
+  const f = firma(kim.firmaId);
+  if (kim.rol === "ANA_FIRMA") return { etiket: "Üye İşyeri", kayitlar: depo.tablo("uyeIsyerleri").map((u) => ({ cariNo: u.cariNo, ad: u.ad })) };
+  if (kim.rol === "BAYI") {
+    const acik = f?.uyeIsyerleri || [];
+    return { etiket: "Ana Firma Carisi", kayitlar: depo.tablo("uyeIsyerleri").filter((u) => acik.includes(u.cariNo)).map((u) => ({ cariNo: u.cariNo, ad: u.ad })) };
+  }
+  const bayi = f?.bagliFirmaId ? firma(f.bagliFirmaId) : null;
+  return { etiket: "Bayi Carisi", kayitlar: bayi ? [{ cariNo: bayi.cariNo, ad: bayi.unvan }] : [] };
+}
+
 /** Sayfalama: { kayitlar, toplam, sayfa, boyut } */
 export function sayfala(liste, sorgu) {
   const sayfa = Math.max(1, Number(sorgu.get("sayfa")) || 1);

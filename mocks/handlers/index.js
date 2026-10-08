@@ -6,5 +6,17 @@ import { bayilerHandlers } from "./bayiler";
 import { firmaHandlers } from "./firma";
 import { tanimlarHandlers } from "./tanimlar";
 import { musterilerHandlers } from "./musteriler";
+import { odemelerHandlers } from "./odemeler";
+import { linklerHandlers } from "./linkler";
 
-export const handlers = [...oturumHandlers, ...panelHandlers, ...islemlerHandlers, ...bayilerHandlers, ...firmaHandlers, ...tanimlarHandlers, ...musterilerHandlers];
+export const handlers = [
+  ...oturumHandlers,
+  ...panelHandlers,
+  ...islemlerHandlers,
+  ...bayilerHandlers,
+  ...firmaHandlers,
+  ...tanimlarHandlers,
+  ...musterilerHandlers,
+  ...odemelerHandlers,
+  ...linklerHandlers,
+];

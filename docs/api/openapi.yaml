@@ -390,6 +390,126 @@ paths:
         "409": { $ref: "#/components/responses/IsKurali" }
         "422": { $ref: "#/components/responses/IsKurali" }
 
+  /tahsilat-carileri:
+    get:
+      tags: [Ödeme]
+      summary: Ödemenin aktarılacağı cariler
+      description: Ana firma üye işyerlerini, bayi kendisine açık üye işyerlerini, alt bayi bağlı olduğu bayinin carisini görür (şartname s.2, s.6).
+      responses:
+        "200":
+          description: Cariler
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  etiket: { type: string, example: Ana Firma Carisi, description: Ekranda alanın başlığı }
+                  kayitlar:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        cariNo: { type: string }
+                        ad: { type: string }
+
+  /odeme/taksit-secenekleri:
+    get:
+      tags: [Ödeme]
+      summary: Taksit seçenekleri ve vade farkı
+      description: |
+        Taksitler ve işlem limiti oturum firmasının tanımından; vade profili firmanın kendi profili, ana firma bir
+        bayiden tahsilat yapıyorsa o bayinin profili, aksi halde Profil 1 (şartname s.4–5). Hesap sunucuda yapılır;
+        formül backend ekibince netleştirilecek (mockup varsayımı: tutar × aylık oran × (taksit − 1)).
+      parameters:
+        - { name: musteriTuru, in: query, required: true, schema: { $ref: "#/components/schemas/MusteriTuru" } }
+        - { name: musteriCariNo, in: query, schema: { type: string } }
+        - { name: tutarKurus, in: query, schema: { $ref: "#/components/schemas/Kurus" }, description: Boşsa seçenekler tutarsız döner }
+      responses:
+        "200":
+          description: Seçenekler
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vadeProfil: { $ref: "#/components/schemas/VadeFarkiProfili" }
+                  limitKurus: { oneOf: [{ $ref: "#/components/schemas/Kurus" }, { type: "null" }], description: İşlem bazlı ödeme limiti; ana firmada yok }
+                  taksitler: { type: array, items: { type: integer } }
+                  secenekler:
+                    type: array
+                    items: { $ref: "#/components/schemas/TaksitSecenegi" }
+              example:
+                vadeProfil: { id: 2, ad: Vade Farkı Profil 2, oranYuzde: 2.45 }
+                limitKurus: 15000000
+                taksitler: [1, 2, 3, 6, 9]
+                secenekler:
+                  - { taksit: 1, vadeFarkiKurus: 0, toplamKurus: 1200000, aylikKurus: 1200000 }
+                  - { taksit: 6, vadeFarkiKurus: 147000, toplamKurus: 1347000, aylikKurus: 224500 }
+
+  /odemeler:
+    post:
+      tags: [Ödeme]
+      summary: Manuel ödeme al
+      description: |
+        Şartname s.6 ve s.9. Kart numarası isteğe yazılmaz: istemci kartı ödeme sağlayıcısında tokenlaştırır ve
+        yalnızca `kart.token` gönderir (PCI). `Idempotency-Key` başlığı aynı isteğin ikinci gönderiminde ilk cevabı
+        döndürür. Doğrulama hataları 422 ile alan alan gelir. Demo: son 4 hanesi 0002 olan kart BASARISIZ döner.
+      parameters:
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OdemeGirdisi" }
+            example:
+              musteriTuru: DUZENLI_MUSTERI
+              musteri: { cariNo: "120.01.045" }
+              tahsilatCariNo: "320.00.001"
+              tutarKurus: 1200000
+              taksit: 6
+              aciklama: Eylül faturası
+              kart: { token: tok_demo_4821_x7k2p9, son4: "4821", isim: Ahmet Yıldız }
+              faturaBeyani: true
+      responses:
+        "201":
+          description: İşlem sonucu (BASARILI ya da BASARISIZ)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OdemeSonucu" }
+        "422": { $ref: "#/components/responses/IsKurali" }
+
+  /odeme-linkleri:
+    get:
+      tags: [Ödeme]
+      summary: Ödeme linkleri (rol kapsamında, en yeniden eskiye)
+      responses:
+        "200":
+          description: Liste
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Liste"
+                  - type: object
+                    properties:
+                      kayitlar: { type: array, items: { $ref: "#/components/schemas/OdemeLinki" } }
+    post:
+      tags: [Ödeme]
+      summary: Ödeme linki oluştur ve gönder
+      description: Müşteri seçimi manuel ödemeyle aynı yapıda (şartname s.6). Müşteriye yalnızca `taksitler` listesindeki taksitler gösterilir.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OdemeLinkiGirdisi" }
+      responses:
+        "201":
+          description: Oluşturulan link
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OdemeLinki" }
+        "422": { $ref: "#/components/responses/IsKurali" }
+
   # --- Sonraki adımlarda eklenecek uç noktalar (docs/api/README.md'deki tablo) ---
   # /panel/bekleyenler (menü rozetleri — iptal/iade ve fatura ekranları API'ye geçince) · /tahsilat-carileri · /firma/ortaklar · /odeme/taksit-secenekleri · /odemeler · /odeme-linkleri
   # /iptal-iade-talepleri · /iptal-iade-talepleri/uygun-islemler · /iptal-iade-talepleri/{id}/onay · /{id}/red
@@ -577,6 +697,101 @@ components:
         ortaklar: { type: array, items: { type: string }, description: Kendi kartı ödemesinde kart sahibi seçenekleri }
         logoRenk: { type: [string, "null"] }
         durum: { $ref: "#/components/schemas/KayitDurumu" }
+
+    TaksitSecenegi:
+      type: object
+      properties:
+        taksit: { type: integer, description: 1 = tek çekim }
+        vadeFarkiKurus: { $ref: "#/components/schemas/Kurus" }
+        toplamKurus: { $ref: "#/components/schemas/Kurus" }
+        aylikKurus: { $ref: "#/components/schemas/Kurus" }
+
+    MusteriGirdisi:
+      type: object
+      description: |
+        BAYI / ALT_BAYI / DUZENLI_MUSTERI → yalnızca `cariNo`; DUZENSIZ_MUSTERI → unvan, kimlikNo (TCKN/VKN), telefon, email?;
+        MUSTERI_KARTI → unvan, telefon, email?; KENDI_KARTI → gönderilmez, `kartSahibi` kullanılır.
+      properties:
+        cariNo: { type: string }
+        unvan: { type: string }
+        kimlikNo: { type: string, description: 10 haneli VKN ya da 11 haneli TCKN }
+        telefon: { type: string }
+        email: { type: string }
+
+    OdemeGirdisi:
+      type: object
+      required: [musteriTuru, tahsilatCariNo, tutarKurus, taksit, kart]
+      properties:
+        musteriTuru: { $ref: "#/components/schemas/MusteriTuru" }
+        musteri: { $ref: "#/components/schemas/MusteriGirdisi" }
+        kartSahibi: { type: string, description: KENDI_KARTI için firma unvanı ya da ortak adı }
+        tahsilatCariNo: { type: string }
+        tutarKurus: { $ref: "#/components/schemas/Kurus" }
+        taksit: { type: integer, minimum: 1 }
+        aciklama: { type: string }
+        kart:
+          type: object
+          required: [token, son4, isim]
+          properties:
+            token: { type: string, description: Ödeme sağlayıcısının kart tokenı — kart numarası asla gönderilmez }
+            son4: { type: string }
+            isim: { type: string, description: Kart üzerindeki isim }
+        faturaBeyani: { type: boolean, description: Müşteri kartında zorunlu (şartname s.9) }
+
+    OdemeSonucu:
+      allOf:
+        - $ref: "#/components/schemas/Islem"
+        - type: object
+          properties:
+            kart:
+              type: object
+              properties:
+                son4: { type: string }
+                isim: { type: string }
+            tahsilatCarisi:
+              type: object
+              properties:
+                cariNo: { type: string }
+                ad: { type: string }
+            vadeFarkiKurus: { $ref: "#/components/schemas/Kurus" }
+            toplamKurus: { $ref: "#/components/schemas/Kurus" }
+            aylikKurus: { $ref: "#/components/schemas/Kurus" }
+            vadeProfil: { $ref: "#/components/schemas/VadeFarkiProfili" }
+            faturaGerekli: { type: boolean, description: Kendi kartı olmayan bayi / alt bayi işlemi — fatura yüklenmeli }
+            redNedeni: { type: [string, "null"], description: BASARISIZ ise bankanın red nedeni }
+
+    OdemeLinkiGirdisi:
+      type: object
+      required: [musteriTuru, tahsilatCariNo, tutarKurus, taksitler, kanal, gecerlilikGun]
+      properties:
+        musteriTuru: { $ref: "#/components/schemas/MusteriTuru" }
+        musteri: { $ref: "#/components/schemas/MusteriGirdisi" }
+        kartSahibi: { type: string }
+        tahsilatCariNo: { type: string }
+        tutarKurus: { $ref: "#/components/schemas/Kurus" }
+        taksitler: { type: array, items: { type: integer }, description: Müşteriye gösterilecek taksitler }
+        kanal: { type: string, enum: [SMS, EPOSTA, LINK] }
+        hedef: { type: string, description: SMS için telefon, EPOSTA için e-posta }
+        gecerlilikGun: { type: integer, enum: [1, 3, 7, 30] }
+        aciklama: { type: string }
+        faturaBeyani: { type: boolean }
+
+    OdemeLinki:
+      type: object
+      properties:
+        linkNo: { type: string, example: LNK-7Q2M4X }
+        url: { type: string, format: uri }
+        olusturma: { type: string, format: date-time }
+        sonGecerlilik: { type: string, format: date-time }
+        olusturan: { $ref: "#/components/schemas/FirmaOzeti" }
+        musteriTuru: { $ref: "#/components/schemas/MusteriTuru" }
+        musteriUnvan: { type: string }
+        tutarKurus: { $ref: "#/components/schemas/Kurus" }
+        kanal: { type: string, enum: [SMS, EPOSTA, LINK] }
+        hedef: { type: [string, "null"] }
+        taksitler: { type: [array, "null"], items: { type: integer } }
+        tahsilatCarisi: { type: [object, "null"] }
+        durum: { type: string, enum: [BEKLIYOR, ODENDI, SURESI_DOLDU, IPTAL_EDILDI] }
 
     Musteri:
       type: object

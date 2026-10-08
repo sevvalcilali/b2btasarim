@@ -1,82 +1,90 @@
-// Manuel ödeme ve link ile ödemenin ortak müşteri bölümü ve ödeme koşulları (şartname s.4–6).
-
-import { useState } from "react";
+// Manuel ödeme ve link ile ödemenin ortak müşteri bölümü (şartname s.6). Veri: GET /bayiler, GET /musteriler,
+// GET /tahsilat-carileri, GET /firma. Taksit, limit ve vade farkı ekranların kendi isteğiyle (/odeme/taksit-secenekleri) gelir.
+import { useEffect, useRef, useState } from "react";
 import { ROLES } from "@/lib/roles";
-import { anaFirma } from "@/lib/mockData";
 import I from "@/components/DesignIcons";
-import { agDeposu, firmaKaydi, vadeProfili } from "./ag";
+import { etiket } from "@/lib/etiketler";
+import { useBayiler } from "@/lib/sorgular/bayiler";
+import { useMusteriler, useTahsilatCarileri } from "@/lib/sorgular/odeme";
+import { useFirma } from "@/lib/sorgular/tanimlar";
 import { inputCls, Alan, MusteriSecici } from "./ortak";
 import { FOCUS } from "./tema";
 import { rakamlar } from "./yardimci";
 
+// Rolün seçebildiği müşteri türleri (şartname s.6)
 const MUSTERI_SECENEKLERI = {
-  [ROLES.ANA_FIRMA]: ["Bayi", "Düzenli Müşteri", "Düzensiz Müşteri"],
-  [ROLES.BAYI]: ["Alt Bayi", "Düzenli Müşteri", "Düzensiz Müşteri", "Kendi Kartı"],
-  [ROLES.ALT_BAYI]: ["Müşteri Kartı", "Kendi Kartı"],
-};
-
-export const TAHSILAT_CARISI = {
-  [ROLES.ANA_FIRMA]: "Üye İşyeri",
-  [ROLES.BAYI]: "Ana Firma Carisi",
-  [ROLES.ALT_BAYI]: "Bayi Carisi",
+  [ROLES.ANA_FIRMA]: ["BAYI", "DUZENLI_MUSTERI", "DUZENSIZ_MUSTERI"],
+  [ROLES.BAYI]: ["ALT_BAYI", "DUZENLI_MUSTERI", "DUZENSIZ_MUSTERI", "KENDI_KARTI"],
+  [ROLES.ALT_BAYI]: ["MUSTERI_KARTI", "KENDI_KARTI"],
 };
 
 // tanımlı (listeden seçilen) müşteri türleri
-const LISTELI = new Set(["Bayi", "Alt Bayi", "Düzenli Müşteri"]);
+export const LISTELI = new Set(["BAYI", "ALT_BAYI", "DUZENLI_MUSTERI"]);
 
-const ANA_FIRMA_TAKSITLER = [1, 2, 3, 6, 9, 12];
-
-// Müşteri seçimi — manuel ödeme ve link ile ödeme aynı yapıyı kullanır (şartname s.6)
-const BOS_KISI = { ad: "", vkn: "", tel: "", email: "" };
+const BOS_KISI = { ad: "", kimlikNo: "", tel: "", email: "" };
 
 // onerilenCari: listeden "Ödeme Al" ile gelindiğinde müşteri türü ve müşteri hazır seçili gelir
-export function useMusteriSecimi(role, meta, onerilenCari) {
-  const { bayiler, altBayiler, musteriler } = agDeposu.al();
+export function useMusteriSecimi(role, onerilenCari) {
   const turler = MUSTERI_SECENEKLERI[role];
-  const kayit = firmaKaydi(role);
-  const cariler =
-    role === ROLES.ALT_BAYI
-      ? bayiler.filter((b) => b.unvan === meta.parent).map((b) => ({ ad: b.unvan, cari: b.cari }))
-      : anaFirma.uyeIsyerleri;
+  const bayiTuru = turler.find((t) => t === "BAYI" || t === "ALT_BAYI");
+  const bayiler = useBayiler({ tur: bayiTuru, durum: "AKTIF" }, { enabled: !!bayiTuru });
+  const musteriler = useMusteriler({}, { enabled: turler.includes("DUZENLI_MUSTERI") });
+  const cariler = useTahsilatCarileri();
+  const firma = useFirma();
 
-  const [baslangic] = useState(() => {
-    const aday = [
-      ["Bayi", bayiler],
-      ["Alt Bayi", altBayiler],
-      ["Düzenli Müşteri", musteriler.filter((x) => x.sahip === meta.company)],
-    ].find(([t, liste]) => turler.includes(t) && liste.some((x) => x.cari === onerilenCari));
-    return aday ? { tur: aday[0], secili: aday[1].find((x) => x.cari === onerilenCari) } : null;
-  });
-  const [tur, setTurDurumu] = useState(baslangic?.tur || turler[0]);
-  const [secili, setSecili] = useState(baslangic?.secili || null);
+  const [tur, setTurDurumu] = useState(turler[0]);
+  const [secili, setSecili] = useState(null);
   const [kendi, setKendi] = useState("");
   const [kisi, setKisi] = useState(BOS_KISI);
-  const [cari, setCari] = useState(cariler[0]?.cari || "");
+  const [cari, setCari] = useState("");
 
-  // listeden seçilecek müşteriler
-  const secenekler =
-    tur === "Bayi"
-      ? bayiler.filter((b) => b.durum === "Aktif")
-      : tur === "Alt Bayi"
-        ? altBayiler.filter((b) => b.durum === "Aktif" && b.bagliBayi === meta.company)
-        : musteriler.filter((x) => x.sahip === meta.company);
-  // kendi kartı: firmanın kendi unvanı ya da ortakları
-  const kendiSecenekleri = [{ ad: meta.company, rol: "Firma unvanı" }, ...(kayit?.ortaklar || []).map((o) => ({ ad: o, rol: "Ortak" }))];
-  const kendiKarti = tur === "Kendi Kartı";
+  const listeler = {
+    BAYI: bayiler.data?.kayitlar,
+    ALT_BAYI: bayiler.data?.kayitlar,
+    DUZENLI_MUSTERI: musteriler.data?.kayitlar,
+  };
+  const secenekler = listeler[tur] || [];
+  const listeYukleniyor = LISTELI.has(tur) && (tur === "DUZENLI_MUSTERI" ? musteriler.isPending : bayiler.isPending);
 
+  // önerilen cari listelerden birinde bulununca o türe geçilir ve seçilir (bir kez)
+  const uygulandi = useRef(false);
+  useEffect(() => {
+    if (!onerilenCari || uygulandi.current) return;
+    for (const t of turler) {
+      const kayit = listeler[t]?.find((x) => x.cariNo === onerilenCari);
+      if (kayit) {
+        uygulandi.current = true;
+        setTurDurumu(t);
+        setSecili(kayit);
+        return;
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onerilenCari, bayiler.data, musteriler.data]);
+
+  // tahsilat carisi: liste gelince ilk kayıt seçilir
+  useEffect(() => {
+    if (!cari && cariler.data?.kayitlar?.length) setCari(cariler.data.kayitlar[0].cariNo);
+  }, [cariler.data, cari]);
+
+  const kendiKarti = tur === "KENDI_KARTI";
+  const kendiSecenekleri = firma.data ? [{ ad: firma.data.unvan, rol: "Firma unvanı" }, ...(firma.data.ortaklar || []).map((o) => ({ ad: o, rol: "Ortak" }))] : [];
+
+  // ekran tarafı doğrulama; anahtarlar sunucu cevabındaki alan adlarıyla aynı
   const hatalar = {};
-  if (LISTELI.has(tur) && !secili) hatalar.musteri = "Listeden bir müşteri seçin.";
-  if (tur === "Düzensiz Müşteri" || tur === "Müşteri Kartı") {
-    if (!kisi.ad.trim()) hatalar.ad = "Ad soyad ya da unvan girin.";
-    if (rakamlar(kisi.tel).length < 10) hatalar.tel = "Geçerli bir telefon numarası girin.";
+  if (LISTELI.has(tur) && !secili) hatalar.musteriCariNo = "Listeden bir müşteri seçin.";
+  if (tur === "DUZENSIZ_MUSTERI" || tur === "MUSTERI_KARTI") {
+    if (!kisi.ad.trim()) hatalar.musteriUnvan = "Ad soyad ya da unvan girin.";
+    if (rakamlar(kisi.tel).length < 10) hatalar.musteriTelefon = "Geçerli bir telefon numarası girin.";
   }
-  if (tur === "Düzensiz Müşteri" && ![10, 11].includes(rakamlar(kisi.vkn).length)) hatalar.vkn = "10 haneli VKN ya da 11 haneli TCKN girin.";
-  if (kendiKarti && !kendi) hatalar.kendi = "Kartın kime ait olduğunu seçin.";
+  if (tur === "DUZENSIZ_MUSTERI" && ![10, 11].includes(rakamlar(kisi.kimlikNo).length)) hatalar.musteriKimlikNo = "10 haneli VKN ya da 11 haneli TCKN girin.";
+  if (kendiKarti && !kendi) hatalar.kartSahibi = "Kartın kime ait olduğunu seçin.";
+  if (!cari) hatalar.tahsilatCariNo = "Tahsilat carisi seçin.";
+
+  const cariAdi = cariler.data?.kayitlar.find((c) => c.cariNo === cari) || null;
 
   return {
     turler,
-    kayit,
-    cariler,
     tur,
     secili,
     setSecili,
@@ -86,18 +94,35 @@ export function useMusteriSecimi(role, meta, onerilenCari) {
     setKisi,
     cari,
     setCari,
+    cariler: cariler.data?.kayitlar || [],
+    cariEtiketi: cariler.data?.etiket || "Tahsilat carisi",
     secenekler,
+    listeYukleniyor,
     kendiSecenekleri,
     kendiKarti,
+    firma: firma.data || null,
     hatalar,
+    yukleniyor: cariler.isPending || firma.isPending,
+    hata: cariler.error || firma.error || bayiler.error || musteriler.error || null,
     ad: LISTELI.has(tur) ? secili?.unvan : kendiKarti ? kendi : kisi.ad.trim(),
     // link gönderiminde öneri olarak kullanılan iletişim bilgisi
     iletisim: LISTELI.has(tur)
       ? { tel: secili?.telefon || "", email: secili?.email || "" }
       : kendiKarti
-        ? { tel: kayit?.telefon || "", email: kayit?.email || "" }
+        ? { tel: firma.data?.telefon || "", email: firma.data?.email || "" }
         : { tel: kisi.tel, email: kisi.email },
-    cariAdi: cariler.find((c) => c.cari === cari),
+    cariAdi,
+    // ödeme / link isteğinin müşteri kısmı (sözleşme: OdemeGirdisi)
+    govde: () => ({
+      musteriTuru: tur,
+      musteri: LISTELI.has(tur)
+        ? { cariNo: secili?.cariNo }
+        : kendiKarti
+          ? undefined
+          : { unvan: kisi.ad.trim(), kimlikNo: rakamlar(kisi.kimlikNo) || undefined, telefon: kisi.tel.trim(), email: kisi.email.trim() || undefined },
+      kartSahibi: kendiKarti ? kendi : undefined,
+      tahsilatCariNo: cari,
+    }),
     setTur: (t) => {
       setTurDurumu(t);
       setSecili(null);
@@ -112,23 +137,8 @@ export function useMusteriSecimi(role, meta, onerilenCari) {
   };
 }
 
-// Taksit sınırı, işlem limiti ve vade profili bayi tanımından gelir; ana firma bayiden tahsilatta o bayinin profilini uygular
-export function odemeKosullari(kayit, tur, secili) {
-  return {
-    taksitler: kayit ? kayit.taksitler : ANA_FIRMA_TAKSITLER,
-    limit: kayit ? kayit.islemLimiti : null,
-    profil: vadeProfili(kayit ? kayit.vadeProfil : tur === "Bayi" && secili ? secili.vadeProfil : "Profil 1"),
-  };
-}
-
-export function vadeHesabi(tutar, n, profil) {
-  const vade = tutar > 0 && n > 1 && profil ? (tutar * profil.oran * (n - 1)) / 100 : 0;
-  const toplam = tutar + vade;
-  return { vade, toplam, aylik: toplam / n };
-}
-
 export function MusteriBolumu({ role, m, h }) {
-  const { turler, tur, setTur, secenekler, secili, setSecili, kisi, setKisi, kendiKarti, kendiSecenekleri, kendi, setKendi, cariler, cari, setCari } = m;
+  const { turler, tur, setTur, secenekler, listeYukleniyor, secili, setSecili, kisi, setKisi, kendiKarti, kendiSecenekleri, kendi, setKendi, cariler, cariEtiketi, cari, setCari } = m;
   return (
     <>
       <div role="radiogroup" aria-label="Müşteri türü" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-0.5">
@@ -143,22 +153,28 @@ export function MusteriBolumu({ role, m, h }) {
               tur === t ? "bg-[var(--brand)] font-bold text-white" : "bg-[var(--soft)] font-semibold text-[var(--fg-2)] hover:text-[var(--brand-text)]"
             } ${FOCUS}`}
           >
-            {t}
+            {etiket("musteriTuru", t)}
           </button>
         ))}
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {LISTELI.has(tur) && (
-          <Alan id="bn-musteri" etiket={tur === "Düzenli Müşteri" ? "Tanımlı müşteri" : tur} hata={h("musteri")} className="sm:col-span-2">
-            <MusteriSecici key={tur} id="bn-musteri" secenekler={secenekler} secili={secili} onSec={setSecili} hata={h("musteri")} />
+          <Alan
+            id="bn-musteri"
+            etiket={tur === "DUZENLI_MUSTERI" ? "Tanımlı müşteri" : etiket("musteriTuru", tur)}
+            hata={h("musteriCariNo")}
+            ipucu={listeYukleniyor ? "Liste yükleniyor…" : undefined}
+            className="sm:col-span-2"
+          >
+            <MusteriSecici key={tur} id="bn-musteri" secenekler={secenekler} secili={secili} onSec={setSecili} hata={h("musteriCariNo")} />
           </Alan>
         )}
 
         {LISTELI.has(tur) && secili && (
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-xl bg-[var(--soft)] p-3 text-[12px] sm:col-span-2 sm:grid-cols-4">
             {[
-              ["Cari No", secili.cari],
+              ["Cari No", secili.cariNo],
               ["Vergi No", secili.vergiNo],
               ["Telefon", secili.telefon],
               ["E-posta", secili.email],
@@ -171,32 +187,25 @@ export function MusteriBolumu({ role, m, h }) {
           </dl>
         )}
 
-        {(tur === "Düzensiz Müşteri" || tur === "Müşteri Kartı") && (
+        {(tur === "DUZENSIZ_MUSTERI" || tur === "MUSTERI_KARTI") && (
           <>
-            <Alan id="bn-ad" etiket="Ad soyad / Unvan" hata={h("ad")}>
-              <input
-                id="bn-ad"
-                value={kisi.ad}
-                onChange={(e) => setKisi({ ...kisi, ad: e.target.value })}
-                aria-invalid={h("ad") ? true : undefined}
-                autoComplete="name"
-                className={inputCls(h("ad"))}
-              />
+            <Alan id="bn-ad" etiket="Ad soyad / Unvan" hata={h("musteriUnvan")}>
+              <input id="bn-ad" value={kisi.ad} onChange={(e) => setKisi({ ...kisi, ad: e.target.value })} aria-invalid={h("musteriUnvan") ? true : undefined} autoComplete="name" className={inputCls(h("musteriUnvan"))} />
             </Alan>
-            {tur === "Düzensiz Müşteri" && (
-              <Alan id="bn-vkn" etiket="TCKN / VKN" hata={h("vkn")}>
+            {tur === "DUZENSIZ_MUSTERI" && (
+              <Alan id="bn-vkn" etiket="TCKN / VKN" hata={h("musteriKimlikNo")}>
                 <input
                   id="bn-vkn"
                   inputMode="numeric"
                   maxLength={11}
-                  value={kisi.vkn}
-                  onChange={(e) => setKisi({ ...kisi, vkn: rakamlar(e.target.value) })}
-                  aria-invalid={h("vkn") ? true : undefined}
-                  className={`${inputCls(h("vkn"))} tabular-nums`}
+                  value={kisi.kimlikNo}
+                  onChange={(e) => setKisi({ ...kisi, kimlikNo: rakamlar(e.target.value) })}
+                  aria-invalid={h("musteriKimlikNo") ? true : undefined}
+                  className={`${inputCls(h("musteriKimlikNo"))} tabular-nums`}
                 />
               </Alan>
             )}
-            <Alan id="bn-tel" etiket="Telefon" hata={h("tel")}>
+            <Alan id="bn-tel" etiket="Telefon" hata={h("musteriTelefon")}>
               <input
                 id="bn-tel"
                 type="tel"
@@ -204,22 +213,15 @@ export function MusteriBolumu({ role, m, h }) {
                 placeholder="05XX XXX XX XX"
                 value={kisi.tel}
                 onChange={(e) => setKisi({ ...kisi, tel: e.target.value })}
-                aria-invalid={h("tel") ? true : undefined}
+                aria-invalid={h("musteriTelefon") ? true : undefined}
                 autoComplete="tel"
-                className={`${inputCls(h("tel"))} tabular-nums`}
+                className={`${inputCls(h("musteriTelefon"))} tabular-nums`}
               />
             </Alan>
             <Alan id="bn-eposta" etiket="E-posta (isteğe bağlı)">
-              <input
-                id="bn-eposta"
-                type="email"
-                value={kisi.email}
-                onChange={(e) => setKisi({ ...kisi, email: e.target.value })}
-                autoComplete="email"
-                className={inputCls()}
-              />
+              <input id="bn-eposta" type="email" value={kisi.email} onChange={(e) => setKisi({ ...kisi, email: e.target.value })} autoComplete="email" className={inputCls()} />
             </Alan>
-            {tur === "Düzensiz Müşteri" && (
+            {tur === "DUZENSIZ_MUSTERI" && (
               <p className="flex items-start gap-1.5 text-[11.5px] text-[var(--muted)] sm:col-span-2">
                 <I name="info" size={13} className="mt-px shrink-0" />
                 Düzensiz müşteride bilgiler bu alanlarla sınırlıdır; müşteri tanımı oluşturulmaz.
@@ -229,7 +231,7 @@ export function MusteriBolumu({ role, m, h }) {
         )}
 
         {kendiKarti && (
-          <fieldset className="sm:col-span-2" aria-describedby={h("kendi") ? "bn-kendi-hata" : undefined}>
+          <fieldset className="sm:col-span-2" aria-describedby={h("kartSahibi") ? "bn-kendi-hata" : undefined}>
             <legend className="mb-1 block text-[12px] font-semibold text-[var(--fg-2)]">Kart sahibi</legend>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               {kendiSecenekleri.map((o) => (
@@ -239,15 +241,7 @@ export function MusteriBolumu({ role, m, h }) {
                     kendi === o.ad ? "border-[var(--brand)] bg-[var(--brand-soft)]" : "border-[var(--border-strong)] hover:border-[var(--brand)]"
                   }`}
                 >
-                  <input
-                    type="radio"
-                    name="bn-kendi"
-                    value={o.ad}
-                    checked={kendi === o.ad}
-                    onChange={() => setKendi(o.ad)}
-                    aria-invalid={h("kendi") ? true : undefined}
-                    className="h-4 w-4 accent-[var(--brand)]"
-                  />
+                  <input type="radio" name="bn-kendi" value={o.ad} checked={kendi === o.ad} onChange={() => setKendi(o.ad)} aria-invalid={h("kartSahibi") ? true : undefined} className="h-4 w-4 accent-[var(--brand)]" />
                   <span className="min-w-0 leading-tight">
                     <span className="block truncate text-[12.5px] font-bold text-[var(--fg)]">{o.ad}</span>
                     <span className="block text-[11px] text-[var(--muted)]">{o.rol}</span>
@@ -255,24 +249,20 @@ export function MusteriBolumu({ role, m, h }) {
                 </label>
               ))}
             </div>
-            {h("kendi") && (
+            {h("kartSahibi") && (
               <p id="bn-kendi-hata" className="mt-1 text-[11.5px] font-semibold text-[var(--danger-text)]">
-                {h("kendi")}
+                {h("kartSahibi")}
               </p>
             )}
           </fieldset>
         )}
 
-        <Alan
-          id="bn-cari"
-          etiket={TAHSILAT_CARISI[role]}
-          ipucu={role === ROLES.ANA_FIRMA ? "Ödemenin alınacağı üye işyeri." : "Ödemenin aktarılacağı cari."}
-          className="sm:col-span-2"
-        >
-          <select id="bn-cari" value={cari} onChange={(e) => setCari(e.target.value)} className={inputCls()}>
+        <Alan id="bn-cari" etiket={cariEtiketi} hata={h("tahsilatCariNo")} ipucu={role === ROLES.ANA_FIRMA ? "Ödemenin alınacağı üye işyeri." : "Ödemenin aktarılacağı cari."} className="sm:col-span-2">
+          <select id="bn-cari" value={cari} onChange={(e) => setCari(e.target.value)} aria-invalid={h("tahsilatCariNo") ? true : undefined} className={inputCls(h("tahsilatCariNo"))}>
+            {cariler.length === 0 && <option value="">Yükleniyor…</option>}
             {cariler.map((c) => (
-              <option key={c.cari} value={c.cari}>
-                {c.ad} — {c.cari}
+              <option key={c.cariNo} value={c.cariNo}>
+                {c.ad} — {c.cariNo}
               </option>
             ))}
           </select>
@@ -280,4 +270,9 @@ export function MusteriBolumu({ role, m, h }) {
       </div>
     </>
   );
+}
+
+/** Sunucudan dönen alan hatalarını (ApiHatasi.alanlar) forma bağlayan yardımcı: h(k) → ekran ya da sunucu hatası */
+export function hataBaglayici(denendi, hatalar, sunucuHatalari) {
+  return (k) => sunucuHatalari[k] || (denendi ? hatalar[k] : undefined);
 }

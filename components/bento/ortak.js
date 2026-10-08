@@ -131,7 +131,7 @@ export function MusteriSecici({ id, secenekler, secili, onSec, hata }) {
   const [aktif, setAktif] = useState(0);
   const kutuRef = useRef(null);
   const kucuk = (x) => x.toLocaleLowerCase("tr-TR");
-  const liste = secenekler.filter((m) => !arama || [m.unvan, m.cari, m.vergiNo].some((f) => kucuk(f).includes(kucuk(arama))));
+  const liste = secenekler.filter((m) => !arama || [m.unvan, m.cariNo, m.vergiNo].some((f) => kucuk(f).includes(kucuk(arama))));
 
   useEffect(() => {
     if (!acik) return undefined;
@@ -174,7 +174,7 @@ export function MusteriSecici({ id, secenekler, secili, onSec, hata }) {
         aria-activedescendant={acik && liste[aktif] ? `${id}-sec-${aktif}` : undefined}
         aria-invalid={hata ? true : undefined}
         aria-describedby={hata ? `${id}-hata` : undefined}
-        value={acik || !secili ? arama : `${secili.unvan} — ${secili.cari}`}
+        value={acik || !secili ? arama : `${secili.unvan} — ${secili.cariNo}`}
         placeholder="Unvan, cari no ya da vergi no ile arayın"
         onFocus={() => {
           setAcik(true);
@@ -200,10 +200,10 @@ export function MusteriSecici({ id, secenekler, secili, onSec, hata }) {
           ) : (
             liste.map((m, i) => (
               <li
-                key={m.cari}
+                key={m.cariNo}
                 id={`${id}-sec-${i}`}
                 role="option"
-                aria-selected={secili?.cari === m.cari}
+                aria-selected={secili?.cariNo === m.cariNo}
                 onMouseDown={(e) => {
                   e.preventDefault();
                   sec(m);
@@ -214,10 +214,10 @@ export function MusteriSecici({ id, secenekler, secili, onSec, hata }) {
                 <span className="min-w-0">
                   <span className="block truncate text-[13px] font-semibold text-[var(--fg)]">{m.unvan}</span>
                   <span className="block text-[11px] tabular-nums text-[var(--muted)]">
-                    {m.cari} · VKN {m.vergiNo}
+                    {m.cariNo} · VKN {m.vergiNo}
                   </span>
                 </span>
-                {secili?.cari === m.cari && <I name="check" size={15} className="shrink-0 text-[var(--brand-text)]" />}
+                {secili?.cariNo === m.cariNo && <I name="check" size={15} className="shrink-0 text-[var(--brand-text)]" />}
               </li>
             ))
           )}

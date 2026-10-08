@@ -40,8 +40,8 @@ Ekran (components/bento/ekranlar)  →  lib/sorgular (React Query kancaları)  �
 | | `GET /panel/bekleyenler` (menü rozetleri) | ⏳ adım 5–6 ile (iptal/iade ve fatura API'ye geçince) |
 | Ana Sayfa | `GET /panel/ozet` · `GET /panel/haftalik-hacim` · `GET /panel/bakiye` · `GET /islemler?boyut=6` | ✅ |
 | İşlem Detayları | `GET /islemler` | ✅ sözleşme + sahte backend + ekran |
-| Manuel Ödeme | `GET /musteriler` · `GET /tahsilat-carileri` · `GET /firma/ortaklar` · `GET /odeme/taksit-secenekleri` · `POST /odemeler` | ⏳ adım 4 |
-| Link ile Ödeme | + `GET /odeme-linkleri` · `POST /odeme-linkleri` | ⏳ adım 4 |
+| Manuel Ödeme | `GET /bayiler` · `GET /musteriler` · `GET /tahsilat-carileri` · `GET /firma` (ortaklar) · `GET /odeme/taksit-secenekleri` · `POST /odemeler` | ✅ |
+| Link ile Ödeme | + `GET /odeme-linkleri` · `POST /odeme-linkleri` | ✅ |
 | İptal / İade | `GET /iptal-iade-talepleri` · `GET …/uygun-islemler` · `POST …` · `POST …/{id}/onay` · `POST …/{id}/red` | ⏳ adım 5 |
 | Bayi Tanım | `GET/POST /bayiler` · `GET/PUT /bayiler/{cariNo}` · `GET /firma` · `GET /vade-farki-profilleri` · `GET /uye-isyerleri` · `POST /musteriler` | ✅ |
 | Fatura Yükleme | `GET/POST /faturalar` · `POST /faturalar/{islemNo}/hatirlatma` · `POST /faturalar/{islemNo}/yukleme-linki` | ⏳ adım 6 |
