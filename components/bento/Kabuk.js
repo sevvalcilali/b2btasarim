@@ -236,7 +236,7 @@ const basHarfler = (ad) =>
     .map((p) => p[0].toLocaleUpperCase("tr-TR"))
     .join("");
 
-export function UserMenu({ meta, isDark, onToggleTheme, onLogout }) {
+export function UserMenu({ meta, isDark, onToggleTheme, onLogout, onFirmaBilgileri }) {
   const [open, setOpen] = useState(false);
   useDismiss(open, () => setOpen(false));
   const oturum = useOturum();
@@ -269,10 +269,20 @@ export function UserMenu({ meta, isDark, onToggleTheme, onLogout }) {
               <p className="truncate text-[11.5px] text-[var(--muted)]">{firmaUnvan}</p>
             </div>
             <div className="my-1 border-t border-[var(--border)]" />
-            <button type="button" role="menuitem" className={MENU_ITEM} onClick={() => setOpen(false)}>
-              <I name="building" size={14} />
-              Firma Bilgileri
-            </button>
+            {onFirmaBilgileri && (
+              <button
+                type="button"
+                role="menuitem"
+                className={MENU_ITEM}
+                onClick={() => {
+                  onFirmaBilgileri();
+                  setOpen(false);
+                }}
+              >
+                <I name="building" size={14} />
+                Firma Bilgileri
+              </button>
+            )}
             <button
               type="button"
               role="menuitem"

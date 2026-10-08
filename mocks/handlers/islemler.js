@@ -19,6 +19,7 @@ export function islemCevabi(t) {
     taksit: t.taksit,
     tutarKurus: t.tutarKurus,
     durum: t.durum,
+    uyeIsyeriCariNo: t.uyeIsyeriCariNo ?? null,
   };
 }
 

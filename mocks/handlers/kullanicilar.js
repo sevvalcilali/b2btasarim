@@ -6,6 +6,7 @@ import { gecikme, hata, kuralHatasi, uc, yetkili } from "./yardimci";
 
 const YETKILER = ["YONETICI", "ODEME", "RAPORLAMA"];
 const kucult = (s) => String(s ?? "").trim().toLocaleLowerCase("tr-TR");
+const epostaKucult = (s) => String(s ?? "").trim().toLowerCase(); // e-posta ASCII: tr-TR küçültme I→ı yapar
 const firmaKullanicilari = (firmaId) => depo.tablo("kullanicilar").filter((k) => k.firmaId === firmaId);
 
 const kullaniciCevabi = (k, kim) => ({
@@ -26,7 +27,7 @@ function kullaniciHatalari(g, kim, mevcut) {
   const h = {};
   if (!g.adSoyad) h.adSoyad = "Ad soyad girin.";
   if (!/^\S+@\S+\.\S+$/.test(g.email)) h.email = "Geçerli bir e-posta girin.";
-  else if (depo.tablo("kullanicilar").some((k) => k.kullaniciId !== mevcut?.kullaniciId && kucult(k.email) === kucult(g.email))) h.email = "Bu e-posta başka bir kullanıcıda kayıtlı.";
+  else if (depo.tablo("kullanicilar").some((k) => k.kullaniciId !== mevcut?.kullaniciId && epostaKucult(k.email) === epostaKucult(g.email))) h.email = "Bu e-posta başka bir kullanıcıda kayıtlı.";
   if (g.telefon && g.telefon.replace(/\D/g, "").length < 10) h.telefon = "Geçerli bir telefon girin.";
   if (!YETKILER.includes(g.yetki)) h.yetki = "Yetki seçin.";
   if (!["AKTIF", "PASIF"].includes(g.durum)) h.durum = "Durum AKTIF ya da PASIF olmalı.";

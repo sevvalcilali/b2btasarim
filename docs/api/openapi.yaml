@@ -1536,6 +1536,7 @@ components:
     OdemeLinki:
       type: object
       properties:
+        uyeIsyeriCariNo: { type: [string, "null"], description: Oturumdaki cari seçimi (üye işyeri) }
         linkNo: { type: string, example: LNK-7Q2M4X }
         url: { type: string, format: uri }
         olusturma: { type: string, format: date-time }

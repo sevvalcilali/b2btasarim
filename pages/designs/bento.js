@@ -178,7 +178,7 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
                 onClick={() => setDuyurularAcik(true)}
                 aria-label={bekleyenler.data?.okunmamisDuyuru ? `Duyurular, ${bekleyenler.data.okunmamisDuyuru} okunmamış` : "Duyurular"}
                 title="Duyurular"
-                className={`${GHOST} relative hidden sm:grid`}
+                className={`${GHOST} relative`}
               >
                 <I name="bell" size={16} />
                 {bekleyenler.data?.okunmamisDuyuru > 0 && (
@@ -188,7 +188,7 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
                   </span>
                 )}
               </button>
-              <UserMenu meta={meta} isDark={isDark} onToggleTheme={onToggleTheme} onLogout={onLogout} />
+              <UserMenu meta={meta} isDark={isDark} onToggleTheme={onToggleTheme} onLogout={onLogout} onFirmaBilgileri={role !== ROLES.ANA_FIRMA ? () => navigate("/ayarlar/firma") : null} />
             </div>
           </header>
         </div>

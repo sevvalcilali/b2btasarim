@@ -9,11 +9,13 @@ import { CARD, FOCUS } from "./tema";
 // sayfanın kök öğesine (#bn-root) taşınır; kart üzerine gelince oluşan transform da sabit konumu bozmaz.
 export function Pencere({ baslik, altBaslik, onClose, genislik = "max-w-5xl", children }) {
   const closeRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose; // Esc her zaman güncel kapatıcıyı çağırır (içerik değişen pencereler)
   const baslikId = `bn-pencere-${useId().replace(/:/g, "")}`;
 
   useEffect(() => {
     closeRef.current?.focus();
-    const onKey = (e) => e.key === "Escape" && onClose();
+    const onKey = (e) => e.key === "Escape" && onCloseRef.current();
     document.addEventListener("keydown", onKey);
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";

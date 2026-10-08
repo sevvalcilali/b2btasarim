@@ -2,7 +2,7 @@
 // Ana firma tüm bayi / alt bayileri, bayi kendisini ve alt bayilerini görür; alt bayinin özet raporu yoktur (403).
 import { http, HttpResponse } from "msw";
 import { depo } from "../db/depo";
-import { altBayileri, faturaDurumu, faturaGerekli, firma, firmaOzeti, kapsamda, taksitHesabi } from "../kurallar";
+import { altBayileri, faturaDurumu, faturaGerekli, firma, firmaOzeti, kapsamda, simdi, taksitHesabi } from "../kurallar";
 import { gecikme, hata, uc, yetkili } from "./yardimci";
 
 const GUN = 86400000;
@@ -44,7 +44,7 @@ function raporKapsami(kim, s) {
     kim.rol === "ANA_FIRMA"
       ? depo.tablo("firmalar").filter((f) => f.tur !== "ANA_FIRMA")
       : [firma(kim.firmaId), ...altBayileri(kim.firmaId)].filter(Boolean);
-  return { donem, esik: gunSayisi ? new Date(Date.now() - gunSayisi * GUN).toISOString() : null, firmalar };
+  return { donem, esik: gunSayisi ? simdi(Date.now() - gunSayisi * GUN) : null, firmalar };
 }
 
 export const raporlarHandlers = [
@@ -88,7 +88,7 @@ export const raporlarHandlers = [
     const musteriTuru = s.get("musteriTuru");
     const donem = DONEMLER[s.get("donem") || "30g"] === undefined ? "30g" : s.get("donem") || "30g";
     const gunSayisi = DONEMLER[donem];
-    const esik = gunSayisi ? new Date(Date.now() - gunSayisi * GUN).toISOString() : null;
+    const esik = gunSayisi ? simdi(Date.now() - gunSayisi * GUN) : null;
 
     // rapor satırları: ana firma → bayiler + tüm alt bayiler; bayi → kendisi + alt bayileri
     const firmalar =

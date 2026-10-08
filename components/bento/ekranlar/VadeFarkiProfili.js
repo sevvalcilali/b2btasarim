@@ -53,7 +53,7 @@ export function VadeFarkiProfilTanim({ meta, onNavigate }) {
       </div>
 
       {sorgu.isPending ? (
-        <YukleniyorKutu satir={3} />
+        <YukleniyorKutu />
       ) : sorgu.isError ? (
         <HataKutusu hata={sorgu.error} onTekrar={() => sorgu.refetch()} />
       ) : profiller.length === 0 ? (

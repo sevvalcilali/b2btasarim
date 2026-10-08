@@ -256,7 +256,7 @@ export function DuyuruPopup() {
     okundu.mutate(d.duyuruId);
   };
   return (
-    <Pencere baslik={d.baslik} altBaslik={`Ana firma duyurusu · ${tarih(d.tarih)}`} onClose={kapat} genislik="max-w-md">
+    <Pencere key={d.duyuruId} baslik={d.baslik} altBaslik={`Ana firma duyurusu · ${tarih(d.tarih)}`} onClose={kapat} genislik="max-w-md">
       <p className="whitespace-pre-line text-[13px] leading-relaxed text-[var(--fg)]">{d.icerik}</p>
       <div className="mt-5 flex items-center justify-between gap-3">
         <span className="text-[11.5px] text-[var(--muted)]">{okunmamis.length > 1 ? `${okunmamis.length} okunmamış duyuru` : "Son okunmamış duyuru"}</span>

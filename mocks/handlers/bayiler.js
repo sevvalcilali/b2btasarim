@@ -3,7 +3,7 @@
 import { http, HttpResponse } from "msw";
 import { depo } from "../db/depo";
 import { altBayileri, anaFirma, firma, firmaCevabi, icerir, kimlikHatalari, kosulHatalari, sayaclar } from "../kurallar";
-import { gecikme, hata, kuralHatasi, uc, yetkili } from "./yardimci";
+import { gecikme, hata, kuralHatasi, uc, yetkiGerekli, yetkili } from "./yardimci";
 import { dosyadanCsv, tlCoz } from "../csv";
 
 /** Rolün tanımlayıp düzenleyebildiği kayıtlar: ana firma → bayiler; bayi → kendi alt bayileri */
@@ -16,6 +16,8 @@ export function yonetilenler(kim) {
 
 /** Yeni kayıt için yetki ve tür kontrolü. Dönüş: hata cevabı ya da null */
 function yetkiKontrolu(kim, tur) {
+  const yetkiHatasi = yetkiGerekli(kim, "BAYI_TANIM");
+  if (yetkiHatasi) return yetkiHatasi;
   if (kim.rol === "ANA_FIRMA" && tur === "BAYI") return null;
   if (kim.rol === "BAYI" && tur === "ALT_BAYI") {
     return firma(kim.firmaId)?.altBayiYetkisi ? null : hata(403, "ALT_BAYI_YETKISI_YOK", "Alt bayi tanımlama yetkiniz bulunmuyor. Bu yetki ana firmanın bayi tanımından açılır.");
@@ -46,7 +48,7 @@ function satirdanGirdi(s, kim, ust) {
     islemLimitiKurus: limitKurus === null ? ust?.islemLimitiKurus ?? 15000000 : limitKurus,
     uyeIsyerleri: ust ? ust.uyeIsyerleri : depo.tablo("uyeIsyerleri").map((u) => u.cariNo),
     altBayiYetkisi: kim.rol === "ANA_FIRMA" ? /^(evet|e|1|true)$/i.test(String(s.altbayiyetkisi || "")) : undefined,
-    durum: String(s.durum || "AKTIF").trim().toLocaleUpperCase("tr-TR") === "PASIF" ? "PASIF" : "AKTIF",
+    durum: /^pasif$/i.test(String(s.durum || "").trim()) ? "PASIF" : "AKTIF", // ASCII karşılaştırma: tr-TR büyütme i→İ yapar
   };
 }
 
@@ -58,7 +60,7 @@ async function topluCoz(request, kim) {
   if (!fd) return { cevap: hata(400, "GECERSIZ_GOVDE", "Form verisi okunamadı.") };
   const okunan = await dosyadanCsv(fd);
   if (okunan.hata) return { cevap: kuralHatasi("DOSYA", okunan.hata, { dosya: okunan.hata }) };
-  const zorunlu = ["unvan", "carino", "vergino", "telefon", "adres"];
+  const zorunlu = ["unvan", "carino", "vergino", "telefon", "email", "adres"];
   const eksik = zorunlu.filter((b) => !okunan.basliklar.includes(b));
   if (eksik.length) return { cevap: kuralHatasi("BASLIK", `Eksik sütun: ${eksik.join(", ")}. Şablonu kullanın.`, { dosya: `Eksik sütun: ${eksik.join(", ")}` }) };
   const ust = kim.rol === "BAYI" ? firma(kim.firmaId) : null;
@@ -182,6 +184,8 @@ export const bayilerHandlers = [
     await gecikme();
     const { kim, cevap } = yetkili(request);
     if (cevap) return cevap;
+    const yetkiHatasi = yetkiGerekli(kim, "BAYI_TANIM", ["ANA_FIRMA", "BAYI"]);
+    if (yetkiHatasi) return yetkiHatasi;
     const cariNo = decodeURIComponent(params.cariNo);
     const mevcut = yonetilenler(kim).find((x) => x.cariNo === cariNo);
     if (!mevcut) return hata(404, "BAYI_YOK", "Bayi bulunamadı ya da kapsamınızda değil.");
@@ -189,7 +193,7 @@ export const bayilerHandlers = [
     if (!g) return hata(400, "GECERSIZ_GOVDE", "İstek gövdesi okunamadı.");
     const kimlik = { ...temizle(g), cariNo }; // cari no değiştirilemez
     const ust = kim.rol === "BAYI" ? firma(kim.firmaId) : null;
-    const alanlar = { ...kimlikHatalari(kimlik, { mevcutCariNo: cariNo }), ...kosulHatalari(g, ust) };
+    const alanlar = { ...kimlikHatalari(kimlik, { mevcutCariNo: cariNo }), ...kosulHatalari(g, ust, { mevcutProfilId: mevcut.vadeProfilId }) };
     if (Object.keys(alanlar).length) return kuralHatasi("DOGRULAMA", "Bazı alanlar hatalı.", alanlar);
     const guncel = depo.degistir("firmalar", "cariNo", cariNo, (f) => ({
       ...f,

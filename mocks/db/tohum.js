@@ -141,7 +141,7 @@ export const firmalar = [
     telefon: "0332 111 78 90",
     email: "konya@perakende.com",
     adres: "Fevzi Çakmak Mah. 10520 Sk. No:3 Karatay / Konya",
-    vadeProfilId: 4,
+    vadeProfilId: 3,
     taksitler: [
       1,
       2,

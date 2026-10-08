@@ -104,7 +104,7 @@ function FaturaYukle({ satir, onYuklendi, onClose }) {
         <div>
           <label
             htmlFor="bn-f-dosya"
-            className={`flex cursor-pointer flex-col items-center gap-1.5 rounded-2xl border-2 border-dashed px-4 py-6 text-center transition hover:border-[var(--brand)] hover:bg-[var(--soft)] ${h("dosya") ? "border-[var(--danger)]" : "border-[var(--border-strong)]"}`}
+            className={`flex cursor-pointer flex-col items-center gap-1.5 rounded-2xl border-2 border-dashed px-4 py-6 text-center transition focus-within:border-[var(--brand)] focus-within:ring-2 focus-within:ring-[var(--ring)] hover:border-[var(--brand)] hover:bg-[var(--soft)] ${h("dosya") ? "border-[var(--danger)]" : "border-[var(--border-strong)]"}`}
           >
             <span className="grid h-10 w-10 place-items-center rounded-full bg-[var(--brand-soft)] text-[var(--brand-text)]">
               <I name={dosya ? "check" : "receipt"} size={18} />

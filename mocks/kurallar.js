@@ -84,11 +84,13 @@ export const cariKullanimda = (cariNo) =>
  * Ödeme koşulları (şartname s.5). ust: tanımı yapan firmanın kendi kaydı — alt bayiye verilen sınırlar onu aşamaz;
  * ana firma için ust = null (tüm taksitler ve tüm üye işyerleri açık).
  */
-export function kosulHatalari(g, ust) {
+export function kosulHatalari(g, ust, { mevcutProfilId } = {}) {
   const h = {};
+  const profil = depo.tablo("vadeFarkiProfilleri").find((v) => v.id === g.vadeProfilId);
   const izinliTaksit = ust ? ust.taksitler : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
   const izinliUye = ust ? ust.uyeIsyerleri : depo.tablo("uyeIsyerleri").map((u) => u.cariNo);
-  if (!depo.tablo("vadeFarkiProfilleri").some((v) => v.id === g.vadeProfilId)) h.vadeProfilId = "Vade farkı profili seçin.";
+  if (!profil) h.vadeProfilId = "Vade farkı profili seçin.";
+  else if (profil.durum === "PASIF" && profil.id !== mevcutProfilId) h.vadeProfilId = "Pasif profil atanamaz; aktif bir profil seçin."; // mevcut atama korunur
   if (!Array.isArray(g.taksitler) || g.taksitler.length === 0) h.taksitler = "En az bir taksit açık olmalı.";
   else if (g.taksitler.some((n) => !izinliTaksit.includes(n))) h.taksitler = "Yalnızca sizin görebildiğiniz taksitler verilebilir.";
   if (!(Number.isInteger(g.islemLimitiKurus) && g.islemLimitiKurus > 0)) h.islemLimitiKurus = "İşlem bazlı ödeme limiti girin.";
@@ -231,4 +233,14 @@ export function sayaclar(liste, alan, kodlar) {
 /** Türkçe duyarsız metin araması */
 export const icerir = (metin, aranan) => String(metin ?? "").toLocaleLowerCase("tr-TR").includes(String(aranan).toLocaleLowerCase("tr-TR"));
 
-export const simdi = () => new Date().toISOString();
+/** Şu an, tohumla aynı biçimde (+03:00): metin sıralaması ve dönem eşikleri tutarlı kalır. ms ile başka bir an. */
+export function simdi(ms = Date.now()) {
+  return new Date(ms + 3 * 3600000).toISOString().replace(/\.\d{3}Z$/, "+03:00");
+}
+
+// Şartname s.3: yetki → açılan ekranlar / işlemler
+export const YETKI_EKRANLARI = {
+  YONETICI: ["ODEME", "RAPOR", "IPTAL_IADE_GIRIS", "IPTAL_IADE_ONAY", "BAYI_TANIM", "KULLANICI_TANIM", "AYARLAR"],
+  ODEME: ["ODEME", "RAPOR", "IPTAL_IADE_GIRIS"],
+  RAPORLAMA: ["RAPOR"],
+};

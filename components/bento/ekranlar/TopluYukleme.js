@@ -106,7 +106,7 @@ function TopluYukleme({ meta, onNavigate, yol, aciklama, sablon, sutunlar, hucre
         </Adim>
 
         <Adim no={2} i={1} baslik="Dosyayı seçin ve önizleyin" aciklama="Önizleme her satırı sunucuda doğrular; bu adımda hiçbir kayıt yazılmaz.">
-          <label htmlFor="bn-toplu-dosya" className={`flex cursor-pointer flex-col items-center gap-1.5 rounded-2xl border-2 border-dashed px-4 py-6 text-center transition hover:border-[var(--brand)] hover:bg-[var(--soft)] ${hata ? "border-[var(--danger)]" : "border-[var(--border-strong)]"}`}>
+          <label htmlFor="bn-toplu-dosya" className={`flex cursor-pointer flex-col items-center gap-1.5 rounded-2xl border-2 border-dashed px-4 py-6 text-center transition focus-within:border-[var(--brand)] focus-within:ring-2 focus-within:ring-[var(--ring)] hover:border-[var(--brand)] hover:bg-[var(--soft)] ${hata ? "border-[var(--danger)]" : "border-[var(--border-strong)]"}`}>
             <span className="grid h-10 w-10 place-items-center rounded-full bg-[var(--brand-soft)] text-[var(--brand-text)]">
               <I name={dosya ? "check" : "download"} size={18} />
             </span>

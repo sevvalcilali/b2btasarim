@@ -2,7 +2,7 @@
 // (sekme kapanınca tohuma döner); "Demo verisini sıfırla" da tohuma döndürür.
 import * as tohum from "./tohum";
 
-const ANAHTAR = "nkb-demo-db-v1";
+const ANAHTAR = "nkb-demo-db-v2"; // tohum biçimi değişince sürüm artar; eski kayıt yok sayılır
 const TOHUM = Object.fromEntries(Object.entries(tohum));
 
 const kopya = (v) => JSON.parse(JSON.stringify(v));

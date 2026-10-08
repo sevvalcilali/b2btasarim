@@ -3,8 +3,8 @@
 // Hareketler: borç yüklemeleri (tohum) + bu firmanın yaptığı ödemeler, iade ve iptaller (işlem tablosu).
 import { http, HttpResponse } from "msw";
 import { depo } from "../db/depo";
-import { firma, firmaOzeti } from "../kurallar";
-import { gecikme, hata, kuralHatasi, uc, yetkili } from "./yardimci";
+import { firma, firmaOzeti, simdi } from "../kurallar";
+import { gecikme, hata, kuralHatasi, uc, yetkiGerekli, yetkili } from "./yardimci";
 import { dosyadanCsv, tlCoz } from "../csv";
 import { yonetilenler } from "./bayiler";
 
@@ -20,7 +20,8 @@ function islemHareketi(t) {
 
 /** Dosyayı okuyup satırları doğrular: cari yönetilen bir bayi olmalı, tutarlar ≥ 0, borç limiti aşmamalı */
 async function topluCoz(request, kim) {
-  if (kim.rol === "ALT_BAYI") return { cevap: hata(403, "YETKI_YOK", "Alt bayi bakiye yükleyemez.") };
+  const yetkiHatasi = yetkiGerekli(kim, "BAYI_TANIM", ["ANA_FIRMA", "BAYI"]);
+  if (yetkiHatasi) return { cevap: yetkiHatasi };
   const fd = await request.formData().catch(() => null);
   if (!fd) return { cevap: hata(400, "GECERSIZ_GOVDE", "Form verisi okunamadı.") };
   const okunan = await dosyadanCsv(fd);
@@ -76,10 +77,10 @@ export const bakiyeHandlers = [
       return yeni;
     });
     // borç artışı ekstreye hareket olarak düşer
-    const simdi = new Date().toISOString();
+    const zaman = simdi();
     const hareketler = gecerliler
       .filter((s) => s.girdi.borcKurus > (s.eski?.borcKurus || 0))
-      .map((s, i) => ({ hareketId: `BH-${Date.now()}-${i}`, firmaId: s.firmaId, tarih: simdi, aciklama: s.girdi.aciklama || "Toplu borç yüklemesi", tutarKurus: s.girdi.borcKurus - (s.eski?.borcKurus || 0) }));
+      .map((s, i) => ({ hareketId: `BH-${Date.now()}-${i}`, firmaId: s.firmaId, tarih: zaman, aciklama: s.girdi.aciklama || "Toplu borç yüklemesi", tutarKurus: s.girdi.borcKurus - (s.eski?.borcKurus || 0) }));
     if (hareketler.length) depo.guncelle("borcHareketleri", (l) => [...hareketler, ...l]);
     return HttpResponse.json({ ...topluOzet(satirlar), guncellenen: gecerliler.length, atlanan: satirlar.length - gecerliler.length }, { status: 200 });
   }),
@@ -92,7 +93,7 @@ export const bakiyeHandlers = [
     if (!f?.bagliFirmaId) return hata(403, "YETKI_YOK", "Ana firmanın üst carisi yoktur; firma limiti ana sayfada gösterilir.");
     const s = new URL(request.url).searchParams;
     const donem = DONEMLER[s.get("donem")] === undefined ? "30g" : s.get("donem");
-    const esik = DONEMLER[donem] ? new Date(Date.now() - DONEMLER[donem] * GUN).toISOString() : null;
+    const esik = DONEMLER[donem] ? simdi(Date.now() - DONEMLER[donem] * GUN) : null;
     const b = depo.tablo("bakiyeler")[kim.firmaId] || { bakiyeKurus: 0, borcKurus: 0, limitKurus: 0, kullanimYuzde: 0 };
 
     const hepsi = [
@@ -114,7 +115,7 @@ export const bakiyeHandlers = [
       borcKurus: b.borcKurus,
       limitKurus: b.limitKurus,
       kullanimYuzde: b.kullanimYuzde,
-      sonGuncelleme: new Date(Date.now() - 35 * 60000).toISOString(),
+      sonGuncelleme: simdi(Date.now() - 35 * 60000),
       donem,
       hareketler,
       donemToplami: { borcKurus: toplam((h) => h.tur === "BORC"), odemeKurus: toplam((h) => h.tur === "ODEME"), iadeIptalKurus: toplam((h) => h.tur === "IADE" || h.tur === "IPTAL") },

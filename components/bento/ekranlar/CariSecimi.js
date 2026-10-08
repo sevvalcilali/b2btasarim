@@ -18,16 +18,20 @@ export function CariSecici({ role }) {
   const sec = useAktifUyeIsyeriSec();
   const [bildirim, setBildirim] = useState(null);
   const bildirimBitti = useCallback(() => setBildirim(null), []);
+  const [secilen, setSecilen] = useState(null); // sunucu cevabı gelene kadar seçim ekranda kalsın
   const etiket = role === ROLES.ALT_BAYI ? "Bayi cari seçimi" : "Ana firma cari seçimi";
-  const aktif = oturum.data?.aktifUyeIsyeri?.cariNo || "";
+  const aktif = secilen ?? (oturum.data?.aktifUyeIsyeri?.cariNo || "");
   const secenekler = uyeler.data?.kayitlar || [];
 
   const degistir = async (cariNo) => {
+    setSecilen(cariNo);
     try {
       const u = await sec.mutateAsync(cariNo);
       setBildirim(`Tahsilat carisi ${u.ad} (${u.cariNo}) olarak seçildi.`);
     } catch (err) {
       setBildirim(err?.message || "Cari seçilemedi.");
+    } finally {
+      setSecilen(null); // önbellek güncellendi (ya da hata: eski değere dön)
     }
   };
 
@@ -43,6 +47,11 @@ export function CariSecici({ role }) {
           className={`h-9 max-w-[260px] rounded-full border border-[var(--border-strong)] bg-[var(--surface)] pl-3 pr-8 text-[12.5px] font-medium text-[var(--fg-2)] transition hover:border-[var(--brand)] disabled:opacity-60 ${FOCUS}`}
         >
           {!aktif && <option value="">{etiket}</option>}
+          {aktif && !secenekler.some((u) => u.cariNo === aktif) && (
+            <option value={aktif} disabled>
+              {oturum.data.aktifUyeIsyeri.ad} — artık size açık değil
+            </option>
+          )}
           {secenekler.map((u) => (
             <option key={u.cariNo} value={u.cariNo}>
               {u.ad} — {u.cariNo}
@@ -59,7 +68,7 @@ export function CariSecici({ role }) {
 export function AktifCariNotu() {
   const oturum = useOturum();
   const u = oturum.data?.aktifUyeIsyeri;
-  if (!u) return null;
+  if (!u || oturum.data.rol === "ANA_FIRMA") return null; // ana firmanın seçim ekranı yok; formdaki üye işyeri yeterli
   return (
     <>
       {" · Tahsilat carisi: "}

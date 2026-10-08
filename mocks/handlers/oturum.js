@@ -1,15 +1,8 @@
 // GET /oturum · PUT /oturum/aktif-uye-isyeri · POST /demo/sifirla
 import { http, HttpResponse } from "msw";
 import { depo } from "../db/depo";
-import { anaFirma, firma } from "../kurallar";
+import { YETKI_EKRANLARI, anaFirma, firma } from "../kurallar";
 import { gecikme, hata, kuralHatasi, uc, yetkili } from "./yardimci";
-
-// Şartname s.3: yetki → açılan ekranlar
-const YETKILER = {
-  YONETICI: ["ODEME", "RAPOR", "IPTAL_IADE_GIRIS", "IPTAL_IADE_ONAY", "BAYI_TANIM", "KULLANICI_TANIM", "AYARLAR"],
-  ODEME: ["ODEME", "RAPOR", "IPTAL_IADE_GIRIS"],
-  RAPORLAMA: ["RAPOR"],
-};
 
 /** Üye işyeri özeti: tahsilatın işleneceği ana firma carisi (şartname s.1: ana firma altında birden çok üye işyeri) */
 const uyeIsyeriOzeti = (cariNo) => {
@@ -39,7 +32,7 @@ export const oturumHandlers = [
         bagli: bagli ? { firmaId: bagli.firmaId, unvan: bagli.unvan, tur: bagli.tur } : null,
       },
       anaFirma: { firmaId: ana.firmaId, unvan: ana.unvan, kisaAd: ana.kisaAd, aciklama: ana.aciklama, logoRenk: ana.logoRenk || null },
-      yetkiler: YETKILER[kim.yetki] || [],
+      yetkiler: YETKI_EKRANLARI[kim.yetki] || [],
       aktifUyeIsyeri: uyeIsyeriOzeti(kim.aktifUyeIsyeri),
     });
   }),

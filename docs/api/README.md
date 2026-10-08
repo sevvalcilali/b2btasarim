@@ -101,7 +101,7 @@ Sahte backend'de etkisi olmayan, gerçek serviste önem kazanan noktalar (code r
 2. Ödemede kart tokenı: kart numarası backend'e açık gitmez; tokenı hangi sağlayıcı / 3D Secure akışı üretir?
 3. Yeni kullanıcının şifresi: `POST /kullanicilar` kullanıcıyı açar; şifre belirleme / davet e-postasını backend gönderir (ekranda yalnız not var).
 4. Bakiye / borç ve ekstre hareketlerinin kaynağı (ERP / cari hesap entegrasyonu?) — demo, borç yüklemelerini ve ödemeleri işlem tablosundan türetir; kur bilgisi kaynağı (TCMB?).
-5. Cari seçimi: "Ana Firma Cari Seçimi" / "Bayi Carisi Seçimi" ana firmanın üye işyerlerinden (s.1) birini seçmek olarak yorumlandı; seçim oturumda tutulur ve ödemeler `uyeIsyeriCariNo` ile işlenir.
+5. Cari seçimi: "Ana Firma Cari Seçimi" / "Bayi Carisi Seçimi" ana firmanın üye işyerlerinden (s.1) birini seçmek olarak yorumlandı; seçim oturumda tutulur (`aktifUyeIsyeri`), ödeme formundaki tahsilat carisinin varsayılanı olur ve işleme `uyeIsyeriCariNo` olarak da yazılır. Ödemenin işlendiği cari formdaki `tahsilatCariNo`dur.
 6. Firma Bilgileri: bayi / alt bayinin iletişim bilgisini kendisinin güncelleyebildiği varsayıldı (`PUT /firma/iletisim`); tanım alanları üst firmada kalır.
 7. Toplu yükleme dosyaları: örnek sunucu yalnız CSV okur (`mocks/csv.js`); gerçek backend .xlsx da kabul etmeli. Sütun adları şablonda; satır doğrulama kuralları bayi tanımıyla aynı (`kimlikHatalari`, `kosulHatalari`).
 8. Vade farkı formülü: sunucu `GET /odeme/taksit-secenekleri` ile hesaplar; mockup varsayımı tutar × oran × (taksit − 1).

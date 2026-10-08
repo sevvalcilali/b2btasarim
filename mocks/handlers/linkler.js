@@ -20,6 +20,7 @@ export const linkCevabi = (l) => ({
   hedef: l.hedef || null,
   taksitler: l.taksitler || null,
   tahsilatCarisi: l.tahsilatCarisi || null,
+  uyeIsyeriCariNo: l.uyeIsyeriCariNo ?? null,
   durum: l.durum,
 });
 
@@ -62,7 +63,7 @@ export const linklerHandlers = [
     const link = {
       linkNo: `LNK-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
       olusturma: simdi(),
-      sonGecerlilik: new Date(Date.now() + g.gecerlilikGun * 86400000).toISOString(),
+      sonGecerlilik: simdi(Date.now() + g.gecerlilikGun * 86400000),
       olusturanId: kim.firmaId,
       uyeIsyeriCariNo: kim.aktifUyeIsyeri || null,
       musteriTuru: g.musteriTuru,

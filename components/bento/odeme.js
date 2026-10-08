@@ -6,6 +6,7 @@ import I from "@/components/DesignIcons";
 import { etiket } from "@/lib/etiketler";
 import { useBayiler } from "@/lib/sorgular/bayiler";
 import { useMusteriler, useTahsilatCarileri } from "@/lib/sorgular/odeme";
+import { useOturum } from "@/lib/sorgular/oturum";
 import { useFirma } from "@/lib/sorgular/tanimlar";
 import { inputCls, Alan, MusteriSecici } from "./ortak";
 import { FOCUS } from "./tema";
@@ -31,6 +32,7 @@ export function useMusteriSecimi(role, onerilenCari) {
   const musteriler = useMusteriler({}, { enabled: turler.includes("DUZENLI_MUSTERI") });
   const cariler = useTahsilatCarileri();
   const firma = useFirma();
+  const oturum = useOturum();
 
   const [tur, setTurDurumu] = useState(turler[0]);
   const [secili, setSecili] = useState(null);
@@ -62,10 +64,13 @@ export function useMusteriSecimi(role, onerilenCari) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onerilenCari, bayiler.data, musteriler.data]);
 
-  // tahsilat carisi: liste gelince ilk kayıt seçilir
+  // tahsilat carisi: oturumdaki cari seçimi (ana sayfa / Bayi Carisi Seçimi) listedeyse o, değilse ilk kayıt
   useEffect(() => {
-    if (!cari && cariler.data?.kayitlar?.length) setCari(cariler.data.kayitlar[0].cariNo);
-  }, [cariler.data, cari]);
+    const liste = cariler.data?.kayitlar;
+    if (cari || !liste?.length || oturum.isPending) return;
+    const aktif = oturum.data?.aktifUyeIsyeri?.cariNo;
+    setCari(liste.some((c) => c.cariNo === aktif) ? aktif : liste[0].cariNo);
+  }, [cariler.data, cari, oturum.data, oturum.isPending]);
 
   const kendiKarti = tur === "KENDI_KARTI";
   const kendiSecenekleri = firma.data ? [{ ad: firma.data.unvan, rol: "Firma unvanı" }, ...(firma.data.ortaklar || []).map((o) => ({ ad: o, rol: "Ortak" }))] : [];

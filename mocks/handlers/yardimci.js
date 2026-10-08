@@ -1,6 +1,6 @@
 // Handler yardımcıları: adres kalıbı, hata cevabı, gerçekçi gecikme, oturum zorunluluğu.
 import { HttpResponse, delay } from "msw";
-import { oturum } from "../kurallar";
+import { YETKI_EKRANLARI, oturum } from "../kurallar";
 
 // İstekler hangi adrese giderse gitsin (/api/v1 ya da tam adres) yakalanır.
 export const uc = (yol) => `*/api/v1${yol}`;
@@ -18,6 +18,16 @@ export const gecikme = () => delay(150 + Math.floor(Math.random() * 300));
 export function yetkili(request) {
   const kim = oturum(request);
   return kim ? { kim } : { cevap: hata(401, "OTURUM_YOK", "Oturum bulunamadı. Yeniden giriş yapın.") };
+}
+
+/**
+ * Yetki kontrolü (şartname s.3): roller verilmişse rol onlardan biri olmalı; kullanıcının yetkisi ekranı açmalı. Dönüş: 403 ya da null.
+ *   const y = yetkiGerekli(kim, "BAYI_TANIM", ["ANA_FIRMA", "BAYI"]); if (y) return y;
+ */
+export function yetkiGerekli(kim, ekran, roller) {
+  if (roller && !roller.includes(kim.rol)) return hata(403, "YETKI_YOK", "Bu işlem rolünüze kapalı.");
+  if (!(YETKI_EKRANLARI[kim.yetki] || []).includes(ekran)) return hata(403, "YETKI_YOK", "Bu işlem için Yönetici yetkisi gerekir.");
+  return null;
 }
 
 /** 422 — iş kuralı hatası; alanlar: { alanAdi: "mesaj" } forma düşer */
