@@ -45,7 +45,7 @@ export function SiraliBaslik({ alan, siralama, onSirala, className = "", childre
         type="button"
         onClick={() => onSirala(alan)}
         title={aktif ? (yukari ? "Azalan sırala" : "Artan sırala") : "Sırala"}
-        className={`group inline-flex items-center gap-1 rounded uppercase tracking-wider transition-colors hover:text-[var(--brand-text)] ${aktif ? "text-[var(--brand-text)]" : ""} ${className.includes("text-right") ? "flex-row-reverse" : ""} ${FOCUS}`}
+        className={`bn-yazdir-koru group inline-flex items-center gap-1 rounded uppercase tracking-wider transition-colors hover:text-[var(--brand-text)] ${aktif ? "text-[var(--brand-text)]" : ""} ${className.includes("text-right") ? "flex-row-reverse" : ""} ${FOCUS}`}
       >
         {children}
         <I name="chevronDown" size={11} className={`transition-transform ${aktif ? (yukari ? "rotate-180" : "") : "opacity-30 group-hover:opacity-70"}`} />

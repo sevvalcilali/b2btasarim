@@ -9,7 +9,7 @@ import { useBayiOzeti } from "@/lib/sorgular/raporlar";
 import { BosDurum, HataKutusu, Yukleniyor } from "../durumlar";
 import { csvIndir, csvTutar } from "@/lib/disaAktar";
 import { aralikSorgusu, donemAraligi } from "@/lib/donem";
-import { Konum, TarihAraligi, DegisimRozeti } from "../ortak";
+import { Konum, TarihAraligi, DegisimRozeti, YazdirDugmesi } from "../ortak";
 import { HOME } from "../sayfalar";
 import { SiraliBaslik, useSiralama } from "../tablo";
 import { CARD, FOCUS } from "../tema";
@@ -37,6 +37,9 @@ export function BayiOzet({ role, meta, onNavigate }) {
   const toplam = veri?.toplam;
   const enYuksek = Math.max(1, ...satirlar.map((s) => s.ciroKurus));
   const { sirali, siralama, sirala } = useSiralama(satirlar, OZET_SUTUNLARI);
+  const [arama, setArama] = useState("");
+  const q = arama.trim().toLocaleLowerCase("tr-TR");
+  const gorunen = q ? sirali.filter((s) => s.firma.unvan.toLocaleLowerCase("tr-TR").includes(q)) : sirali; // ekranda süzme, toplamlar sunucudan
   const basariOrani = (s) => (s.islemAdet ? (s.basariliAdet / s.islemAdet) * 100 : 0);
   const secimCls = (aktif) =>
     `inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[12px] transition ${aktif ? "bg-[var(--brand)] font-bold text-white" : "bg-[var(--soft)] font-semibold text-[var(--fg-2)] hover:text-[var(--brand-text)]"} ${FOCUS}`;
@@ -53,6 +56,7 @@ export function BayiOzet({ role, meta, onNavigate }) {
             {meta.company} · {altMi ? "Sizin ve alt bayilerinizin ciro özeti" : "Bayi ve alt bayi bazında ciro özeti"}
           </p>
         </div>
+        <div className="flex gap-2 self-start md:self-auto">
         <button
           type="button"
           onClick={() =>
@@ -69,6 +73,8 @@ export function BayiOzet({ role, meta, onNavigate }) {
           <I name="download" size={14} />
           Dışa Aktar
         </button>
+        <YazdirDugmesi />
+        </div>
       </div>
 
       {/* dönem toplamları — sunucudan */}
@@ -102,6 +108,13 @@ export function BayiOzet({ role, meta, onNavigate }) {
               </button>
             ))}
           </div>
+          <label className="relative block lg:w-56">
+            <span className="sr-only">Firma ara</span>
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]">
+              <I name="search" size={14} />
+            </span>
+            <input type="search" value={arama} onChange={(e) => setArama(e.target.value)} placeholder="Firma ara" className="h-9 w-full rounded-full border border-[var(--border-strong)] bg-[var(--surface)] pl-8 pr-3 text-[12.5px] text-[var(--fg)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--brand)]" />
+          </label>
         </div>
 
         {sorgu.isPending ? (
@@ -123,7 +136,7 @@ export function BayiOzet({ role, meta, onNavigate }) {
                 </tr>
               </thead>
               <tbody>
-                {sirali.map((s, i) => (
+                {gorunen.map((s, i) => (
                   <tr key={s.firma.firmaId} className={`transition-colors hover:bg-[var(--soft)] ${i > 0 ? "border-t border-[var(--border)]" : ""}`}>
                     <td className={td}>
                       <span className="block font-semibold text-[var(--fg)]">{s.firma.unvan}</span>
@@ -169,6 +182,7 @@ export function BayiOzet({ role, meta, onNavigate }) {
                 </tfoot>
               )}
             </table>
+            {satirlar.length > 0 && gorunen.length === 0 && <BosDurum baslik="Aramaya uyan firma yok" eylemler={[{ etiket: "Aramayı temizle", onClick: () => setArama("") }]} />}
             {satirlar.length === 0 && (
               <BosDurum baslik="Bu dönemde işlem yok" aciklama="Dönemi genişletin ya da müşteri türü filtresini kaldırın." eylemler={[aralik.kod !== "90g" && { etiket: "Son 90 günü göster", onClick: () => setAralik(donemAraligi("90g")) }, musteriTuru && { etiket: "Müşteri türü filtresini kaldır", onClick: () => setMusteriTuru("") }]} />
             )}

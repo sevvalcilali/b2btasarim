@@ -92,7 +92,9 @@ export const raporlarHandlers = [
     const musteriTuru = s.get("musteriTuru");
     // rapor satırları: ana firma → bayiler + tüm alt bayiler; bayi → kendisi + alt bayileri
     const { aralik, firmalar } = raporKapsami(kim, s);
-    const kapsamdakiler = depo.tablo("islemler").filter((t) => kapsamda(kim, t.cekimYapanId) && (!musteriTuru || t.musteriTuru === musteriTuru));
+    // yalnız rapor satırındaki firmaların çekimleri: ana firmanın kendi tahsilatı bayi özetine girmez (toplam = satırların toplamı)
+    const satirFirmalari = new Set(firmalar.map((f) => f.firmaId));
+    const kapsamdakiler = depo.tablo("islemler").filter((t) => satirFirmalari.has(t.cekimYapanId) && (!musteriTuru || t.musteriTuru === musteriTuru));
     const islemler = kapsamdakiler.filter((t) => aralik.icinde(t.tarih));
 
     const kayitlar = firmalar

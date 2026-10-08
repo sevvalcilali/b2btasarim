@@ -152,9 +152,10 @@ export function Sidebar({ role, desktopOpen, mobileOpen, hidden, onClose, onLogo
     <>
       {mobileOpen && <div className="fixed inset-0 z-[55] bg-black/40 lg:hidden" onClick={onClose} aria-hidden="true" />}
       <aside
+        data-yazdir="gizle"
         aria-label="Ana menü"
         inert={hidden ? "" : undefined}
-        className={`fixed inset-y-0 left-0 z-[60] flex w-[248px] shrink-0 flex-col border-[var(--border)] bg-[var(--surface)] transition-[transform,margin,opacity] duration-300 ease-out [box-shadow:var(--shadow)] motion-reduce:transition-none max-lg:rounded-r-2xl max-lg:border-r lg:sticky lg:bottom-auto lg:left-auto lg:top-3 lg:z-30 lg:my-3 lg:h-[calc(100vh-24px)] lg:translate-x-0 lg:self-start lg:rounded-2xl lg:border ${
+        className={`print:hidden fixed inset-y-0 left-0 z-[60] flex w-[248px] shrink-0 flex-col border-[var(--border)] bg-[var(--surface)] transition-[transform,margin,opacity] duration-300 ease-out [box-shadow:var(--shadow)] motion-reduce:transition-none max-lg:rounded-r-2xl max-lg:border-r lg:sticky lg:bottom-auto lg:left-auto lg:top-3 lg:z-30 lg:my-3 lg:h-[calc(100vh-24px)] lg:translate-x-0 lg:self-start lg:rounded-2xl lg:border ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         } ${desktopOpen ? "lg:ml-3 lg:opacity-100" : "lg:-ml-[248px] lg:opacity-0"}`}
       >

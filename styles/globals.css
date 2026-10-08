@@ -34,3 +34,13 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #a9b3dc;
 }
+
+/* Yazdırma: kabuk (menü, üst bar), düğmeler ve filtreler gizlenir; rapor içeriği tam genişlikte, beyaz zeminde basılır */
+@media print {
+  @page { margin: 12mm; }
+  body { background: #fff !important; color: #000; }
+  button:not(.bn-yazdir-koru) { display: none !important; }
+  .bn-rise, .bn-fill, .bn-grow, .bn-draw, .bn-wipe { animation: none !important; }
+  main { max-width: none !important; padding: 0 !important; }
+  [class*="box-shadow"] { box-shadow: none !important; }
+}

@@ -8,7 +8,7 @@ import { durumTonu, etiket } from "@/lib/etiketler";
 import { useBayiFaturaOzeti } from "@/lib/sorgular/raporlar";
 import { BosDurum, HataKutusu, Yukleniyor } from "../durumlar";
 import { aralikSorgusu, donemAraligi } from "@/lib/donem";
-import { Konum, TarihAraligi, DegisimRozeti } from "../ortak";
+import { Konum, TarihAraligi, DegisimRozeti, YazdirDugmesi } from "../ortak";
 import { HOME } from "../sayfalar";
 import { SiraliBaslik, useSiralama } from "../tablo";
 import { CARD, FOCUS } from "../tema";
@@ -48,6 +48,7 @@ export function BayiFaturaOzet({ role, meta, onNavigate }) {
             {meta.company} · {altMi ? "Sizin ve alt bayilerinizin fatura yükleme durumu" : "Bayi ve alt bayi bazında fatura yükleme durumu"}
           </p>
         </div>
+        <div className="flex gap-2 self-start md:self-auto">
         <button
           type="button"
           onClick={() => onNavigate("/raporlar/fatura-yukleme")}
@@ -56,6 +57,8 @@ export function BayiFaturaOzet({ role, meta, onNavigate }) {
           <I name="receipt" size={14} />
           Fatura Yükleme Detay
         </button>
+        <YazdirDugmesi />
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

@@ -4,7 +4,7 @@ import { Fragment, useCallback, useState } from "react";
 import { ROLES } from "@/lib/roles";
 import I from "@/components/DesignIcons";
 import { ApiHatasi } from "@/lib/api/hata";
-import { kurusCoz, tarihSaat, tl } from "@/lib/bicim";
+import { kurusCoz, tarihSaat, tl, paraMetniBicimle } from "@/lib/bicim";
 import { durumTonu, etiket } from "@/lib/etiketler";
 import { useTalepOlustur, useTalepOnayla, useTalepReddet, useTalepUygunIslemler, useTalepler } from "@/lib/sorgular/talepler";
 import { BosDurum, HataKutusu, Yukleniyor } from "../durumlar";
@@ -115,7 +115,7 @@ function YeniTalep({ role, meta, onKaydedildi, onClose }) {
                 placeholder="0,00"
                 readOnly={tur === "IPTAL"}
                 value={tur === "IPTAL" ? tl(islemTutari, { isaret: false }) : tutarMetni}
-                onChange={(e) => setTutarMetni(e.target.value.replace(/[^\d.,]/g, ""))}
+                onChange={(e) => setTutarMetni(paraMetniBicimle(e.target.value))}
                 aria-invalid={h("tutarKurus") ? true : undefined}
                 className={`${inputCls(h("tutarKurus"))} pl-7 font-bold tabular-nums`}
               />

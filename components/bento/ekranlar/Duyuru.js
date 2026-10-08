@@ -31,6 +31,10 @@ export function DuyuruYonetimi({ meta, onNavigate }) {
   const kayitlar = sorgu.data?.kayitlar || [];
   const duzenlenebilir = sorgu.data?.duzenlenebilir ?? false;
   const guncelle = useDuyuruGuncelle();
+  const [arama, setArama] = useState("");
+  const [durumFiltresi, setDurumFiltresi] = useState("");
+  const q = arama.trim().toLocaleLowerCase("tr-TR");
+  const gorunen = kayitlar.filter((d) => (!durumFiltresi || d.durum === durumFiltresi) && (!q || `${d.baslik} ${d.icerik}`.toLocaleLowerCase("tr-TR").includes(q)));
   const [duzenlenen, setDuzenlenen] = useState(null); // null · "yeni" · kayıt
   const [bildirim, setBildirim] = useState(null);
   const bildirimBitti = useCallback(() => setBildirim(null), []);
@@ -75,17 +79,40 @@ export function DuyuruYonetimi({ meta, onNavigate }) {
       </div>
 
       <section style={{ "--i": 1 }} className={`bn-rise overflow-hidden ${CARD} hover:!translate-y-0`} aria-label="Duyurular" aria-busy={sorgu.isFetching || guncelle.isPending}>
+        <div className="flex flex-col gap-3 p-3 sm:p-4 md:flex-row md:items-center md:justify-between">
+          <div role="group" aria-label="Durum" className="flex gap-1">
+            {[
+              ["", "Tümü", kayitlar.length],
+              ["YAYINDA", "Yayında", yayinda],
+              ["ARSIV", "Arşiv", kayitlar.length - yayinda],
+            ].map(([deger, ad, adet]) => (
+              <button key={ad} type="button" onClick={() => setDurumFiltresi(deger)} aria-pressed={durumFiltresi === deger} className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12px] transition ${durumFiltresi === deger ? "bg-[var(--brand)] font-bold text-white" : "bg-[var(--soft)] font-semibold text-[var(--fg-2)] hover:text-[var(--brand-text)]"} ${FOCUS}`}>
+                {ad}
+                <span className={`rounded-full px-1.5 text-[10.5px] font-bold tabular-nums ${durumFiltresi === deger ? "bg-white/20 text-white" : "bg-[var(--surface)] text-[var(--muted)]"}`}>{sorgu.data ? adet : "–"}</span>
+              </button>
+            ))}
+          </div>
+          <label className="relative block md:w-64">
+            <span className="sr-only">Duyuru ara</span>
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]">
+              <I name="search" size={14} />
+            </span>
+            <input type="search" value={arama} onChange={(e) => setArama(e.target.value)} placeholder="Başlık ya da metin" className="h-9 w-full rounded-full border border-[var(--border-strong)] bg-[var(--surface)] pl-8 pr-3 text-[12.5px] text-[var(--fg)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--brand)]" />
+          </label>
+        </div>
         {sorgu.isPending ? (
           <Yukleniyor satir={3} baslik={false} />
         ) : sorgu.isError ? (
           <HataKutusu hata={sorgu.error} onTekrar={() => sorgu.refetch()} />
+        ) : kayitlar.length > 0 && gorunen.length === 0 ? (
+          <BosDurum baslik="Filtreye uyan duyuru yok" eylemler={[{ etiket: "Filtreleri temizle", onClick: () => { setArama(""); setDurumFiltresi(""); } }]} />
         ) : kayitlar.length === 0 ? (
           <BosDurum baslik="Henüz duyuru yok" aciklama="Yayınladığınız duyuru bayi ve alt bayi ekranlarına pop-up olarak düşer." ikon="megaphone" eylemler={duzenlenebilir && [{ etiket: "Yeni Duyuru", ikon: "plus", birincil: true, onClick: () => setDuzenlenen("yeni") }]} />
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-[12.5px]">
               <thead>
-                <tr className="border-b border-[var(--border)] bg-[var(--soft)] text-left text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                <tr className="border-y border-[var(--border)] bg-[var(--soft)] text-left text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
                   <th scope="col" className={`${th} min-w-[280px]`}>Duyuru</th>
                   <th scope="col" className={th}>Hedef</th>
                   <th scope="col" className={th}>Tarih</th>
@@ -95,7 +122,7 @@ export function DuyuruYonetimi({ meta, onNavigate }) {
                 </tr>
               </thead>
               <tbody>
-                {kayitlar.map((d, i) => (
+                {gorunen.map((d, i) => (
                   <tr key={d.duyuruId} className={`transition-colors hover:bg-[var(--soft)] ${i > 0 ? "border-t border-[var(--border)]" : ""} ${d.durum === "ARSIV" ? "opacity-70" : ""}`}>
                     <td className={td}>
                       <span className="block font-semibold text-[var(--fg)]">{d.baslik}</span>

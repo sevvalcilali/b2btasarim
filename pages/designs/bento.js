@@ -106,7 +106,7 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
       <div className="flex min-w-0 flex-1 flex-col px-3 lg:px-4">
         {/* yüzen üst bar */}
         <div className="sticky top-0 z-20 bg-[var(--bg)] pt-3">
-          <header className="flex h-12 items-center gap-1 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-2 [box-shadow:var(--shadow)] sm:gap-1.5">
+          <header className="flex h-12 items-center gap-1 rounded-2xl print:hidden border border-[var(--border)] bg-[var(--surface)] px-2 [box-shadow:var(--shadow)] sm:gap-1.5">
             <button
               type="button"
               onClick={toggleMenu}
@@ -197,6 +197,10 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
 
         {/* key: rol ya da ekran değişince giriş animasyonları yeniden oynar */}
         <main key={`${role}-${current}`} className="mx-auto w-full max-w-[1280px] flex-1 py-4">
+          {/* yalnız yazdırmada; saat istemcide üretilir (sunucu HTML'iyle fark hidrasyon uyarısı vermesin) */}
+          <p className="mb-3 hidden text-[11px] text-[var(--muted)] print:block" suppressHydrationWarning>
+            {meta.company} · N Kolay Bayim · yazdırma: {new Date().toLocaleString("tr-TR")}
+          </p>
           {current === "/raporlar/islem-detaylari" ? (
             <IslemDetaylari role={role} meta={meta} onHome={() => navigate(HOME)} />
           ) : current === "/odeme/manuel" ? (

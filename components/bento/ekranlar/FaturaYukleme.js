@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { ROLES } from "@/lib/roles";
 import I from "@/components/DesignIcons";
 import { ApiHatasi } from "@/lib/api/hata";
-import { kurusCoz, sayi, tarih, tarihSaat, tl } from "@/lib/bicim";
+import { kurusCoz, sayi, tarih, tarihSaat, tl, paraMetniBicimle } from "@/lib/bicim";
 import { durumTonu, etiket } from "@/lib/etiketler";
 import { useFaturaHatirlat, useFaturaYukle, useFaturaYuklemeLinki, useFaturalar } from "@/lib/sorgular/faturalar";
 import { BosDurum, HataKutusu, Yukleniyor } from "../durumlar";
@@ -91,7 +91,7 @@ function FaturaYukle({ satir, onYuklendi, onClose }) {
                 inputMode="decimal"
                 value={tutarMetni}
                 onChange={(e) => {
-                  setTutarMetni(e.target.value.replace(/[^\d.,]/g, ""));
+                  setTutarMetni(paraMetniBicimle(e.target.value));
                   setSunucuHatalari({});
                 }}
                 aria-invalid={h("tutarKurus") ? true : undefined}

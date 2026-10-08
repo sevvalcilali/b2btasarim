@@ -5,7 +5,7 @@ import { useState } from "react";
 import I from "@/components/DesignIcons";
 import { ApiHatasi } from "@/lib/api/hata";
 import { kartTokenla } from "@/lib/api/odemeler";
-import { kurusCoz, taksitMetni, tl, tl2, yuzde } from "@/lib/bicim";
+import { kurusCoz, taksitMetni, tl, tl2, yuzde, paraMetniBicimle } from "@/lib/bicim";
 import { etiket } from "@/lib/etiketler";
 import { useOdemeYap, useTaksitSecenekleri } from "@/lib/sorgular/odeme";
 import { HataKutusu } from "../durumlar";
@@ -206,7 +206,7 @@ export function ManuelOdeme({ role, meta, onNavigate, onerilenCari }) {
                     inputMode="decimal"
                     placeholder="0,00"
                     value={tutarMetni}
-                    onChange={(e) => setTutarMetni(e.target.value.replace(/[^\d.,]/g, ""))}
+                    onChange={(e) => setTutarMetni(paraMetniBicimle(e.target.value))}
                     onBlur={() => gecerliTutar && setTutarMetni(tl(tutarKurus, { kurusGoster: true, isaret: false }))}
                     aria-invalid={h("tutarKurus") ? true : undefined}
                     className={`${inputCls(h("tutarKurus"))} pl-7 text-[15px] font-bold tabular-nums`}

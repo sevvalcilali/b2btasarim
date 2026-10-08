@@ -151,6 +151,21 @@ export function TarihAraligi({ deger, onChange, tumu = false }) {
   );
 }
 
+// Yazdır düğmesi: tarayıcının yazdırma / PDF kaydetme penceresi; kabuk ve düğmeler print CSS ile gizlenir
+export function YazdirDugmesi({ className = "" }) {
+  return (
+    <button
+      type="button"
+      onClick={() => window.print()}
+      title="Yazdır ya da PDF olarak kaydet"
+      className={`inline-flex h-9 items-center gap-1.5 self-start rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 text-[12.5px] font-semibold text-[var(--fg-2)] transition active:scale-[0.97] hover:border-[var(--brand)] hover:text-[var(--brand-text)] md:self-auto ${FOCUS} ${className}`}
+    >
+      <I name="printer" size={14} />
+      Yazdır
+    </button>
+  );
+}
+
 // Önceki döneme göre değişim rozeti: ▲ %12 / ▼ %8; önceki 0 ise "yeni", tersi: düşüş iyidir (bekleyen fatura gibi)
 export function DegisimRozeti({ simdiki, onceki, tersi = false, koyu = false }) {
   if (onceki == null || simdiki == null) return null;

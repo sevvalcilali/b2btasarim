@@ -9,7 +9,7 @@ import { BosDurum, HataKutusu, Yukleniyor } from "../durumlar";
 import { csvIndir, csvTutar } from "@/lib/disaAktar";
 import { SiraliBaslik, siralamaDegistir } from "../tablo";
 import { aralikSorgusu } from "@/lib/donem";
-import { Konum, TarihAraligi } from "../ortak";
+import { Konum, TarihAraligi, YazdirDugmesi } from "../ortak";
 import { CARD, FOCUS } from "../tema";
 import { useGecikmeli } from "../yardimci";
 
@@ -67,6 +67,7 @@ export function IslemDetaylari({ role, meta, onHome }) {
             {meta.company} · {KAPSAM[role]}
           </p>
         </div>
+        <div className="flex gap-2 self-start md:self-auto">
         <button
           type="button"
           onClick={() =>
@@ -83,6 +84,8 @@ export function IslemDetaylari({ role, meta, onHome }) {
           <I name="download" size={14} />
           Dışa Aktar
         </button>
+        <YazdirDugmesi />
+        </div>
       </div>
 
       {/* filtrelenen işlemlerin özeti — sunucudan (sayfadan bağımsız) */}

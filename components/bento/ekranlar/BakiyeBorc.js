@@ -7,7 +7,7 @@ import { etiket } from "@/lib/etiketler";
 import { useBakiyeEkstresi } from "@/lib/sorgular/bakiye";
 import { BosDurum, HataKutusu, Yukleniyor } from "../durumlar";
 import { aralikSorgusu, donemAraligi } from "@/lib/donem";
-import { Konum, TarihAraligi } from "../ortak";
+import { Konum, TarihAraligi, YazdirDugmesi } from "../ortak";
 import { HOME } from "../sayfalar";
 import { CARD, FOCUS } from "../tema";
 import { Money } from "../yardimci";
@@ -30,12 +30,15 @@ export function BakiyeBorc({ role, meta, onNavigate }) {
 
   return (
     <>
-      <div className="bn-rise mb-4 px-1">
-        <Konum onHome={() => onNavigate(HOME)} yol={["Ödeme Al", baslik]} />
-        <h1 className="text-xl font-extrabold tracking-tight text-[var(--fg)]">{baslik}</h1>
-        <p className="mt-0.5 text-[12.5px] text-[var(--muted)]">
-          {meta.company} · {veri ? `${veri.ustCari.unvan} carisi · güncelleme ${tarihSaat(veri.sonGuncelleme)}` : "Yükleniyor…"}
-        </p>
+      <div className="bn-rise mb-4 flex flex-col gap-3 px-1 md:flex-row md:items-end md:justify-between">
+        <div>
+          <Konum onHome={() => onNavigate(HOME)} yol={["Ödeme Al", baslik]} />
+          <h1 className="text-xl font-extrabold tracking-tight text-[var(--fg)]">{baslik}</h1>
+          <p className="mt-0.5 text-[12.5px] text-[var(--muted)]">
+            {meta.company} · {veri ? `${veri.ustCari.unvan} carisi · güncelleme ${tarihSaat(veri.sonGuncelleme)}` : "Yükleniyor…"}
+          </p>
+        </div>
+        <YazdirDugmesi />
       </div>
 
       {sorgu.isPending ? (

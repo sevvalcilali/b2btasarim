@@ -183,7 +183,7 @@ export function BayiListesi({ role, meta, tumAltBayiler, vurgu, kayitAdi, onNavi
                     className={`transition-colors hover:bg-[var(--soft)] ${i > 0 ? "border-t border-[var(--border)]" : ""} ${vurgu === b.cariNo ? "bg-[var(--success-soft)]" : ""}`}
                   >
                     <td className={td}>
-                      <button type="button" onClick={() => setDetay(b.cariNo)} title="Detayı aç" className={`block rounded text-left font-semibold text-[var(--fg)] hover:text-[var(--brand-text)] hover:underline ${FOCUS}`}>
+                      <button type="button" onClick={() => setDetay(b.cariNo)} title="Detayı aç" className={`bn-yazdir-koru block rounded text-left font-semibold text-[var(--fg)] hover:text-[var(--brand-text)] hover:underline ${FOCUS}`}>
                         {b.unvan}
                       </button>
                       <span className="block text-[11px] tabular-nums text-[var(--muted)]">
