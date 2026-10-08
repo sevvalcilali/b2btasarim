@@ -1117,72 +1117,99 @@ export const panelOzetleri = {
     bugun: {
       TOPLAM: {
         adet: 1284,
-        tutarKurus: 428490000
+        tutarKurus: 428490000,
+        degisimYuzde: 6.4
       },
       BASARILI: {
         adet: 1180,
-        tutarKurus: 396010000
+        tutarKurus: 396010000,
+        degisimYuzde: 7.1
       },
       BASARISIZ: {
         adet: 74,
-        tutarKurus: 21040000
+        tutarKurus: 21040000,
+        degisimYuzde: -2.3
       },
       IPTAL: {
         adet: 18,
-        tutarKurus: 6420000
+        tutarKurus: 6420000,
+        degisimYuzde: 0.8
       },
       IADE: {
         adet: 12,
-        tutarKurus: 5020000
+        tutarKurus: 5020000,
+        degisimYuzde: -1.2
       }
+    },
+    seriler: {
+      TOPLAM: [44, 50, 49, 57, 61, 66, 72],
+      BASARILI: [40, 52, 47, 60, 58, 71, 76]
     }
   },
   "320.01.001": {
     bugun: {
       TOPLAM: {
         adet: 268,
-        tutarKurus: 86230000
+        tutarKurus: 86230000,
+        degisimYuzde: 6.4
       },
       BASARILI: {
         adet: 249,
-        tutarKurus: 80410000
+        tutarKurus: 80410000,
+        degisimYuzde: 7.1
       },
       BASARISIZ: {
         adet: 12,
-        tutarKurus: 3870000
+        tutarKurus: 3870000,
+        degisimYuzde: -2.3
       },
       IPTAL: {
         adet: 4,
-        tutarKurus: 1290000
+        tutarKurus: 1290000,
+        degisimYuzde: 0.8
       },
       IADE: {
         adet: 3,
-        tutarKurus: 660000
+        tutarKurus: 660000,
+        degisimYuzde: -1.2
       }
+    },
+    seriler: {
+      TOPLAM: [44, 50, 49, 57, 61, 66, 72],
+      BASARILI: [40, 52, 47, 60, 58, 71, 76]
     }
   },
   "540.02.011": {
     bugun: {
       TOPLAM: {
         adet: 61,
-        tutarKurus: 18450000
+        tutarKurus: 18450000,
+        degisimYuzde: 6.4
       },
       BASARILI: {
         adet: 57,
-        tutarKurus: 17120000
+        tutarKurus: 17120000,
+        degisimYuzde: 7.1
       },
       BASARISIZ: {
         adet: 3,
-        tutarKurus: 930000
+        tutarKurus: 930000,
+        degisimYuzde: -2.3
       },
       IPTAL: {
         adet: 1,
-        tutarKurus: 240000
+        tutarKurus: 240000,
+        degisimYuzde: 0.8
       },
       IADE: {
         adet: 0,
-        tutarKurus: 160000
+        tutarKurus: 160000,
+        degisimYuzde: -1.2
       }
+    },
+    seriler: {
+      TOPLAM: [44, 50, 49, 57, 61, 66, 72],
+      BASARILI: [40, 52, 47, 60, 58, 71, 76]
     }
   }
 };

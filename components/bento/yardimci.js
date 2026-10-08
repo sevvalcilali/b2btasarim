@@ -67,8 +67,9 @@ function useCountUp(target) {
   return val;
 }
 
-export function Money({ value }) {
-  const v = useCountUp(parseAmount(value));
+// value: "₺ 12.400" biçiminde metin (eski ekranlar) · kurus: API'den gelen kuruş (yeni ekranlar)
+export function Money({ value, kurus }) {
+  const v = useCountUp(kurus != null ? Math.round(kurus / 100) : parseAmount(value));
   return <>₺ {v.toLocaleString("tr-TR")}</>;
 }
 

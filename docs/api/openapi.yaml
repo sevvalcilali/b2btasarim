@@ -118,8 +118,103 @@ paths:
                 musteriTurleri: [BAYI, ALT_BAYI, DUZENLI_MUSTERI, DUZENSIZ_MUSTERI, KENDI_KARTI]
         "401": { $ref: "#/components/responses/OturumYok" }
 
+  /panel/ozet:
+    get:
+      tags: [Panel]
+      summary: Ana Sayfa KPI özeti
+      description: Kalem başına adet, tutar ve düne göre değişim; başarı oranı; ortalama işlem; mini seriler. Rol kapsamına göre hesaplanır.
+      parameters:
+        - { name: donem, in: query, schema: { type: string, enum: [bugun, hafta, ay], default: bugun } }
+      responses:
+        "200":
+          description: KPI özeti
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [donem, kalemler, basariOraniYuzde, ortalamaIslemKurus]
+                properties:
+                  donem: { type: string }
+                  kalemler:
+                    type: object
+                    description: TOPLAM, BASARILI, BASARISIZ, IPTAL, IADE anahtarları
+                    additionalProperties:
+                      type: object
+                      properties:
+                        adet: { type: integer }
+                        tutarKurus: { $ref: "#/components/schemas/Kurus" }
+                        degisimYuzde: { type: number, description: Düne göre yüzde değişim, işaretli }
+                  basariOraniYuzde: { type: number }
+                  ortalamaIslemKurus: { $ref: "#/components/schemas/Kurus" }
+                  seriler:
+                    type: object
+                    description: Kart içi mini grafik için 7 noktalı seriler (TOPLAM, BASARILI); birimsiz
+                    additionalProperties: { type: array, items: { type: number } }
+              example:
+                donem: bugun
+                kalemler:
+                  TOPLAM: { adet: 1284, tutarKurus: 428490000, degisimYuzde: 6.4 }
+                  BASARILI: { adet: 1180, tutarKurus: 396010000, degisimYuzde: 7.1 }
+                  BASARISIZ: { adet: 74, tutarKurus: 21040000, degisimYuzde: -2.3 }
+                  IPTAL: { adet: 18, tutarKurus: 6420000, degisimYuzde: 0.8 }
+                  IADE: { adet: 12, tutarKurus: 5020000, degisimYuzde: -1.2 }
+                basariOraniYuzde: 91.9
+                ortalamaIslemKurus: 333715
+                seriler: { TOPLAM: [44, 50, 49, 57, 61, 66, 72], BASARILI: [40, 52, 47, 60, 58, 71, 76] }
+        "401": { $ref: "#/components/responses/OturumYok" }
+
+  /panel/haftalik-hacim:
+    get:
+      tags: [Panel]
+      summary: Son 7 günün günlük işlem hacmi
+      responses:
+        "200":
+          description: Günlük hacim
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [gunler, toplamKurus, degisimYuzde]
+                properties:
+                  gunler:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        gun: { type: string, format: date }
+                        tutarKurus: { $ref: "#/components/schemas/Kurus" }
+                  toplamKurus: { $ref: "#/components/schemas/Kurus" }
+                  degisimYuzde: { type: number, description: Geçen haftaya göre, işaretli }
+              example:
+                gunler: [{ gun: "2026-09-28", tutarKurus: 51200000 }, { gun: "2026-09-29", tutarKurus: 64400000 }]
+                toplamKurus: 374000000
+                degisimYuzde: 12.4
+        "401": { $ref: "#/components/responses/OturumYok" }
+
+  /panel/bakiye:
+    get:
+      tags: [Panel]
+      summary: Bakiye ve borç
+      description: Ana firma kendi limitini, bayi ana firma carisini, alt bayi bayi carisini görür (şartname s.2).
+      responses:
+        "200":
+          description: Bakiye
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [bakiyeKurus, borcKurus, limitKurus, kullanimYuzde, gorunum]
+                properties:
+                  bakiyeKurus: { $ref: "#/components/schemas/Kurus" }
+                  borcKurus: { $ref: "#/components/schemas/Kurus" }
+                  limitKurus: { $ref: "#/components/schemas/Kurus" }
+                  kullanimYuzde: { type: number }
+                  gorunum: { type: string, enum: [FIRMA_LIMITI, UST_CARI] }
+              example: { bakiyeKurus: 18420000, borcKurus: 4650000, limitKurus: 40000000, kullanimYuzde: 46, gorunum: UST_CARI }
+        "401": { $ref: "#/components/responses/OturumYok" }
+
   # --- Sonraki adımlarda eklenecek uç noktalar (docs/api/README.md'deki tablo) ---
-  # /panel/ozet · /panel/haftalik-hacim · /panel/bekleyenler
+  # /panel/bekleyenler (menü rozetleri — iptal/iade ve fatura ekranları API'ye geçince)
   # /musteriler · /tahsilat-carileri · /firma/ortaklar · /odeme/taksit-secenekleri · /odemeler · /odeme-linkleri
   # /iptal-iade-talepleri · /iptal-iade-talepleri/uygun-islemler · /iptal-iade-talepleri/{id}/onay · /{id}/red
   # /bayiler · /bayiler/{cariNo} · /alt-bayiler · /vade-farki-profilleri · /uye-isyerleri

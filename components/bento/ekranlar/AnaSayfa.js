@@ -2,40 +2,18 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { ROLES } from "@/lib/roles";
-import { kpis, bakiyeOzet } from "@/lib/mockData";
 import I from "@/components/DesignIcons";
-import { tl, tarihSaat } from "@/lib/bicim";
+import { gunKisa, tl, tlKisa, tarihSaat, yuzde } from "@/lib/bicim";
 import { durumTonu, etiket } from "@/lib/etiketler";
 import { useIslemler } from "@/lib/sorgular/islemler";
-import { BosDurum, HataKutusu, Yukleniyor } from "../durumlar";
+import { useBakiye, useHaftalikHacim, usePanelOzet } from "@/lib/sorgular/panel";
+import { BosDurum, HataKutusu, Yukleniyor, YukleniyorKutu } from "../durumlar";
 import { Pencere } from "../ortak";
 import { isReady } from "../sayfalar";
 import { CARD, FOCUS } from "../tema";
-import { parseAmount, smoothPath, curveThrough, Money, TrendArrow } from "../yardimci";
+import { smoothPath, curveThrough, Money, TrendArrow } from "../yardimci";
 
-// ---- veri yardımcıları -------------------------------------------------------------------
-// Haftalık hacim (bin ₺)
-const WEEK = [
-  { d: "Pzt", k: 512 },
-  { d: "Sal", k: 644 },
-  { d: "Çar", k: 446 },
-  { d: "Per", k: 751 },
-  { d: "Cum", k: 826 },
-  { d: "Cmt", k: 330 },
-  { d: "Paz", k: 231 },
-];
-
-const AXIS_MAX = 1000;
-
-// Mock "düne göre" değişimleri — good: değişim olumlu mu?
-const TREND = {
-  toplam: { txt: "%6,4", up: true, good: true },
-  basarili: { txt: "%7,1", up: true, good: true },
-  basarisiz: { txt: "%2,3", up: false, good: true },
-  iptal: { txt: "%0,8", up: true, good: false },
-  iade: { txt: "%1,2", up: false, good: true },
-};
-
+// ---- KPI blokları ------------------------------------------------------------------------
 // Küçük renkli KPI blokları (toplam ve başarılı büyük bloklarda ayrı çizilir)
 const TILE = {
   basarisiz: { wrap: "bg-[var(--danger-soft)]", ink: "text-[var(--danger-text)]", fill: "bg-[var(--danger)]" },
@@ -65,22 +43,20 @@ const BIG = {
     icon: "check",
     bg: "bg-[linear-gradient(135deg,#078350,#04603A)] [box-shadow:0_16px_34px_-16px_rgba(4,96,58,0.75)]",
     glow: "bg-[#7CE3B1]",
-    series: [40, 52, 47, 60, 58, 71, 76],
   },
   toplam: {
     title: "Toplam İşlem",
     icon: "trendingUp",
     bg: "bg-[linear-gradient(135deg,#0C34E7,#0A23A8)] [box-shadow:0_16px_34px_-16px_rgba(12,52,231,0.75)]",
     glow: "bg-[#D4D1FC]",
-    series: [44, 50, 49, 57, 61, 66, 72],
   },
 };
 
 // footer: { label, value, bar? } — bar verilirse altta yüzde çubuğu çizilir
 function BigTile({ s, index, footer }) {
   const b = BIG[s.key];
-  const tr = TREND[s.key];
-  const line = smoothPath(b.series, 400, 80, 4);
+  const tr = s.trend;
+  const line = smoothPath(s.seri?.length > 1 ? s.seri : [1, 1], 400, 80, 4);
   return (
     <div
       style={{ "--i": index }}
@@ -100,7 +76,7 @@ function BigTile({ s, index, footer }) {
       </div>
 
       <p className="relative mt-4 text-[30px] font-extrabold leading-none tracking-tight tabular-nums sm:text-[34px] xl:text-[40px]">
-        <Money value={s.value} />
+        <Money kurus={s.tutarKurus} />
       </p>
       <p className="relative mt-2 flex items-center gap-1 text-[12px] text-white/85">
         <span className="inline-flex items-center gap-0.5 font-bold text-white">
@@ -137,7 +113,7 @@ function BigTile({ s, index, footer }) {
 
 function SoftTile({ s, index, total }) {
   const t = TILE[s.key] || TILE.iade;
-  const tr = TREND[s.key];
+  const tr = s.trend;
   const pay = total ? (s.count / total) * 100 : 0;
   return (
     <div
@@ -151,7 +127,7 @@ function SoftTile({ s, index, total }) {
         </span>
       </div>
       <p className="mt-2.5 text-[16px] font-extrabold leading-none tracking-tight tabular-nums text-[var(--fg)] sm:text-[19px]">
-        <Money value={s.value} />
+        <Money kurus={s.tutarKurus} />
       </p>
       <div className="mt-3 h-1 overflow-hidden rounded-full bg-[var(--surface)]" aria-hidden="true">
         <div className={`bn-fill h-full rounded-full ${t.fill}`} style={{ width: `${Math.max(pay, 3)}%` }} />
@@ -176,11 +152,14 @@ const CHART_TYPES = [
 
 // Haftalık hacim kartı: kullanıcı sütun ya da çizgi grafiği seçer; seçim tarayıcıda hatırlanır.
 // Büyüt düğmesi grafiği ekranın ortasında büyük bir pencerede açar.
-function ChartCard() {
+// hacim: GET /panel/haftalik-hacim cevabı — gunler[{gun, tutarKurus}], toplamKurus, degisimYuzde
+function ChartCard({ hacim }) {
   const [type, setType] = useState("bar");
   const [expanded, setExpanded] = useState(false);
   const expandRef = useRef(null);
-  const total = WEEK.reduce((a, w) => a + w.k, 0);
+  // grafik bin ₺ ile çizer; eksen 250K'nın katına yuvarlanır
+  const week = hacim.gunler.map((g) => ({ d: gunKisa(g.gun), k: Math.round(g.tutarKurus / 100000) }));
+  const axisMax = Math.max(250, Math.ceil(Math.max(...week.map((w) => w.k)) / 250) * 250);
 
   useEffect(() => {
     try {
@@ -201,7 +180,7 @@ function ChartCard() {
     expandRef.current?.focus();
   };
 
-  const subtitle = `Son 7 gün · toplam ₺ ${(total / 1000).toFixed(2).replace(".", ",")}M`;
+  const subtitle = `Son 7 gün · toplam ${tlKisa(hacim.toplamKurus)}`;
 
   return (
     <section style={{ "--i": 5 }} className={`bn-rise p-4 lg:col-span-2 ${CARD}`} aria-labelledby="bn-chart-title">
@@ -213,7 +192,7 @@ function ChartCard() {
           <p className="mt-0.5 text-xs text-[var(--muted)]">{subtitle}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <TrendBadge />
+          <TrendBadge degisim={hacim.degisimYuzde} />
           <ChartTypeToggle type={type} onChange={choose} />
           <button
             ref={expandRef}
@@ -228,26 +207,27 @@ function ChartCard() {
         </div>
       </div>
 
-      {type === "bar" ? <BarChart /> : <LineChart />}
+      {type === "bar" ? <BarChart week={week} axisMax={axisMax} /> : <LineChart week={week} />}
 
       {expanded && (
         <Pencere baslik="Haftalık İşlem Hacmi" altBaslik={subtitle} onClose={close}>
           <div className="flex flex-wrap items-center gap-2">
-            <TrendBadge />
+            <TrendBadge degisim={hacim.degisimYuzde} />
             <ChartTypeToggle type={type} onChange={choose} />
           </div>
-          {type === "bar" ? <BarChart large /> : <LineChart large />}
+          {type === "bar" ? <BarChart week={week} axisMax={axisMax} large /> : <LineChart week={week} large />}
         </Pencere>
       )}
     </section>
   );
 }
 
-function TrendBadge() {
+function TrendBadge({ degisim }) {
+  const up = degisim >= 0;
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[11px] font-bold text-[var(--success-text)]">
-      <TrendArrow up />
-      %12,4 geçen haftaya göre
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${up ? "bg-[var(--success-soft)] text-[var(--success-text)]" : "bg-[var(--danger-soft)] text-[var(--danger-text)]"}`}>
+      <TrendArrow up={up} />
+      {yuzde(Math.abs(degisim))} geçen haftaya göre
     </span>
   );
 }
@@ -275,8 +255,8 @@ function ChartTypeToggle({ type, onChange }) {
 }
 
 // large: büyütülmüş pencerede daha yüksek alan, daha geniş sütunlar ve tüm günlerin tutarı görünür
-function BarChart({ large = false }) {
-  const maxK = Math.max(...WEEK.map((w) => w.k));
+function BarChart({ week, axisMax, large = false }) {
+  const maxK = Math.max(...week.map((w) => w.k));
   return (
     <>
       <div className={`relative ${large ? "mt-10 h-[min(52vh,440px)] min-h-[220px]" : "mt-6 h-40"}`}>
@@ -287,9 +267,9 @@ function BarChart({ large = false }) {
           <span className="border-t border-[var(--border-strong)]" />
         </div>
         <div className="relative flex h-full items-end justify-around gap-2">
-          {WEEK.map((w, i) => (
+          {week.map((w, i) => (
             <div key={w.d} className="group flex h-full flex-1 items-end justify-center">
-              <div className={`relative w-full ${large ? "max-w-[64px]" : "max-w-[32px]"}`} style={{ height: `${(w.k / AXIS_MAX) * 100}%` }}>
+              <div className={`relative w-full ${large ? "max-w-[64px]" : "max-w-[32px]"}`} style={{ height: `${(w.k / axisMax) * 100}%` }}>
                 <div
                   style={{ "--i": i }}
                   className={`bn-grow h-full w-full rounded-t-[10px] bg-[linear-gradient(180deg,var(--chart-to),var(--chart-from))] transition-opacity duration-200 group-hover:opacity-100 ${
@@ -309,7 +289,7 @@ function BarChart({ large = false }) {
         </div>
       </div>
       <div className="mt-2 flex justify-around gap-2 text-[11px] font-medium text-[var(--muted)]">
-        {WEEK.map((w) => (
+        {week.map((w) => (
           <span key={w.d} className="flex-1 text-center">
             {w.d}
           </span>
@@ -320,10 +300,10 @@ function BarChart({ large = false }) {
 }
 
 // Tasarım 04'teki (Nova) alan grafiği: gün gün okunur; boşta en yüksek gün seçilidir.
-function LineChart({ large = false }) {
+function LineChart({ week, large = false }) {
   const W = 640;
   const H = 200;
-  const values = WEEK.map((w) => w.k);
+  const values = week.map((w) => w.k);
   const max = Math.max(...values);
   const step = (W - 24) / (values.length - 1);
   const pts = values.map((v, i) => [12 + i * step, H - 12 - (v / max) * (H - 52)]);
@@ -356,7 +336,7 @@ function LineChart({ large = false }) {
           </svg>
           {pts.map((p, i) => (
             <span
-              key={WEEK[i].d}
+              key={week[i].d}
               aria-hidden="true"
               className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-[var(--surface)] bg-[var(--chart-from)] transition-all duration-200 ${
                 i === active ? "h-4 w-4" : "h-2.5 w-2.5"
@@ -379,15 +359,15 @@ function LineChart({ large = false }) {
           }`}
           style={{ left: `${ax}%`, top: `calc(${ay}% - 12px)` }}
         >
-          {WEEK[active].d} · ₺ {WEEK[active].k}K
+          {week[active].d} · ₺ {week[active].k}K
         </span>
 
         {/* gün gün okuma alanları */}
         {pts.map((p, i) => (
           <button
-            key={WEEK[i].d}
+            key={week[i].d}
             type="button"
-            aria-label={`${WEEK[i].d}: ₺ ${WEEK[i].k}K`}
+            aria-label={`${week[i].d}: ₺ ${week[i].k}K`}
             onMouseEnter={() => setActive(i)}
             onFocus={() => setActive(i)}
             className="absolute inset-y-0 -translate-x-1/2 cursor-default rounded-lg focus:outline-none focus-visible:bg-[var(--soft)]"
@@ -398,11 +378,11 @@ function LineChart({ large = false }) {
       <div className="relative mt-2 h-4 text-[11px]">
         {pts.map((p, i) => (
           <span
-            key={WEEK[i].d}
+            key={week[i].d}
             className={`absolute -translate-x-1/2 transition-colors ${i === active ? "font-bold text-[var(--brand-text)]" : "font-medium text-[var(--muted)]"}`}
             style={{ left: `${(p[0] / W) * 100}%` }}
           >
-            {WEEK[i].d}
+            {week[i].d}
           </span>
         ))}
       </div>
@@ -410,8 +390,20 @@ function LineChart({ large = false }) {
   );
 }
 
-function BalanceCard({ role }) {
-  const bakiye = bakiyeOzet[role];
+// Bakiye ve Borç — veri: GET /panel/bakiye
+function BalanceCard() {
+  const sorgu = useBakiye();
+  const bakiye = sorgu.data;
+  if (!bakiye) {
+    return (
+      <section style={{ "--i": 6 }} className={`bn-rise flex flex-col p-4 ${CARD}`} aria-labelledby="bn-balance-title" aria-busy={sorgu.isPending}>
+        <h2 id="bn-balance-title" className="text-sm font-bold text-[var(--fg)]">
+          Bakiye ve Borç
+        </h2>
+        {sorgu.isError ? <HataKutusu hata={sorgu.error} onTekrar={() => sorgu.refetch()} /> : <YukleniyorKutu className="mt-4" />}
+      </section>
+    );
+  }
   return (
     <section style={{ "--i": 6 }} className={`bn-rise flex flex-col p-4 ${CARD}`} aria-labelledby="bn-balance-title">
       <div className="flex items-start justify-between gap-2">
@@ -419,44 +411,44 @@ function BalanceCard({ role }) {
           <h2 id="bn-balance-title" className="text-sm font-bold text-[var(--fg)]">
             Bakiye ve Borç
           </h2>
-          <p className="mt-0.5 text-xs text-[var(--muted)]">{role === ROLES.ANA_FIRMA ? "Firma limiti" : "Üst cari görünümü"}</p>
+          <p className="mt-0.5 text-xs text-[var(--muted)]">{bakiye.gorunum === "FIRMA_LIMITI" ? "Firma limiti" : "Üst cari görünümü"}</p>
         </div>
-        <span className="rounded-full bg-[var(--brand-soft)] px-2 py-0.5 text-[11px] font-bold tabular-nums text-[var(--brand-text)]">%{bakiye.kullanim}</span>
+        <span className="rounded-full bg-[var(--brand-soft)] px-2 py-0.5 text-[11px] font-bold tabular-nums text-[var(--brand-text)]">{yuzde(bakiye.kullanimYuzde, 0)}</span>
       </div>
 
       <div className="relative mt-3 overflow-hidden rounded-xl bg-[#0C34E7] p-3.5 text-white">
         <div className="pointer-events-none absolute -right-8 -top-10 h-28 w-28 rounded-full bg-[#D4D1FC] opacity-25 blur-2xl" aria-hidden="true" />
         <p className="relative text-[11px] font-medium text-white/75">Kullanılabilir Bakiye</p>
         <p className="relative mt-1 text-[21px] font-extrabold leading-none tracking-tight tabular-nums">
-          <Money value={bakiye.bakiye} />
+          <Money kurus={bakiye.bakiyeKurus} />
         </p>
       </div>
 
       <dl className="mt-3 space-y-2 text-[12.5px]">
         <div className="flex items-center justify-between">
           <dt className="text-[var(--muted)]">Güncel Borç</dt>
-          <dd className="font-bold tabular-nums text-[var(--danger-text)]">{bakiye.borc}</dd>
+          <dd className="font-bold tabular-nums text-[var(--danger-text)]">{tl(bakiye.borcKurus)}</dd>
         </div>
         <div className="flex items-center justify-between">
           <dt className="text-[var(--muted)]">Ödeme Limiti</dt>
-          <dd className="font-bold tabular-nums text-[var(--fg)]">{bakiye.limit}</dd>
+          <dd className="font-bold tabular-nums text-[var(--fg)]">{tl(bakiye.limitKurus)}</dd>
         </div>
       </dl>
 
       <div className="mt-auto pt-4">
         <div className="mb-1.5 flex justify-between text-[11px] font-medium text-[var(--muted)]">
           <span>Limit Kullanımı</span>
-          <span className="font-bold tabular-nums text-[var(--fg-2)]">%{bakiye.kullanim}</span>
+          <span className="font-bold tabular-nums text-[var(--fg-2)]">{yuzde(bakiye.kullanimYuzde, 0)}</span>
         </div>
         <div
           className="h-1.5 overflow-hidden rounded-full bg-[var(--brand-soft)]"
           role="progressbar"
-          aria-valuenow={bakiye.kullanim}
+          aria-valuenow={bakiye.kullanimYuzde}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-label="Limit kullanımı"
         >
-          <div className="bn-fill h-full rounded-full bg-[linear-gradient(90deg,var(--chart-from),var(--chart-to))]" style={{ width: `${bakiye.kullanim}%` }} />
+          <div className="bn-fill h-full rounded-full bg-[linear-gradient(90deg,var(--chart-from),var(--chart-to))]" style={{ width: `${bakiye.kullanimYuzde}%` }} />
         </div>
       </div>
     </section>
@@ -595,13 +587,37 @@ function DistributionCard({ stats }) {
 }
 
 // Ana Sayfa: KPI blokları, haftalık hacim, bakiye, son işlemler.
+// /panel/ozet kalemleri → kart satırları. İyi yönde değişim: toplam ve başarılıda artış, diğerlerinde azalış.
+const KALEM = [
+  { key: "toplam", kod: "TOPLAM", label: "Toplam İşlem", iyiArtis: true },
+  { key: "basarili", kod: "BASARILI", label: "Başarılı", iyiArtis: true },
+  { key: "basarisiz", kod: "BASARISIZ", label: "Başarısız", iyiArtis: false },
+  { key: "iptal", kod: "IPTAL", label: "İptal", iyiArtis: false },
+  { key: "iade", kod: "IADE", label: "İade", iyiArtis: false },
+];
+function kpiSatirlari(ozet) {
+  return KALEM.map((k) => {
+    const v = ozet.kalemler[k.kod] || { adet: 0, tutarKurus: 0, degisimYuzde: 0 };
+    const d = v.degisimYuzde || 0;
+    return {
+      key: k.key,
+      label: k.label,
+      count: v.adet,
+      tutarKurus: v.tutarKurus,
+      trend: { txt: yuzde(Math.abs(d)), up: d >= 0, good: k.iyiArtis ? d >= 0 : d <= 0 },
+      seri: ozet.seriler?.[k.kod],
+    };
+  });
+}
+
+// Ana Sayfa — veri: GET /panel/ozet (KPI), /panel/haftalik-hacim (grafik), /panel/bakiye, /islemler?boyut=6
 export function Dashboard({ role, meta, onNavigate }) {
-  const stats = kpis[role];
-  const toplam = stats.find((s) => s.key === "toplam") || stats[0];
-  const basarili = stats.find((s) => s.key === "basarili");
-  const others = stats.filter((s) => s.key !== "basarili" && s.key !== "toplam");
-  const ortalama = toplam.count ? parseAmount(toplam.value) / toplam.count : 0;
-  const basariOrani = toplam.count ? (basarili.count / toplam.count) * 100 : 0;
+  const ozet = usePanelOzet("bugun");
+  const hacim = useHaftalikHacim();
+  const stats = ozet.data ? kpiSatirlari(ozet.data) : null;
+  const toplam = stats?.find((s) => s.key === "toplam");
+  const basarili = stats?.find((s) => s.key === "basarili");
+  const others = stats?.filter((s) => s.key !== "basarili" && s.key !== "toplam") || [];
   const selectCls = `h-9 rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-[12.5px] font-medium text-[var(--fg-2)] ${FOCUS}`;
 
   return (
@@ -644,32 +660,60 @@ export function Dashboard({ role, meta, onNavigate }) {
       </div>
 
       {/* KPI bento blokları — üstte eşit iki büyük blok (başarılı, toplam), altta üç küçük blok */}
-      <div className="grid grid-cols-6 gap-3">
-        <BigTile
-          s={basarili}
-          index={0}
-          footer={{ label: "Başarı oranı", value: `%${basariOrani.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}`, bar: basariOrani }}
-        />
-        <BigTile
-          s={toplam}
-          index={1}
-          footer={{ label: "Ortalama işlem tutarı", value: `₺ ${Math.round(ortalama).toLocaleString("tr-TR")}` }}
-        />
-        {others.map((s, i) => (
-          <SoftTile key={s.key} s={s} index={i + 2} total={toplam.count} />
-        ))}
+      <div className="grid grid-cols-6 gap-3" aria-busy={ozet.isPending}>
+        {ozet.isError ? (
+          <div className={`col-span-6 ${CARD} hover:!translate-y-0`}>
+            <HataKutusu hata={ozet.error} onTekrar={() => ozet.refetch()} />
+          </div>
+        ) : !stats ? (
+          <>
+            {[0, 1].map((i) => (
+              <div key={i} className="col-span-6 h-[232px] rounded-2xl bg-[var(--soft)] p-5 sm:col-span-3">
+                <YukleniyorKutu />
+              </div>
+            ))}
+            {[2, 3, 4].map((i) => (
+              <div key={i} className="col-span-2 rounded-2xl bg-[var(--soft)] p-4">
+                <YukleniyorKutu />
+              </div>
+            ))}
+          </>
+        ) : (
+          <>
+            <BigTile s={basarili} index={0} footer={{ label: "Başarı oranı", value: yuzde(ozet.data.basariOraniYuzde), bar: ozet.data.basariOraniYuzde }} />
+            <BigTile s={toplam} index={1} footer={{ label: "Ortalama işlem tutarı", value: tl(ozet.data.ortalamaIslemKurus) }} />
+            {others.map((s, i) => (
+              <SoftTile key={s.key} s={s} index={i + 2} total={toplam.count} />
+            ))}
+          </>
+        )}
       </div>
 
       <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <ChartCard />
-        <BalanceCard role={role} />
+        {hacim.data ? (
+          <ChartCard hacim={hacim.data} />
+        ) : (
+          <section style={{ "--i": 5 }} className={`bn-rise p-4 lg:col-span-2 ${CARD} hover:!translate-y-0`} aria-labelledby="bn-chart-title" aria-busy={hacim.isPending}>
+            <h2 id="bn-chart-title" className="text-sm font-bold text-[var(--fg)]">
+              Haftalık İşlem Hacmi
+            </h2>
+            {hacim.isError ? <HataKutusu hata={hacim.error} onTekrar={() => hacim.refetch()} /> : <Yukleniyor satir={4} baslik={false} />}
+          </section>
+        )}
+        <BalanceCard />
       </div>
 
       <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
         <TransactionsCard onSeeAll={() => onNavigate("/raporlar/islem-detaylari")} />
         <div className="flex flex-col gap-3">
           <QuickCard onNavigate={onNavigate} />
-          <DistributionCard stats={stats} />
+          {stats ? (
+            <DistributionCard stats={stats} />
+          ) : (
+            <section style={{ "--i": 9 }} className={`bn-rise flex-1 p-4 ${CARD}`}>
+              <YukleniyorKutu />
+            </section>
+          )}
         </div>
       </div>
     </>
