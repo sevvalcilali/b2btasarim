@@ -21,6 +21,7 @@ export const SAYFALAR = {
   "firma": "/ayarlar/firma",
   "duyuru": "/duyuru",
   "kur": "/odeme/kur",
+  "bayi-cari": "/odeme/bayi-cari",
   "ana-firma-bakiye": "/odeme/ana-firma-bakiye",
   "bayi-bakiye": "/odeme/bayi-bakiye",
 };

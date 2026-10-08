@@ -119,6 +119,24 @@ paths:
                 musteriTurleri: [BAYI, ALT_BAYI, DUZENLI_MUSTERI, DUZENSIZ_MUSTERI, KENDI_KARTI]
         "401": { $ref: "#/components/responses/OturumYok" }
 
+  /oturum/aktif-uye-isyeri:
+    put:
+      tags: [Oturum]
+      summary: Cari seçimi — sonraki ödemelerin işleneceği üye işyeri (şartname s.1–2)
+      description: Bayi "Ana Firma Cari Seçimi", alt bayi "Bayi Carisi Seçimi". Yalnızca firmaya açık üye işyerleri seçilebilir (422).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [cariNo], properties: { cariNo: { type: string, example: "320.00.002" } } }
+      responses:
+        "200":
+          description: Seçilen üye işyeri
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UyeIsyeriOzeti" }
+        "422": { $ref: "#/components/responses/IsKurali" }
+
   /panel/ozet:
     get:
       tags: [Panel]
@@ -1149,6 +1167,7 @@ components:
         islemNo: { type: string, example: TRX-90241 }
         tarih: { type: string, format: date-time }
         cekimYapan: { $ref: "#/components/schemas/FirmaOzeti", description: Çekimi yapan firma }
+        uyeIsyeriCariNo: { type: [string, "null"], description: Ödemenin işlendiği üye işyeri (oturumdaki cari seçimi) }
         musteriTuru: { $ref: "#/components/schemas/MusteriTuru" }
         musteri:
           type: object
@@ -1557,3 +1576,14 @@ components:
           items:
             type: string
             enum: [ODEME, RAPOR, IPTAL_IADE_GIRIS, IPTAL_IADE_ONAY, BAYI_TANIM, KULLANICI_TANIM, AYARLAR]
+        aktifUyeIsyeri:
+          oneOf:
+            - $ref: "#/components/schemas/UyeIsyeriOzeti"
+            - type: "null"
+          description: Seçili cari; ödemeler bu üye işyerine işlenir
+
+    UyeIsyeriOzeti:
+      type: object
+      properties:
+        cariNo: { type: string, example: "320.00.002" }
+        ad: { type: string, example: Brisa Perakende Lastik }

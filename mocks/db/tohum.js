@@ -1354,7 +1354,8 @@ export const oturumlar = {
     email: "mehmet.yilmaz@brisa.com",
     rol: "ANA_FIRMA",
     firmaId: "100.00.001",
-    yetki: "YONETICI"
+    yetki: "YONETICI",
+    aktifUyeIsyeri: "320.00.001"
   },
   "demo-BAYI": {
     kullaniciId: "K-101",
@@ -1362,7 +1363,8 @@ export const oturumlar = {
     email: "murat@ankaralastik.com",
     rol: "BAYI",
     firmaId: "320.01.001",
-    yetki: "YONETICI"
+    yetki: "YONETICI",
+    aktifUyeIsyeri: "320.00.001"
   },
   "demo-ALT_BAYI": {
     kullaniciId: "K-201",
@@ -1370,7 +1372,8 @@ export const oturumlar = {
     email: "kemal@cankayaotoservis.com",
     rol: "ALT_BAYI",
     firmaId: "540.02.011",
-    yetki: "YONETICI"
+    yetki: "YONETICI",
+    aktifUyeIsyeri: "320.00.002"
   }
 };
 

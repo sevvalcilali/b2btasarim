@@ -64,6 +64,7 @@ export const linklerHandlers = [
       olusturma: simdi(),
       sonGecerlilik: new Date(Date.now() + g.gecerlilikGun * 86400000).toISOString(),
       olusturanId: kim.firmaId,
+      uyeIsyeriCariNo: kim.aktifUyeIsyeri || null,
       musteriTuru: g.musteriTuru,
       musteriUnvan: musteri.unvan,
       tutarKurus: g.tutarKurus,

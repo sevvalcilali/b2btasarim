@@ -11,6 +11,7 @@ import { useOdemeYap, useTaksitSecenekleri } from "@/lib/sorgular/odeme";
 import { HataKutusu } from "../durumlar";
 import { LISTELI, MusteriBolumu, hataBaglayici, useMusteriSecimi } from "../odeme";
 import { Konum, inputCls, Alan, FormBolum } from "../ortak";
+import { AktifCariNotu } from "./CariSecimi";
 import { HOME } from "../sayfalar";
 import { CARD, FOCUS } from "../tema";
 import { rakamlar, useGecikmeli } from "../yardimci";
@@ -108,7 +109,10 @@ export function ManuelOdeme({ role, meta, onNavigate, onerilenCari }) {
     <div className="bn-rise mb-4 px-1">
       <Konum onHome={() => onNavigate(HOME)} yol={["Ödeme Al", "Manuel Ödeme"]} />
       <h1 className="text-xl font-extrabold tracking-tight text-[var(--fg)]">Manuel Ödeme</h1>
-      <p className="mt-0.5 text-[12.5px] text-[var(--muted)]">{meta.company} · Kart bilgisiyle tahsilat</p>
+      <p className="mt-0.5 text-[12.5px] text-[var(--muted)]">
+        {meta.company} · Kart bilgisiyle tahsilat
+        <AktifCariNotu />
+      </p>
     </div>
   );
 

@@ -10,6 +10,7 @@ import { useOdemeLinkiOlustur, useOdemeLinkleri, useTaksitSecenekleri } from "@/
 import { BosDurum, HataKutusu, Yukleniyor } from "../durumlar";
 import { LISTELI, MusteriBolumu, hataBaglayici, useMusteriSecimi } from "../odeme";
 import { Konum, inputCls, Alan, FormBolum, KopyalaDugmesi } from "../ortak";
+import { AktifCariNotu } from "./CariSecimi";
 import { HOME } from "../sayfalar";
 import { CARD, FOCUS } from "../tema";
 import { rakamlar, useGecikmeli } from "../yardimci";
@@ -116,7 +117,10 @@ export function LinkOdeme({ role, meta, onNavigate }) {
       <div className="bn-rise mb-4 px-1">
         <Konum onHome={() => onNavigate(HOME)} yol={["Ödeme Al", "Link ile Ödeme"]} />
         <h1 className="text-xl font-extrabold tracking-tight text-[var(--fg)]">Link ile Ödeme</h1>
-        <p className="mt-0.5 text-[12.5px] text-[var(--muted)]">{meta.company} · Müşteriye ödeme linki gönderin</p>
+        <p className="mt-0.5 text-[12.5px] text-[var(--muted)]">
+          {meta.company} · Müşteriye ödeme linki gönderin
+          <AktifCariNotu />
+        </p>
       </div>
 
       {m.hata ? (

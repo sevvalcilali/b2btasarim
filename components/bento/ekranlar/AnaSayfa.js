@@ -13,6 +13,7 @@ import { isReady } from "../sayfalar";
 import { CARD, FOCUS } from "../tema";
 import { smoothPath, curveThrough, Money, TrendArrow } from "../yardimci";
 import { DuyuruPopup } from "./Duyuru";
+import { CariSecici } from "./CariSecimi";
 
 // ---- KPI blokları ------------------------------------------------------------------------
 // Küçük renkli KPI blokları (toplam ve başarılı büyük bloklarda ayrı çizilir)
@@ -623,8 +624,6 @@ export function Dashboard({ role, meta, onNavigate }) {
   const toplam = stats?.find((s) => s.key === "toplam");
   const basarili = stats?.find((s) => s.key === "basarili");
   const others = stats?.filter((s) => s.key !== "basarili" && s.key !== "toplam") || [];
-  const selectCls = `h-9 rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-[12.5px] font-medium text-[var(--fg-2)] ${FOCUS}`;
-
   return (
     <>
       {/* şartname s.2: ana firmanın duyuruları bayi ekranlarına pop-up olarak düşer */}
@@ -635,26 +634,8 @@ export function Dashboard({ role, meta, onNavigate }) {
           <p className="mt-0.5 text-[12.5px] text-[var(--muted)]">{meta.company} · Bugünkü işlem özeti</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {role === ROLES.BAYI && (
-            <select aria-label="Ana firma cari seçimi" defaultValue="" className={selectCls}>
-              <option value="">Ana Firma Cari Seçimi</option>
-              <option>Brisa A.Ş. — 320.00.001</option>
-              <option>Brisa Perakende — 320.00.002</option>
-            </select>
-          )}
-          {role === ROLES.ALT_BAYI && (
-            <select aria-label="Bayi cari seçimi" defaultValue="" className={selectCls}>
-              <option value="">Bayi Cari Seçimi</option>
-              <option>Ankara Lastik Bayi — 320.01.001</option>
-            </select>
-          )}
-          <button
-            type="button"
-            className={`inline-flex h-9 items-center gap-1.5 rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 text-[12.5px] font-semibold text-[var(--fg-2)] transition active:scale-[0.97] hover:border-[var(--brand)] hover:text-[var(--brand-text)] ${FOCUS}`}
-          >
-            <I name="download" size={14} />
-            Dışa Aktar
-          </button>
+          {/* şartname s.1–2: bayi "Ana Firma Cari Seçimi", alt bayi "Bayi Cari Seçimi" — tahsilatın işleneceği üye işyeri */}
+          {role !== ROLES.ANA_FIRMA && <CariSecici role={role} />}
           <button
             type="button"
             onClick={() => onNavigate("/odeme/manuel")}

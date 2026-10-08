@@ -7,6 +7,7 @@ import { sayi, tl, tlKisa, yuzde } from "@/lib/bicim";
 import { durumTonu, etiket } from "@/lib/etiketler";
 import { useBayiOzeti } from "@/lib/sorgular/raporlar";
 import { BosDurum, HataKutusu, Yukleniyor } from "../durumlar";
+import { csvIndir, csvTutar } from "@/lib/disaAktar";
 import { Konum } from "../ortak";
 import { HOME } from "../sayfalar";
 import { CARD, FOCUS } from "../tema";
@@ -45,7 +46,16 @@ export function BayiOzet({ role, meta, onNavigate }) {
         </div>
         <button
           type="button"
-          className={`inline-flex h-9 items-center gap-1.5 self-start rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 text-[12.5px] font-semibold text-[var(--fg-2)] transition active:scale-[0.97] hover:border-[var(--brand)] hover:text-[var(--brand-text)] md:self-auto ${FOCUS}`}
+          onClick={() =>
+            csvIndir(
+              altMi ? "alt-bayi-ozet" : "bayi-ozet",
+              ["Firma", "Tür", "Bağlı Firma", "Vade Profili", "İşlem", "Başarılı", "Başarısız", "Ciro (TL)", "Vade Farkı (TL)", "İptal / İade (TL)", "Hesaba Geçecek (TL)", "Durum"],
+              satirlar.map((s) => [s.firma.unvan, etiket("firmaTuru", s.firma.tur), s.bagli?.unvan, s.vadeProfil, s.islemAdet, s.basariliAdet, s.basarisizAdet, csvTutar(s.ciroKurus), csvTutar(s.vadeFarkiKurus), csvTutar(s.iptalIadeKurus), csvTutar(s.hesabaGececekKurus), etiket("kayitDurumu", s.durum)])
+            )
+          }
+          disabled={satirlar.length === 0}
+          title="Raporu CSV olarak indirir"
+          className={`inline-flex h-9 items-center gap-1.5 self-start rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 text-[12.5px] font-semibold text-[var(--fg-2)] transition active:scale-[0.97] hover:border-[var(--brand)] hover:text-[var(--brand-text)] disabled:cursor-not-allowed disabled:opacity-50 md:self-auto ${FOCUS}`}
         >
           <I name="download" size={14} />
           Dışa Aktar

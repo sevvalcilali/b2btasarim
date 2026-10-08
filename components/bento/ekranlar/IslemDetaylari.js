@@ -6,6 +6,7 @@ import { sayi, tarihSaat, taksitMetni, tl } from "@/lib/bicim";
 import { ETIKET, durumTonu, etiket } from "@/lib/etiketler";
 import { useIslemler } from "@/lib/sorgular/islemler";
 import { BosDurum, HataKutusu, Yukleniyor } from "../durumlar";
+import { csvIndir, csvTutar } from "@/lib/disaAktar";
 import { Konum } from "../ortak";
 import { CARD, FOCUS } from "../tema";
 import { useGecikmeli } from "../yardimci";
@@ -62,7 +63,16 @@ export function IslemDetaylari({ role, meta, onHome }) {
         </div>
         <button
           type="button"
-          className={`inline-flex h-9 items-center gap-1.5 self-start rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 text-[12.5px] font-semibold text-[var(--fg-2)] transition active:scale-[0.97] hover:border-[var(--brand)] hover:text-[var(--brand-text)] md:self-auto ${FOCUS}`}
+          onClick={() =>
+            csvIndir(
+              "islem-detaylari",
+              ["İşlem No", "Tarih", "Çekim Yapan", "Müşteri Türü", "Unvan", "Cari No", "Vergi No", "Ödeme", "Taksit", "Tutar (TL)", "Durum"],
+              satirlar.map((t) => [t.islemNo, tarihSaat(t.tarih), t.cekimYapan?.unvan, etiket("musteriTuru", t.musteriTuru), t.musteri.unvan, t.musteri.cariNo, t.musteri.vergiNo, ETIKET.odemeTipi[t.odemeTipi], t.taksit, csvTutar(t.tutarKurus), etiket("islemDurumu", t.durum)])
+            )
+          }
+          disabled={satirlar.length === 0}
+          title="Görünen sayfayı CSV olarak indirir"
+          className={`inline-flex h-9 items-center gap-1.5 self-start rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 text-[12.5px] font-semibold text-[var(--fg-2)] transition active:scale-[0.97] hover:border-[var(--brand)] hover:text-[var(--brand-text)] disabled:cursor-not-allowed disabled:opacity-50 md:self-auto ${FOCUS}`}
         >
           <I name="download" size={14} />
           Dışa Aktar

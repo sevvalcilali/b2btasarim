@@ -73,6 +73,7 @@ export const odemelerHandlers = [
       durum: basarisiz ? "BASARISIZ" : "BASARILI",
       aciklama: g.aciklama || null,
       tahsilatCariNo: cari.cariNo,
+      uyeIsyeriCariNo: kim.aktifUyeIsyeri || null, // oturumda seçili cari (şartname s.1)
       kartIsmi: g.kart.isim,
     };
     depo.ekle("islemler", islem);
