@@ -92,7 +92,7 @@ export function BakiyeBorc({ role, meta, onNavigate }) {
               </div>
             </div>
             {hareketler.length === 0 ? (
-              <BosDurum baslik="Bu dönemde hareket yok" ikon="check" tonu="success" />
+              <BosDurum baslik="Bu dönemde hareket yok" ikon="check" tonu="success" eylemler={[donem !== "tumu" && { etiket: "Tüm hareketleri göster", onClick: () => setDonem("tumu") }]} />
             ) : (
               <div className={`overflow-x-auto transition-opacity ${sorgu.isFetching ? "opacity-60" : ""}`}>
                 <table className="min-w-full text-[12.5px]">

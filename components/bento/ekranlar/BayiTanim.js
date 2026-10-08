@@ -187,7 +187,22 @@ export function BayiListesi({ role, meta, tumAltBayiler, vurgu, kayitAdi, onNavi
                 ))}
               </tbody>
             </table>
-            {satirlar.length === 0 && <BosDurum baslik="Kayıt bulunamadı" />}
+            {satirlar.length === 0 &&
+              (arama || durum ? (
+                <BosDurum baslik="Kayıt bulunamadı" aciklama="Arama ya da durum filtresine uyan kayıt yok." eylemler={[{ etiket: "Filtreleri temizle", onClick: () => { setArama(""); setDurum(""); } }]} />
+              ) : (
+                <BosDurum
+                  baslik={tumAltBayiler ? "Ağda henüz alt bayi yok" : `Henüz ${altListe ? "alt bayi" : "bayi"} tanımlı değil`}
+                  aciklama={tumAltBayiler ? "Alt bayileri bağlı oldukları bayiler tanımlar." : "Tek tek tanımlayın ya da Excel şablonuyla toplu ekleyin."}
+                  ikon="dealer"
+                  eylemler={
+                    duzenlenebilir && [
+                      { etiket: altListe ? "Yeni Alt Bayi" : "Yeni Bayi", ikon: "plus", birincil: true, onClick: () => onNavigate("/bayi-tanim/tanimlama") },
+                      { etiket: "Excel ile Toplu Ekleme", ikon: "download", onClick: () => onNavigate("/bayi-tanim/excel-ekleme") },
+                    ]
+                  }
+                />
+              ))}
           </div>
         )}
       </section>

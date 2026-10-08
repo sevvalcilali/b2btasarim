@@ -54,9 +54,13 @@ export function HataKutusu({ hata, onTekrar, className = "" }) {
   );
 }
 
-/** Boş liste */
-export function BosDurum({ baslik, aciklama, ikon = "search", tonu = "soft", children, className = "" }) {
+/**
+ * Boş liste. eylemler: [{ etiket, onClick, ikon?, birincil? }] — ilk kullanımda yol gösterir ("Yeni Bayi", "Excel ile yükle"),
+ * filtre sonucunda çıkış verir ("Filtreleri temizle"). null/false öğeler atlanır.
+ */
+export function BosDurum({ baslik, aciklama, ikon = "search", tonu = "soft", eylemler, children, className = "" }) {
   const renk = tonu === "success" ? "bg-[var(--success-soft)] text-[var(--success-text)]" : "bg-[var(--soft)] text-[var(--muted)]";
+  const dugmeler = (eylemler || []).filter(Boolean);
   return (
     <div className={`flex flex-col items-center gap-2 px-4 py-12 text-center ${className}`}>
       <span className={`grid h-10 w-10 place-items-center rounded-full ${renk}`}>
@@ -64,6 +68,23 @@ export function BosDurum({ baslik, aciklama, ikon = "search", tonu = "soft", chi
       </span>
       <p className="text-[13px] font-bold text-[var(--fg)]">{baslik}</p>
       {aciklama && <p className="max-w-sm text-[12px] text-[var(--muted)]">{aciklama}</p>}
+      {dugmeler.length > 0 && (
+        <div className="mt-2 flex flex-wrap justify-center gap-2">
+          {dugmeler.map((e) => (
+            <button
+              key={e.etiket}
+              type="button"
+              onClick={e.onClick}
+              className={`inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-[12.5px] font-bold transition ${
+                e.birincil ? "bg-[var(--brand)] text-white hover:brightness-110" : "border border-[var(--border-strong)] bg-[var(--surface)] text-[var(--fg-2)] hover:border-[var(--brand)] hover:text-[var(--brand-text)]"
+              } ${FOCUS}`}
+            >
+              {e.ikon && <I name={e.ikon} size={14} />}
+              {e.etiket}
+            </button>
+          ))}
+        </div>
+      )}
       {children}
     </div>
   );

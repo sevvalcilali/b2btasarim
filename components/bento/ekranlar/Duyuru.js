@@ -76,7 +76,7 @@ export function DuyuruYonetimi({ meta, onNavigate }) {
         ) : sorgu.isError ? (
           <HataKutusu hata={sorgu.error} onTekrar={() => sorgu.refetch()} />
         ) : kayitlar.length === 0 ? (
-          <BosDurum baslik="Henüz duyuru yok" aciklama="Yeni Duyuru ile bayilere ilk mesajınızı gönderin." ikon="megaphone" />
+          <BosDurum baslik="Henüz duyuru yok" aciklama="Yayınladığınız duyuru bayi ve alt bayi ekranlarına pop-up olarak düşer." ikon="megaphone" eylemler={duzenlenebilir && [{ etiket: "Yeni Duyuru", ikon: "plus", birincil: true, onClick: () => setDuzenlenen("yeni") }]} />
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-[12.5px]">

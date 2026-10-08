@@ -124,7 +124,7 @@ export function KullaniciTanim({ meta, onNavigate }) {
         ) : sorgu.isError ? (
           <HataKutusu hata={sorgu.error} onTekrar={() => sorgu.refetch()} />
         ) : satirlar.length === 0 ? (
-          <BosDurum baslik="Kullanıcı bulunamadı" aciklama={q || durum ? "Arama ya da durum filtresini değiştirin." : undefined} />
+          <BosDurum baslik="Kullanıcı bulunamadı" aciklama={q || durum ? "Arama ya da durum filtresine uyan kullanıcı yok." : undefined} eylemler={(q || durum) && [{ etiket: "Filtreleri temizle", onClick: () => { setArama(""); setDurum(""); } }]} />
         ) : (
           <div className={`overflow-x-auto transition-opacity ${sorgu.isFetching ? "opacity-60" : ""}`}>
             <table className="min-w-full text-[12.5px]">

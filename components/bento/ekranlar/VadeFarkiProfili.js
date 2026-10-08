@@ -57,7 +57,7 @@ export function VadeFarkiProfilTanim({ meta, onNavigate }) {
       ) : sorgu.isError ? (
         <HataKutusu hata={sorgu.error} onTekrar={() => sorgu.refetch()} />
       ) : profiller.length === 0 ? (
-        <BosDurum baslik="Henüz profil yok" aciklama="Yeni Profil ile ilk vade farkı profilini tanımlayın." ikon="percent" />
+        <BosDurum baslik="Henüz profil yok" aciklama="Her bayi bir vade farkı profiline bağlanır; önce profili tanımlayın." ikon="percent" eylemler={[{ etiket: "Yeni Profil", ikon: "plus", birincil: true, onClick: () => setDuzenlenen("yeni") }]} />
       ) : (
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Vade farkı profilleri">
           {profiller.map((p, i) => (

@@ -401,7 +401,7 @@ export function LinkOdeme({ role, meta, onNavigate }) {
                 ))}
               </tbody>
             </table>
-            {satirlar.length === 0 && <BosDurum baslik="Henüz ödeme linki yok" />}
+            {satirlar.length === 0 && <BosDurum baslik="Henüz ödeme linki yok" aciklama="Yukarıdaki formla oluşturduğunuz linkler ve ödeme durumları burada listelenir." ikon="link" />}
           </div>
         )}
       </section>

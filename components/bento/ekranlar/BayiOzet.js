@@ -176,7 +176,9 @@ export function BayiOzet({ role, meta, onNavigate }) {
                 </tfoot>
               )}
             </table>
-            {satirlar.length === 0 && <BosDurum baslik="Bu dönemde işlem yok" />}
+            {satirlar.length === 0 && (
+              <BosDurum baslik="Bu dönemde işlem yok" aciklama="Dönemi genişletin ya da müşteri türü filtresini kaldırın." eylemler={[donem !== "tumu" && { etiket: "Tüm dönemi göster", onClick: () => setDonem("tumu") }, musteriTuru && { etiket: "Müşteri türü filtresini kaldır", onClick: () => setMusteriTuru("") }]} />
+            )}
           </div>
         )}
 

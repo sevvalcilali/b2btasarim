@@ -462,7 +462,7 @@ function BalanceCard() {
 }
 
 // Son İşlemler — veri: GET /islemler?boyut=6 (rol kapsamı sunucuda)
-function TransactionsCard({ onSeeAll }) {
+function TransactionsCard({ onSeeAll, onOdeme }) {
   const sorgu = useIslemler({ boyut: 6 });
   const satirlar = sorgu.data?.kayitlar || [];
   return (
@@ -518,7 +518,7 @@ function TransactionsCard({ onSeeAll }) {
               ))}
             </tbody>
           </table>
-          {satirlar.length === 0 && <BosDurum baslik="Henüz işlem yok" />}
+          {satirlar.length === 0 && <BosDurum baslik="Henüz işlem yok" aciklama="İlk tahsilatı Ödeme Al ile başlatın; işlemler burada görünür." ikon="wallet" eylemler={[{ etiket: "Ödeme Al", ikon: "plus", birincil: true, onClick: onOdeme }]} />}
         </div>
       )}
     </section>
@@ -692,7 +692,7 @@ export function Dashboard({ role, meta, onNavigate }) {
       </div>
 
       <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <TransactionsCard onSeeAll={() => onNavigate("/raporlar/islem-detaylari")} />
+        <TransactionsCard onSeeAll={() => onNavigate("/raporlar/islem-detaylari")} onOdeme={() => onNavigate("/odeme/manuel")} />
         <div className="flex flex-col gap-3">
           <QuickCard onNavigate={onNavigate} />
           {stats ? (

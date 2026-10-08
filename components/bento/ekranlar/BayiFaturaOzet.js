@@ -159,7 +159,7 @@ export function BayiFaturaOzet({ role, meta, onNavigate }) {
                 </tfoot>
               )}
             </table>
-            {satirlar.length === 0 && <BosDurum baslik="Bu dönemde fatura gereken işlem yok" ikon="check" tonu="success" />}
+            {satirlar.length === 0 && <BosDurum baslik="Bu dönemde fatura gereken işlem yok" ikon="check" tonu="success" eylemler={[donem !== "tumu" && { etiket: "Tüm dönemi göster", onClick: () => setDonem("tumu") }]} />}
           </div>
         )}
       </section>
