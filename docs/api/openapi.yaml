@@ -673,6 +673,40 @@ paths:
                     items: { $ref: "#/components/schemas/MusteriTuru" }
         "403": { $ref: "#/components/responses/YetkiYok" }
 
+  /raporlar/bayi-fatura-ozet:
+    get:
+      tags: [Fatura]
+      summary: Bayi / alt bayi fatura özet raporu (şartname s.2, s.9)
+      description: Firma başına fatura gereken, yüklenen, bekleyen ve reddedilen işlem sayısı ile bekleyen tutar. Kapsam bayi özetiyle aynı; alt bayide yoktur (403).
+      parameters:
+        - { name: donem, in: query, schema: { type: string, enum: [7g, 30g, tumu], default: 30g } }
+      responses:
+        "200":
+          description: Özet
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  donem: { type: string }
+                  kayitlar:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: "#/components/schemas/FaturaOzetRakamlari"
+                        - type: object
+                          properties:
+                            firma: { $ref: "#/components/schemas/FirmaOzeti" }
+                            bagli: { oneOf: [{ $ref: "#/components/schemas/FirmaOzeti" }, { type: "null" }] }
+                            durum: { $ref: "#/components/schemas/KayitDurumu" }
+                  toplam:
+                    allOf:
+                      - $ref: "#/components/schemas/FaturaOzetRakamlari"
+                      - type: object
+                        properties:
+                          firmaAdet: { type: integer }
+        "403": { $ref: "#/components/responses/YetkiYok" }
+
   /faturalar:
     get:
       tags: [Fatura]
@@ -1051,6 +1085,15 @@ components:
         vadeFarkiKurus: { $ref: "#/components/schemas/Kurus" }
         iptalIadeKurus: { $ref: "#/components/schemas/Kurus" }
         hesabaGececekKurus: { $ref: "#/components/schemas/Kurus" }
+
+    FaturaOzetRakamlari:
+      type: object
+      properties:
+        gereken: { type: integer, description: Fatura gereken işlem (bayi / alt bayi çekimi, kendi kartı olmayan, başarılı) }
+        yuklenen: { type: integer }
+        bekleyen: { type: integer }
+        reddedilen: { type: integer }
+        bekleyenKurus: { $ref: "#/components/schemas/Kurus", description: Yüklenmemiş + reddedilmiş işlemlerin tutarı }
 
     BayiOzetSatiri:
       allOf:

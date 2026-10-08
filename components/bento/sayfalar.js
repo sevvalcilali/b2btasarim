@@ -11,6 +11,7 @@ export const SAYFALAR = {
   "iptal-iade-takip": "/iptal-iade/takip",
   "fatura-yukleme": "/raporlar/fatura-yukleme",
   "bayi-ozet": "/raporlar/bayi-ozet",
+  "bayi-fatura-ozet": "/raporlar/bayi-fatura-ozet",
   "bayi-tanimlama": "/bayi-tanim/tanimlama",
   "bayi-liste": "/bayi-tanim/liste",
   "alt-bayi-liste": "/bayi-tanim/alt-bayi-liste",

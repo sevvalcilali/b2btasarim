@@ -2,7 +2,7 @@
 // Ana firma tüm bayi / alt bayileri, bayi kendisini ve alt bayilerini görür; alt bayinin özet raporu yoktur (403).
 import { http, HttpResponse } from "msw";
 import { depo } from "../db/depo";
-import { altBayileri, firma, firmaOzeti, kapsamda, taksitHesabi } from "../kurallar";
+import { altBayileri, faturaDurumu, faturaGerekli, firma, firmaOzeti, kapsamda, taksitHesabi } from "../kurallar";
 import { gecikme, hata, uc, yetkili } from "./yardimci";
 
 const GUN = 86400000;
@@ -36,7 +36,49 @@ function topla(ozet, t) {
   return ozet;
 }
 
+/** Rolün rapor satırı firmaları ve dönem eşiği (iki özet raporunda ortak) */
+function raporKapsami(kim, s) {
+  const donem = DONEMLER[s.get("donem")] === undefined ? "30g" : s.get("donem");
+  const gunSayisi = DONEMLER[donem];
+  const firmalar =
+    kim.rol === "ANA_FIRMA"
+      ? depo.tablo("firmalar").filter((f) => f.tur !== "ANA_FIRMA")
+      : [firma(kim.firmaId), ...altBayileri(kim.firmaId)].filter(Boolean);
+  return { donem, esik: gunSayisi ? new Date(Date.now() - gunSayisi * GUN).toISOString() : null, firmalar };
+}
+
 export const raporlarHandlers = [
+  // Şartname s.2 / s.9: bayi başına fatura durumu — gereken, yüklenen, bekleyen, reddedilen; bekleyen tutar
+  http.get(uc("/raporlar/bayi-fatura-ozet"), async ({ request }) => {
+    await gecikme();
+    const { kim, cevap } = yetkili(request);
+    if (cevap) return cevap;
+    if (kim.rol === "ALT_BAYI") return hata(403, "YETKI_YOK", "Alt bayinin fatura özet raporu yoktur; Fatura Yükleme Detay ekranını kullanın.");
+    const { donem, esik, firmalar } = raporKapsami(kim, new URL(request.url).searchParams);
+    const islemler = depo.tablo("islemler").filter((t) => kapsamda(kim, t.cekimYapanId) && faturaGerekli(t) && (!esik || t.tarih >= esik));
+    const bos = () => ({ gereken: 0, yuklenen: 0, bekleyen: 0, reddedilen: 0, bekleyenKurus: 0 });
+    const topla = (o, t) => {
+      const d = faturaDurumu(t.islemNo).durum;
+      o.gereken += 1;
+      if (d === "YUKLENDI") o.yuklenen += 1;
+      else {
+        if (d === "REDDEDILDI") o.reddedilen += 1;
+        else o.bekleyen += 1;
+        o.bekleyenKurus += t.tutarKurus;
+      }
+      return o;
+    };
+    const kayitlar = firmalar
+      .map((f) => ({
+        firma: firmaOzeti(f.firmaId),
+        bagli: f.bagliFirmaId ? firmaOzeti(f.bagliFirmaId) : null,
+        durum: f.durum,
+        ...islemler.filter((t) => t.cekimYapanId === f.firmaId).reduce(topla, bos()),
+      }))
+      .sort((a, b) => b.bekleyen + b.reddedilen - (a.bekleyen + a.reddedilen) || b.gereken - a.gereken);
+    return HttpResponse.json({ donem, kayitlar, toplam: { ...islemler.reduce(topla, bos()), firmaAdet: kayitlar.length } });
+  }),
+
   http.get(uc("/raporlar/bayi-ozet"), async ({ request }) => {
     await gecikme();
     const { kim, cevap } = yetkili(request);
