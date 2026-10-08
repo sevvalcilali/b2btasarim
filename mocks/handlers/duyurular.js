@@ -2,7 +2,7 @@
 // bayi / alt bayi ekranlarına pop-up düşer; "Okudum" kullanıcı bazında tutulur.
 import { http, HttpResponse } from "msw";
 import { depo } from "../db/depo";
-import { simdi } from "../kurallar";
+import { denetim, simdi } from "../kurallar";
 import { gecikme, hata, kuralHatasi, uc, yetkili } from "./yardimci";
 
 const HEDEFLER = ["BAYI", "ALT_BAYI"];
@@ -61,7 +61,7 @@ export const duyurularHandlers = [
     const { g, cevap: hataCevabi } = await govdeOku(request, kim);
     if (hataCevabi) return hataCevabi;
     const sira = Math.max(0, ...depo.tablo("duyurular").map((d) => Number(d.duyuruId.slice(2)))) + 1;
-    const yeni = { duyuruId: `D-${String(sira).padStart(3, "0")}`, ...g, tarih: simdi().slice(0, 10) };
+    const yeni = { duyuruId: `D-${String(sira).padStart(3, "0")}`, ...g, tarih: simdi().slice(0, 10), olusturma: denetim(kim), sonDegisiklik: denetim(kim) };
     depo.ekle("duyurular", yeni);
     return HttpResponse.json({ ...yeni, okunma: okunma(yeni) }, { status: 201 });
   }),
@@ -73,7 +73,7 @@ export const duyurularHandlers = [
     if (!depo.tablo("duyurular").some((d) => d.duyuruId === params.duyuruId)) return hata(404, "DUYURU_YOK", "Duyuru bulunamadı.");
     const { g, cevap: hataCevabi } = await govdeOku(request, kim);
     if (hataCevabi) return hataCevabi;
-    const guncel = depo.degistir("duyurular", "duyuruId", params.duyuruId, (d) => ({ ...d, ...g }));
+    const guncel = depo.degistir("duyurular", "duyuruId", params.duyuruId, (d) => ({ ...d, ...g, sonDegisiklik: denetim(kim) }));
     return HttpResponse.json({ ...guncel, okunma: okunma(guncel) });
   }),
 

@@ -47,7 +47,9 @@ export const firmalar = [
       "320.00.002"
     ],
     logoRenk: "#C2630F",
-    durum: "AKTIF"
+    durum: "AKTIF",
+    olusturma: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-03-04T10:15:00+03:00" },
+    sonDegisiklik: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-09-18T16:40:00+03:00" }
   },
   {
     firmaId: "320.01.002",
@@ -77,7 +79,9 @@ export const firmalar = [
       "320.00.001",
       "320.00.002"
     ],
-    durum: "AKTIF"
+    durum: "AKTIF",
+    olusturma: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-03-04T10:15:00+03:00" },
+    sonDegisiklik: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-09-18T16:40:00+03:00" }
   },
   {
     firmaId: "320.01.003",
@@ -104,7 +108,9 @@ export const firmalar = [
     uyeIsyerleri: [
       "320.00.002"
     ],
-    durum: "AKTIF"
+    durum: "AKTIF",
+    olusturma: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-03-04T10:15:00+03:00" },
+    sonDegisiklik: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-09-18T16:40:00+03:00" }
   },
   {
     firmaId: "320.01.004",
@@ -130,7 +136,9 @@ export const firmalar = [
     uyeIsyerleri: [
       "320.00.002"
     ],
-    durum: "PASIF"
+    durum: "PASIF",
+    olusturma: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-03-04T10:15:00+03:00" },
+    sonDegisiklik: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-09-18T16:40:00+03:00" }
   },
   {
     firmaId: "320.01.005",
@@ -156,7 +164,9 @@ export const firmalar = [
     uyeIsyerleri: [
       "320.00.002"
     ],
-    durum: "AKTIF"
+    durum: "AKTIF",
+    olusturma: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-03-04T10:15:00+03:00" },
+    sonDegisiklik: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-09-18T16:40:00+03:00" }
   },
   {
     firmaId: "540.02.011",
@@ -184,7 +194,9 @@ export const firmalar = [
       "320.00.002"
     ],
     logoRenk: "#6B2E8F",
-    durum: "AKTIF"
+    durum: "AKTIF",
+    olusturma: { kullaniciId: "K-101", adSoyad: "Murat Aydın", tarih: "2026-03-04T10:15:00+03:00" },
+    sonDegisiklik: { kullaniciId: "K-101", adSoyad: "Murat Aydın", tarih: "2026-09-18T16:40:00+03:00" }
   },
   {
     firmaId: "540.02.012",
@@ -209,7 +221,9 @@ export const firmalar = [
     uyeIsyerleri: [
       "320.00.002"
     ],
-    durum: "AKTIF"
+    durum: "AKTIF",
+    olusturma: { kullaniciId: "K-101", adSoyad: "Murat Aydın", tarih: "2026-03-04T10:15:00+03:00" },
+    sonDegisiklik: { kullaniciId: "K-101", adSoyad: "Murat Aydın", tarih: "2026-09-18T16:40:00+03:00" }
   },
   {
     firmaId: "540.02.013",
@@ -233,7 +247,9 @@ export const firmalar = [
     uyeIsyerleri: [
       "320.00.002"
     ],
-    durum: "PASIF"
+    durum: "PASIF",
+    olusturma: { kullaniciId: "K-101", adSoyad: "Murat Aydın", tarih: "2026-03-04T10:15:00+03:00" },
+    sonDegisiklik: { kullaniciId: "K-101", adSoyad: "Murat Aydın", tarih: "2026-09-18T16:40:00+03:00" }
   }
 ];
 
@@ -256,28 +272,36 @@ export const vadeFarkiProfilleri = [
     ad: "Vade Farkı Profil 1",
     oranYuzde: 1.89,
     aciklama: "Standart bayi profili",
-    durum: "AKTIF"
+    durum: "AKTIF",
+    olusturma: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-01-15T09:30:00+03:00" },
+    sonDegisiklik: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-09-02T14:05:00+03:00" }
   },
   {
     id: 2,
     ad: "Vade Farkı Profil 2",
     oranYuzde: 2.45,
     aciklama: "Orta segment",
-    durum: "AKTIF"
+    durum: "AKTIF",
+    olusturma: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-01-15T09:30:00+03:00" },
+    sonDegisiklik: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-09-02T14:05:00+03:00" }
   },
   {
     id: 3,
     ad: "Vade Farkı Profil 3",
     oranYuzde: 2.9,
     aciklama: "Yüksek risk",
-    durum: "AKTIF"
+    durum: "AKTIF",
+    olusturma: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-01-15T09:30:00+03:00" },
+    sonDegisiklik: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-09-02T14:05:00+03:00" }
   },
   {
     id: 4,
     ad: "Vade Farkı Profil 4",
     oranYuzde: 3.25,
     aciklama: "Özel anlaşma",
-    durum: "PASIF"
+    durum: "PASIF",
+    olusturma: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-01-15T09:30:00+03:00" },
+    sonDegisiklik: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-09-02T14:05:00+03:00" }
   }
 ];
 
@@ -1294,15 +1318,15 @@ export const kurlar = [
 ];
 
 export const kullanicilar = [
-  { kullaniciId: "K-001", firmaId: "100.00.001", adSoyad: "Mehmet Yılmaz", email: "mehmet.yilmaz@brisa.com", telefon: "0532 411 20 01", yetki: "YONETICI", durum: "AKTIF", sonGiris: "2026-10-08T08:42:00+03:00" },
-  { kullaniciId: "K-002", firmaId: "100.00.001", adSoyad: "Ayşe Demir", email: "ayse.demir@brisa.com", telefon: "0533 204 18 77", yetki: "ODEME", durum: "AKTIF", sonGiris: "2026-10-07T17:05:00+03:00" },
-  { kullaniciId: "K-003", firmaId: "100.00.001", adSoyad: "Can Kaya", email: "can.kaya@brisa.com", telefon: "0542 318 40 12", yetki: "RAPORLAMA", durum: "AKTIF", sonGiris: "2026-10-02T09:30:00+03:00" },
-  { kullaniciId: "K-004", firmaId: "100.00.001", adSoyad: "Elif Şahin", email: "elif.sahin@brisa.com", telefon: "0536 772 51 90", yetki: "ODEME", durum: "PASIF", sonGiris: "2026-08-19T14:12:00+03:00" },
-  { kullaniciId: "K-101", firmaId: "320.01.001", adSoyad: "Murat Aydın", email: "murat@ankaralastik.com", telefon: "0312 440 11 20", yetki: "YONETICI", durum: "AKTIF", sonGiris: "2026-10-08T09:10:00+03:00" },
-  { kullaniciId: "K-102", firmaId: "320.01.001", adSoyad: "Selin Koç", email: "selin@ankaralastik.com", telefon: "0532 605 33 41", yetki: "ODEME", durum: "AKTIF", sonGiris: "2026-10-06T11:48:00+03:00" },
-  { kullaniciId: "K-103", firmaId: "320.01.001", adSoyad: "Burak Öz", email: "burak@ankaralastik.com", telefon: "0544 219 70 05", yetki: "RAPORLAMA", durum: "AKTIF", sonGiris: null },
-  { kullaniciId: "K-201", firmaId: "540.02.011", adSoyad: "Kemal Er", email: "kemal@cankayaotoservis.com", telefon: "0312 231 44 10", yetki: "YONETICI", durum: "AKTIF", sonGiris: "2026-10-07T16:20:00+03:00" },
-  { kullaniciId: "K-202", firmaId: "540.02.011", adSoyad: "Derya Ak", email: "derya@cankayaotoservis.com", telefon: "0535 118 62 34", yetki: "ODEME", durum: "AKTIF", sonGiris: "2026-10-05T10:02:00+03:00" }
+  { kullaniciId: "K-001", firmaId: "100.00.001", adSoyad: "Mehmet Yılmaz", email: "mehmet.yilmaz@brisa.com", telefon: "0532 411 20 01", yetki: "YONETICI", durum: "AKTIF", sonGiris: "2026-10-08T08:42:00+03:00", olusturma: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-02-10T09:00:00+03:00" }, sonDegisiklik: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-08-21T11:30:00+03:00" } },
+  { kullaniciId: "K-002", firmaId: "100.00.001", adSoyad: "Ayşe Demir", email: "ayse.demir@brisa.com", telefon: "0533 204 18 77", yetki: "ODEME", durum: "AKTIF", sonGiris: "2026-10-07T17:05:00+03:00", olusturma: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-02-10T09:00:00+03:00" }, sonDegisiklik: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-08-21T11:30:00+03:00" } },
+  { kullaniciId: "K-003", firmaId: "100.00.001", adSoyad: "Can Kaya", email: "can.kaya@brisa.com", telefon: "0542 318 40 12", yetki: "RAPORLAMA", durum: "AKTIF", sonGiris: "2026-10-02T09:30:00+03:00", olusturma: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-02-10T09:00:00+03:00" }, sonDegisiklik: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-08-21T11:30:00+03:00" } },
+  { kullaniciId: "K-004", firmaId: "100.00.001", adSoyad: "Elif Şahin", email: "elif.sahin@brisa.com", telefon: "0536 772 51 90", yetki: "ODEME", durum: "PASIF", sonGiris: "2026-08-19T14:12:00+03:00", olusturma: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-02-10T09:00:00+03:00" }, sonDegisiklik: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-08-21T11:30:00+03:00" } },
+  { kullaniciId: "K-101", firmaId: "320.01.001", adSoyad: "Murat Aydın", email: "murat@ankaralastik.com", telefon: "0312 440 11 20", yetki: "YONETICI", durum: "AKTIF", sonGiris: "2026-10-08T09:10:00+03:00", olusturma: { kullaniciId: "K-101", adSoyad: "Murat Aydın", tarih: "2026-02-10T09:00:00+03:00" }, sonDegisiklik: { kullaniciId: "K-101", adSoyad: "Murat Aydın", tarih: "2026-08-21T11:30:00+03:00" } },
+  { kullaniciId: "K-102", firmaId: "320.01.001", adSoyad: "Selin Koç", email: "selin@ankaralastik.com", telefon: "0532 605 33 41", yetki: "ODEME", durum: "AKTIF", sonGiris: "2026-10-06T11:48:00+03:00", olusturma: { kullaniciId: "K-101", adSoyad: "Murat Aydın", tarih: "2026-02-10T09:00:00+03:00" }, sonDegisiklik: { kullaniciId: "K-101", adSoyad: "Murat Aydın", tarih: "2026-08-21T11:30:00+03:00" } },
+  { kullaniciId: "K-103", firmaId: "320.01.001", adSoyad: "Burak Öz", email: "burak@ankaralastik.com", telefon: "0544 219 70 05", yetki: "RAPORLAMA", durum: "AKTIF", sonGiris: null, olusturma: { kullaniciId: "K-101", adSoyad: "Murat Aydın", tarih: "2026-02-10T09:00:00+03:00" }, sonDegisiklik: { kullaniciId: "K-101", adSoyad: "Murat Aydın", tarih: "2026-08-21T11:30:00+03:00" } },
+  { kullaniciId: "K-201", firmaId: "540.02.011", adSoyad: "Kemal Er", email: "kemal@cankayaotoservis.com", telefon: "0312 231 44 10", yetki: "YONETICI", durum: "AKTIF", sonGiris: "2026-10-07T16:20:00+03:00", olusturma: { kullaniciId: "K-201", adSoyad: "Kemal Er", tarih: "2026-02-10T09:00:00+03:00" }, sonDegisiklik: { kullaniciId: "K-201", adSoyad: "Kemal Er", tarih: "2026-08-21T11:30:00+03:00" } },
+  { kullaniciId: "K-202", firmaId: "540.02.011", adSoyad: "Derya Ak", email: "derya@cankayaotoservis.com", telefon: "0535 118 62 34", yetki: "ODEME", durum: "AKTIF", sonGiris: "2026-10-05T10:02:00+03:00", olusturma: { kullaniciId: "K-201", adSoyad: "Kemal Er", tarih: "2026-02-10T09:00:00+03:00" }, sonDegisiklik: { kullaniciId: "K-201", adSoyad: "Kemal Er", tarih: "2026-08-21T11:30:00+03:00" } }
 ];
 
 export const duyurular = [
@@ -1315,7 +1339,9 @@ export const duyurular = [
       "ALT_BAYI"
     ],
     tarih: "2026-09-28",
-    durum: "YAYINDA"
+    durum: "YAYINDA",
+    olusturma: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-01-15T09:30:00+03:00" },
+    sonDegisiklik: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-09-02T14:05:00+03:00" }
   },
   {
     duyuruId: "D-002",
@@ -1326,7 +1352,9 @@ export const duyurular = [
       "ALT_BAYI"
     ],
     tarih: "2026-09-25",
-    durum: "YAYINDA"
+    durum: "YAYINDA",
+    olusturma: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-01-15T09:30:00+03:00" },
+    sonDegisiklik: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-09-02T14:05:00+03:00" }
   },
   {
     duyuruId: "D-003",
@@ -1336,7 +1364,9 @@ export const duyurular = [
       "BAYI"
     ],
     tarih: "2026-09-20",
-    durum: "ARSIV"
+    durum: "ARSIV",
+    olusturma: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-01-15T09:30:00+03:00" },
+    sonDegisiklik: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-09-02T14:05:00+03:00" }
   }
 ];
 

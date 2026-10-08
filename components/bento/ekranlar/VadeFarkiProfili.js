@@ -8,7 +8,7 @@ import { durumTonu, etiket } from "@/lib/etiketler";
 import { useVadeFarkiProfilleri, useVadeFarkiProfiliGuncelle, useVadeFarkiProfiliOlustur } from "@/lib/sorgular/tanimlar";
 import { BosDurum, HataKutusu, YukleniyorKutu } from "../durumlar";
 import { hataBaglayici } from "../odeme";
-import { Alan, Bildirim, Konum, Pencere, inputCls } from "../ortak";
+import { Alan, Bildirim, Konum, Pencere, inputCls, DenetimNotu } from "../ortak";
 import { HOME } from "../sayfalar";
 import { CARD, FOCUS } from "../tema";
 
@@ -87,6 +87,7 @@ export function VadeFarkiProfilTanim({ meta, onNavigate }) {
                 <dd className="text-right font-bold tabular-nums text-[var(--fg)]">+{tl(p.ornek.vadeFarkiKurus)}</dd>
               </dl>
 
+              <DenetimNotu kayit={p} className="mt-3" />
               <button
                 type="button"
                 onClick={() => setDuzenlenen(p)}

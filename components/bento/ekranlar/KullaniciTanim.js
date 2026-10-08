@@ -8,7 +8,7 @@ import { durumTonu, etiket } from "@/lib/etiketler";
 import { useKullaniciGuncelle, useKullaniciOlustur, useKullanicilar } from "@/lib/sorgular/kullanicilar";
 import { BosDurum, HataKutusu, Yukleniyor } from "../durumlar";
 import { hataBaglayici } from "../odeme";
-import { Alan, Bildirim, Konum, Pencere, inputCls } from "../ortak";
+import { Alan, Bildirim, Konum, Pencere, inputCls, DenetimNotu } from "../ortak";
 import { HOME } from "../sayfalar";
 import { SiraliBaslik, useSiralama } from "../tablo";
 import { CARD, FOCUS } from "../tema";
@@ -245,6 +245,7 @@ function KullaniciFormu({ mevcut, onClose, onKaydedildi }) {
       genislik="max-w-lg"
     >
       <form id="bn-kullanici-form" noValidate onSubmit={kaydet} className="flex flex-col gap-3" aria-busy={gonderiliyor}>
+        {mevcut && <DenetimNotu kayit={mevcut} />}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Alan id="bn-k-ad" etiket="Ad soyad" hata={h("adSoyad")} className="sm:col-span-2">
             <input id="bn-k-ad" value={f.adSoyad} onChange={(e) => degistir({ ...f, adSoyad: e.target.value })} aria-invalid={h("adSoyad") ? true : undefined} className={inputCls(h("adSoyad"))} />

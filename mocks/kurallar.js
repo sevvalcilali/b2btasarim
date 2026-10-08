@@ -57,6 +57,8 @@ export function firmaCevabi(f) {
     ortaklar: f.ortaklar || [],
     logoRenk: f.logoRenk || null,
     durum: f.durum,
+    olusturma: f.olusturma ?? null,
+    sonDegisiklik: f.sonDegisiklik ?? null,
   };
 }
 
@@ -237,6 +239,9 @@ export const icerir = (metin, aranan) => String(metin ?? "").toLocaleLowerCase("
 export function simdi(ms = Date.now()) {
   return new Date(ms + 3 * 3600000).toISOString().replace(/\.\d{3}Z$/, "+03:00");
 }
+
+/** Denetim izi: kaydı kim, ne zaman oluşturdu / değiştirdi (sözleşme: Denetim) */
+export const denetim = (kim) => ({ kullaniciId: kim.kullaniciId, adSoyad: kim.adSoyad, tarih: simdi() });
 
 // Şartname s.3: yetki → açılan ekranlar / işlemler
 export const YETKI_EKRANLARI = {

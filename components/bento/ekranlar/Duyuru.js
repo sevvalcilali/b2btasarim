@@ -9,7 +9,7 @@ import { durumTonu, etiket } from "@/lib/etiketler";
 import { useDuyuruGuncelle, useDuyuruOkundu, useDuyuruOlustur, useDuyurular } from "@/lib/sorgular/duyurular";
 import { BosDurum, HataKutusu, Yukleniyor } from "../durumlar";
 import { hataBaglayici } from "../odeme";
-import { Alan, Bildirim, Konum, Pencere, inputCls, OnayPenceresi } from "../ortak";
+import { Alan, Bildirim, Konum, Pencere, inputCls, OnayPenceresi, DenetimNotu } from "../ortak";
 import { HOME } from "../sayfalar";
 import { CARD, FOCUS } from "../tema";
 
@@ -100,6 +100,7 @@ export function DuyuruYonetimi({ meta, onNavigate }) {
                     <td className={td}>
                       <span className="block font-semibold text-[var(--fg)]">{d.baslik}</span>
                       <span className="mt-0.5 block max-w-md text-[11.5px] leading-snug text-[var(--muted)]">{d.icerik}</span>
+                      <DenetimNotu kayit={d} className="mt-1" />
                     </td>
                     <td className={`${td} whitespace-nowrap`}><HedefRozetleri hedef={d.hedef} /></td>
                     <td className={`${td} whitespace-nowrap tabular-nums text-[var(--fg-2)]`}>{tarih(d.tarih)}</td>

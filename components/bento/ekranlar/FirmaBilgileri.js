@@ -11,7 +11,7 @@ import { useOturum } from "@/lib/sorgular/oturum";
 import { useFirma, useFirmaIletisimGuncelle, useUyeIsyerleri } from "@/lib/sorgular/tanimlar";
 import { HataKutusu, Yukleniyor } from "../durumlar";
 import { hataBaglayici } from "../odeme";
-import { Alan, Bildirim, Konum, Pencere, inputCls } from "../ortak";
+import { Alan, Bildirim, Konum, Pencere, inputCls, DenetimNotu } from "../ortak";
 import { HOME } from "../sayfalar";
 import { CARD, FOCUS } from "../tema";
 import { rakamlar } from "../yardimci";
@@ -104,6 +104,7 @@ export function FirmaBilgileri({ role, meta, onNavigate }) {
               <Satir ad="E-posta">{f.email}</Satir>
               <Satir ad="Adres"><span className="block sm:max-w-xs">{f.adres}</span></Satir>
             </dl>
+            <DenetimNotu kayit={f} className="mt-2" />
           </Kart>
 
           <Kart no={3} i={2} baslik="Ödeme Koşulları" aciklama={`${ustAdi === "bayiniz" ? "Bayinizin" : "Ana firmanın"} bayi tanımında belirlenir; ödeme ekranları bu sınırlarla çalışır.`}>

@@ -1309,6 +1309,8 @@ components:
           properties:
             duyuruId: { type: string, example: D-001 }
             tarih: { type: string, format: date }
+            olusturma: { oneOf: [{ $ref: "#/components/schemas/Denetim" }, { type: "null" }] }
+            sonDegisiklik: { oneOf: [{ $ref: "#/components/schemas/Denetim" }, { type: "null" }] }
             okundu: { type: boolean, description: Bayi / alt bayi cevabında; oturumdaki kullanıcı okudu mu }
             okunma:
               type: object
@@ -1371,6 +1373,8 @@ components:
             kullaniciId: { type: string, example: K-102 }
             kendisi: { type: boolean, description: Oturumdaki kullanıcının kendi kaydı }
             sonGiris: { type: [string, "null"], format: date-time }
+            olusturma: { oneOf: [{ $ref: "#/components/schemas/Denetim" }, { type: "null" }] }
+            sonDegisiklik: { oneOf: [{ $ref: "#/components/schemas/Denetim" }, { type: "null" }] }
 
     VadeFarkiProfiliGirdisi:
       type: object
@@ -1388,6 +1392,8 @@ components:
           properties:
             id: { type: integer }
             kullananBayiSayisi: { type: integer, description: Bu profile bağlı aktif bayi / alt bayi sayısı }
+            olusturma: { oneOf: [{ $ref: "#/components/schemas/Denetim" }, { type: "null" }] }
+            sonDegisiklik: { oneOf: [{ $ref: "#/components/schemas/Denetim" }, { type: "null" }] }
             ornek:
               type: object
               description: Ekrandaki örnek hesap; formül sunucuda (bkz. /odeme/taksit-secenekleri)
@@ -1456,6 +1462,8 @@ components:
         ortaklar: { type: array, items: { type: string }, description: Kendi kartı ödemesinde kart sahibi seçenekleri }
         logoRenk: { type: [string, "null"] }
         durum: { $ref: "#/components/schemas/KayitDurumu" }
+        olusturma: { oneOf: [{ $ref: "#/components/schemas/Denetim" }, { type: "null" }] }
+        sonDegisiklik: { oneOf: [{ $ref: "#/components/schemas/Denetim" }, { type: "null" }] }
 
     TaksitSecenegi:
       type: object
@@ -1645,6 +1653,14 @@ components:
         email: { type: string }
         adres: { type: [string, "null"] }
         durum: { $ref: "#/components/schemas/KayitDurumu" }
+
+    Denetim:
+      type: object
+      description: Denetim izi — kaydı oluşturan / son değiştiren kullanıcı ve zaman
+      properties:
+        kullaniciId: { type: string }
+        adSoyad: { type: string }
+        tarih: { type: string, format: date-time }
 
     FirmaOzeti:
       type: object

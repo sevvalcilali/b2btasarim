@@ -1,7 +1,7 @@
 // GET /firma — oturum firmasının kendi kaydı · PUT /firma/iletisim — bayi / alt bayi kendi iletişim bilgisi (şartname s.10)
 import { http, HttpResponse } from "msw";
 import { depo } from "../db/depo";
-import { firma, firmaCevabi } from "../kurallar";
+import { denetim, firma, firmaCevabi } from "../kurallar";
 import { gecikme, hata, kuralHatasi, uc, yetkili } from "./yardimci";
 
 export const firmaHandlers = [
@@ -28,7 +28,7 @@ export const firmaHandlers = [
     if (!/^\S+@\S+\.\S+$/.test(iletisim.email)) alanlar.email = "Geçerli bir e-posta girin.";
     if (!iletisim.adres) alanlar.adres = "Adres girin.";
     if (Object.keys(alanlar).length) return kuralHatasi("DOGRULAMA", "Bazı alanlar hatalı.", alanlar);
-    const guncel = depo.degistir("firmalar", "firmaId", kim.firmaId, (f) => ({ ...f, ...iletisim }));
+    const guncel = depo.degistir("firmalar", "firmaId", kim.firmaId, (f) => ({ ...f, ...iletisim, sonDegisiklik: denetim(kim) }));
     return guncel ? HttpResponse.json(firmaCevabi(guncel)) : hata(404, "FIRMA_YOK", "Firma kaydı bulunamadı.");
   }),
 ];

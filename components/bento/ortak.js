@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import I from "@/components/DesignIcons";
+import { tarihSaat } from "@/lib/bicim";
 import { CARD, FOCUS } from "./tema";
 
 // Ortak pencere (modal): büyütülmüş grafik, iptal/iade talebi, red gerekçesi. Temanın renk değişkenleri için
@@ -104,6 +105,18 @@ export function YanPanel({ baslik, altBaslik, onClose, genislik = "max-w-xl", al
       </aside>
     </div>,
     root
+  );
+}
+
+// Denetim izi notu: "Son değişiklik: Ad Soyad · 08.10.2026 14:12" (yoksa oluşturan; ikisi de yoksa görünmez)
+export function DenetimNotu({ kayit, className = "" }) {
+  const degisiklik = kayit?.sonDegisiklik;
+  const d = degisiklik || kayit?.olusturma;
+  if (!d) return null;
+  return (
+    <p className={`text-[11px] text-[var(--muted)] ${className}`}>
+      {degisiklik ? "Son değişiklik" : "Oluşturan"}: <span className="font-semibold text-[var(--fg-2)]">{d.adSoyad}</span> · <span className="tabular-nums">{tarihSaat(d.tarih)}</span>
+    </p>
   );
 }
 

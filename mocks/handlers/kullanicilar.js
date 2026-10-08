@@ -2,6 +2,7 @@
 // yetki Yönetici / Ödeme / Raporlama. Yalnız Yönetici ekler ve düzenler.
 import { http, HttpResponse } from "msw";
 import { depo } from "../db/depo";
+import { denetim } from "../kurallar";
 import { gecikme, hata, kuralHatasi, uc, yetkili } from "./yardimci";
 
 const YETKILER = ["YONETICI", "ODEME", "RAPORLAMA"];
@@ -17,6 +18,8 @@ const kullaniciCevabi = (k, kim) => ({
   yetki: k.yetki,
   durum: k.durum,
   sonGiris: k.sonGiris ?? null,
+  olusturma: k.olusturma ?? null,
+  sonDegisiklik: k.sonDegisiklik ?? null,
   kendisi: k.kullaniciId === kim.kullaniciId,
 });
 
@@ -74,7 +77,7 @@ export const kullanicilarHandlers = [
     if (alanlar.email?.includes("başka bir kullanıcıda")) return hata(409, "EPOSTA_CAKISMASI", alanlar.email, { email: alanlar.email });
     if (Object.keys(alanlar).length) return kuralHatasi("DOGRULAMA", "Bazı alanlar hatalı.", alanlar);
     const sira = Math.max(0, ...depo.tablo("kullanicilar").map((k) => Number(k.kullaniciId.slice(2)))) + 1;
-    const yeni = { kullaniciId: `K-${String(sira).padStart(3, "0")}`, firmaId: kim.firmaId, ...g, sonGiris: null };
+    const yeni = { kullaniciId: `K-${String(sira).padStart(3, "0")}`, firmaId: kim.firmaId, ...g, sonGiris: null, olusturma: denetim(kim), sonDegisiklik: denetim(kim) };
     depo.guncelle("kullanicilar", (l) => [...l, yeni]);
     return HttpResponse.json(kullaniciCevabi(yeni, kim), { status: 201 });
   }),
@@ -92,7 +95,7 @@ export const kullanicilarHandlers = [
     const alanlar = kullaniciHatalari(g, kim, mevcut);
     if (alanlar.email?.includes("başka bir kullanıcıda")) return hata(409, "EPOSTA_CAKISMASI", alanlar.email, { email: alanlar.email });
     if (Object.keys(alanlar).length) return kuralHatasi("DOGRULAMA", "Bazı alanlar hatalı.", alanlar);
-    const guncel = depo.degistir("kullanicilar", "kullaniciId", mevcut.kullaniciId, (k) => ({ ...k, ...g }));
+    const guncel = depo.degistir("kullanicilar", "kullaniciId", mevcut.kullaniciId, (k) => ({ ...k, ...g, sonDegisiklik: denetim(kim) }));
     // oturum kaydı da aynı kişiyse ad / e-posta kabukta güncel görünsün
     if (guncel.kullaniciId === kim.kullaniciId) depo.guncelle("oturumlar", (o) => ({ ...o, [Object.keys(o).find((t) => o[t].kullaniciId === kim.kullaniciId)]: { ...kim, adSoyad: guncel.adSoyad, email: guncel.email } }));
     return HttpResponse.json(kullaniciCevabi(guncel, kim));

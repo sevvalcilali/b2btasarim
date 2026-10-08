@@ -2,7 +2,7 @@
 // s.2 / s.10 Excel ile toplu ekleme
 import { http, HttpResponse } from "msw";
 import { depo } from "../db/depo";
-import { altBayileri, anaFirma, firma, firmaCevabi, icerir, kimlikHatalari, kosulHatalari, sayaclar } from "../kurallar";
+import { altBayileri, anaFirma, denetim, firma, firmaCevabi, icerir, kimlikHatalari, kosulHatalari, sayaclar } from "../kurallar";
 import { gecikme, hata, kuralHatasi, uc, yetkiGerekli, yetkili } from "./yardimci";
 import { dosyadanCsv, tlCoz } from "../csv";
 
@@ -113,6 +113,8 @@ export const bayilerHandlers = [
         uyeIsyerleri: g.uyeIsyerleri,
         ...(g.tur === "BAYI" ? { altBayiYetkisi: !!g.altBayiYetkisi } : {}),
         durum: g.durum,
+        olusturma: denetim(kim),
+        sonDegisiklik: denetim(kim),
       }));
     if (yeniler.length) depo.guncelle("firmalar", (l) => [...l, ...yeniler]);
     return HttpResponse.json({ ...topluOzet(satirlar), eklenen: yeniler.length, atlanan: satirlar.length - yeniler.length, kayitlar: yeniler.map(firmaCevabi) }, { status: 201 });
@@ -175,6 +177,8 @@ export const bayilerHandlers = [
       uyeIsyerleri: g.uyeIsyerleri,
       ...(g.tur === "BAYI" ? { altBayiYetkisi: !!g.altBayiYetkisi } : {}),
       durum: g.durum,
+      olusturma: denetim(kim),
+      sonDegisiklik: denetim(kim),
     };
     depo.guncelle("firmalar", (l) => [...l, yeni]);
     return HttpResponse.json(firmaCevabi(yeni), { status: 201 });
@@ -198,6 +202,7 @@ export const bayilerHandlers = [
     const guncel = depo.degistir("firmalar", "cariNo", cariNo, (f) => ({
       ...f,
       ...kimlik,
+      sonDegisiklik: denetim(kim),
       vadeProfilId: g.vadeProfilId,
       taksitler: [...g.taksitler].sort((a, b) => a - b),
       islemLimitiKurus: g.islemLimitiKurus,

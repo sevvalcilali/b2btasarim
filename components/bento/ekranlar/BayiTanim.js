@@ -12,7 +12,7 @@ import { useBayi, useBayiGuncelle, useBayiOlustur, useBayiler, useMusteriOlustur
 import { useIslemler } from "@/lib/sorgular/islemler";
 import { useFirma, useUyeIsyerleri, useVadeFarkiProfilleri } from "@/lib/sorgular/tanimlar";
 import { BosDurum, HataKutusu, Yukleniyor } from "../durumlar";
-import { Konum, Bildirim, inputCls, Alan, FormBolum, YanPanel, OnayPenceresi } from "../ortak";
+import { Konum, Bildirim, inputCls, Alan, FormBolum, YanPanel, OnayPenceresi, DenetimNotu } from "../ortak";
 import { EylemMenusu, SiraliBaslik, useSiralama } from "../tablo";
 import { HOME } from "../sayfalar";
 import { CARD, FOCUS } from "../tema";
@@ -346,6 +346,7 @@ function BayiDetayPaneli({ cariNo, duzenlenebilir, onClose, onNavigate }) {
             )}
             {islemler.data?.toplam > 5 && <p className="mt-1 text-[11.5px] text-[var(--muted)]">Toplam {sayi(islemler.data.toplam)} işlem · tümü İşlem Detayları'nda</p>}
           </section>
+          <DenetimNotu kayit={b} className="border-t border-[var(--border)] pt-3" />
         </div>
       )}
     </YanPanel>

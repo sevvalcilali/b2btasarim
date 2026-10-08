@@ -1,7 +1,7 @@
 // GET/POST /vade-farki-profilleri · PUT /vade-farki-profilleri/{id} · GET /uye-isyerleri
 import { http, HttpResponse } from "msw";
 import { depo } from "../db/depo";
-import { firma, taksitHesabi } from "../kurallar";
+import { denetim, firma, taksitHesabi } from "../kurallar";
 import { gecikme, hata, kuralHatasi, uc, yetkiGerekli, yetkili } from "./yardimci";
 
 const PROFIL_SINIRI = 5; // şartname s.4: en çok 5 profil
@@ -11,7 +11,7 @@ const kullananAktifBayiler = (id) => depo.tablo("firmalar").filter((f) => f.vade
 
 /** Depodaki profil → sözleşmedeki VadeFarkiProfili (kullanım sayısı ve örnek hesap sunucuda) */
 function profilCevabi(p) {
-  return { ...p, kullananBayiSayisi: kullananAktifBayiler(p.id).length, ornek: { ...ORNEK, vadeFarkiKurus: taksitHesabi(ORNEK.tutarKurus, ORNEK.taksit, p.oranYuzde).vadeFarkiKurus } };
+  return { ...p, olusturma: p.olusturma ?? null, sonDegisiklik: p.sonDegisiklik ?? null, kullananBayiSayisi: kullananAktifBayiler(p.id).length, ornek: { ...ORNEK, vadeFarkiKurus: taksitHesabi(ORNEK.tutarKurus, ORNEK.taksit, p.oranYuzde).vadeFarkiKurus } };
 }
 
 const kucult = (s) => String(s ?? "").trim().toLocaleLowerCase("tr-TR");
@@ -56,7 +56,7 @@ export const tanimlarHandlers = [
     if (profiller.length >= PROFIL_SINIRI) return kuralHatasi("PROFIL_SINIRI", `En çok ${PROFIL_SINIRI} vade farkı profili tanımlanabilir.`);
     const alanlar = profilHatalari(g);
     if (Object.keys(alanlar).length) return kuralHatasi("DOGRULAMA", "Bazı alanlar hatalı.", alanlar);
-    const yeni = { id: Math.max(0, ...profiller.map((p) => p.id)) + 1, ...temizle(g) };
+    const yeni = { id: Math.max(0, ...profiller.map((p) => p.id)) + 1, ...temizle(g), olusturma: denetim(kim), sonDegisiklik: denetim(kim) };
     depo.guncelle("vadeFarkiProfilleri", (l) => [...l, yeni]);
     return HttpResponse.json(profilCevabi(yeni), { status: 201 });
   }),
@@ -74,7 +74,7 @@ export const tanimlarHandlers = [
     if (!g) return hata(400, "GECERSIZ_GOVDE", "İstek gövdesi okunamadı.");
     const alanlar = profilHatalari(g, mevcut);
     if (Object.keys(alanlar).length) return kuralHatasi("DOGRULAMA", "Bazı alanlar hatalı.", alanlar);
-    const guncel = depo.degistir("vadeFarkiProfilleri", "id", id, (p) => ({ ...p, ...temizle(g) }));
+    const guncel = depo.degistir("vadeFarkiProfilleri", "id", id, (p) => ({ ...p, ...temizle(g), sonDegisiklik: denetim(kim) }));
     return HttpResponse.json(profilCevabi(guncel));
   }),
 
