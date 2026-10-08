@@ -46,6 +46,7 @@ Ekran (components/bento/ekranlar)  →  lib/sorgular (React Query kancaları)  �
 | Link ile Ödeme | + `GET /odeme-linkleri` · `POST /odeme-linkleri` | ✅ |
 | İptal / İade | `GET /iptal-iade-talepleri` · `GET …/uygun-islemler` · `POST …` · `POST …/{talepNo}/onay` · `POST …/{talepNo}/red` | ✅ |
 | Bayi Tanım | `GET/POST /bayiler` · `GET/PUT /bayiler/{cariNo}` · `GET /firma` · `GET /vade-farki-profilleri` · `GET /uye-isyerleri` · `POST /musteriler` | ✅ |
+| Vade Farkı Profil Tanım | `GET/POST /vade-farki-profilleri` · `PUT /vade-farki-profilleri/{id}` | ✅ |
 | Fatura Yükleme | `GET/POST /faturalar` · `POST /faturalar/{islemNo}/hatirlatma` · `POST /faturalar/{islemNo}/yukleme-linki` | ✅ |
 | Yalnız demo | `POST /demo/sifirla` | ✅ (gerçek backend'de yok) |
 

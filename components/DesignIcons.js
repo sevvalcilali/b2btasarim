@@ -175,6 +175,19 @@ export const ICONS = {
     </>
   ),
   check: <path d="M20 6 9 17l-5-5" />,
+  edit: (
+    <>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </>
+  ),
+  percent: (
+    <>
+      <path d="M19 5 5 19" />
+      <circle cx="6.5" cy="6.5" r="2.5" />
+      <circle cx="17.5" cy="17.5" r="2.5" />
+    </>
+  ),
   card: (
     <>
       <rect x="2" y="5" width="20" height="14" rx="2" />

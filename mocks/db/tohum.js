@@ -278,13 +278,6 @@ export const vadeFarkiProfilleri = [
     oranYuzde: 3.25,
     aciklama: "Özel anlaşma",
     durum: "PASIF"
-  },
-  {
-    id: 5,
-    ad: "Vade Farkı Profil 5",
-    oranYuzde: 3.8,
-    aciklama: "Kampanya profili",
-    durum: "PASIF"
   }
 ];
 
@@ -1356,7 +1349,7 @@ export const duyurular = [
   {
     duyuruId: "D-003",
     baslik: "Yeni Vade Profili",
-    icerik: "Profil 5 kampanya oranları güncellenmiştir.",
+    icerik: "Profil 4 özel anlaşma oranları güncellenmiştir.",
     hedef: [
       "BAYI"
     ],

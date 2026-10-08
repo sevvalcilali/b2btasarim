@@ -324,6 +324,7 @@ paths:
     get:
       tags: [Tanımlar]
       summary: Vade farkı profilleri (şartname s.4, en çok 5)
+      description: Tüm roller okur (bayi tanımında seçilir). Kullanan bayi sayısı ve örnek hesap sunucuda hesaplanır.
       responses:
         "200":
           description: Profiller
@@ -335,6 +336,49 @@ paths:
                   kayitlar:
                     type: array
                     items: { $ref: "#/components/schemas/VadeFarkiProfili" }
+                  sinir: { type: integer, example: 5, description: En çok kaç profil tanımlanabilir }
+    post:
+      tags: [Tanımlar]
+      summary: Yeni vade farkı profili (yalnız ana firma)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VadeFarkiProfiliGirdisi" }
+      responses:
+        "201":
+          description: Oluşturuldu
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VadeFarkiProfili" }
+        "403": { $ref: "#/components/responses/YetkiYok" }
+        "422":
+          description: PROFIL_SINIRI (sınır dolu) ya da DOGRULAMA (ad boş / çakışıyor, oran %0–10 dışında)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HataCevabi" }
+
+  /vade-farki-profilleri/{id}:
+    put:
+      tags: [Tanımlar]
+      summary: Vade farkı profilini güncelle (yalnız ana firma)
+      description: Aktif bir bayinin kullandığı profil pasife alınamaz (422, alanlar.durum). Oran değişikliği sonraki ödemelere yansır.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VadeFarkiProfiliGirdisi" }
+      responses:
+        "200":
+          description: Güncellendi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VadeFarkiProfili" }
+        "403": { $ref: "#/components/responses/YetkiYok" }
+        "404": { $ref: "#/components/responses/Bulunamadi" }
+        "422": { $ref: "#/components/responses/IsKurali" }
 
   /uye-isyerleri:
     get:
@@ -910,14 +954,29 @@ components:
       type: string
       enum: [AKTIF, PASIF]
 
-    VadeFarkiProfili:
+    VadeFarkiProfiliGirdisi:
       type: object
+      required: [ad, oranYuzde, durum]
       properties:
-        id: { type: integer }
-        ad: { type: string, example: Vade Farkı Profil 2 }
-        oranYuzde: { type: number, example: 2.45, description: Aylık vade farkı oranı }
+        ad: { type: string, example: Vade Farkı Profil 2, description: Ağda tek olmalı }
+        oranYuzde: { type: number, minimum: 0, maximum: 10, example: 2.45, description: Aylık vade farkı oranı, en çok 2 ondalık }
         aciklama: { type: string }
         durum: { $ref: "#/components/schemas/KayitDurumu" }
+
+    VadeFarkiProfili:
+      allOf:
+        - $ref: "#/components/schemas/VadeFarkiProfiliGirdisi"
+        - type: object
+          properties:
+            id: { type: integer }
+            kullananBayiSayisi: { type: integer, description: Bu profile bağlı aktif bayi / alt bayi sayısı }
+            ornek:
+              type: object
+              description: Ekrandaki örnek hesap; formül sunucuda (bkz. /odeme/taksit-secenekleri)
+              properties:
+                tutarKurus: { $ref: "#/components/schemas/Kurus" }
+                taksit: { type: integer, example: 6 }
+                vadeFarkiKurus: { $ref: "#/components/schemas/Kurus" }
 
     KimlikGirdisi:
       type: object
