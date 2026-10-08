@@ -1228,6 +1228,16 @@ export const bakiyeler = {
   }
 };
 
+// Üst cariye borç yüklemeleri (sevkiyat / fatura); ödemeler islemler tablosundan türetilir (bakiye ekstresi)
+export const borcHareketleri = [
+  { hareketId: "BH-101", firmaId: "320.01.001", tarih: "2026-10-01T09:00:00+03:00", aciklama: "Eylül sevkiyatı — fatura BRS-2026-0912", tutarKurus: 6800000 },
+  { hareketId: "BH-102", firmaId: "320.01.001", tarih: "2026-09-16T09:00:00+03:00", aciklama: "Kampanya stoğu — fatura BRS-2026-0871", tutarKurus: 4250000 },
+  { hareketId: "BH-103", firmaId: "320.01.001", tarih: "2026-08-28T09:00:00+03:00", aciklama: "Ağustos sevkiyatı — fatura BRS-2026-0790", tutarKurus: 5120000 },
+  { hareketId: "BH-201", firmaId: "540.02.011", tarih: "2026-09-29T10:30:00+03:00", aciklama: "Lastik sevkiyatı — fatura ANK-2026-0233", tutarKurus: 1480000 },
+  { hareketId: "BH-202", firmaId: "540.02.011", tarih: "2026-09-12T10:30:00+03:00", aciklama: "Jant ve balans — fatura ANK-2026-0219", tutarKurus: 960000 },
+  { hareketId: "BH-203", firmaId: "540.02.011", tarih: "2026-08-22T10:30:00+03:00", aciklama: "Ağustos sevkiyatı — fatura ANK-2026-0198", tutarKurus: 1120000 }
+];
+
 export const haftalikHacim = [
   {
     gun: "2026-09-28",

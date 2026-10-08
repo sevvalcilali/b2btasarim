@@ -15,6 +15,9 @@ import { BayiOzet } from "@/components/bento/ekranlar/BayiOzet";
 import { BayiFaturaOzet } from "@/components/bento/ekranlar/BayiFaturaOzet";
 import { VadeFarkiProfilTanim } from "@/components/bento/ekranlar/VadeFarkiProfili";
 import { KullaniciTanim } from "@/components/bento/ekranlar/KullaniciTanim";
+import { KurBilgisi } from "@/components/bento/ekranlar/KurBilgisi";
+import { BakiyeBorc } from "@/components/bento/ekranlar/BakiyeBorc";
+import { FirmaBilgileri } from "@/components/bento/ekranlar/FirmaBilgileri";
 import { IptalIade } from "@/components/bento/ekranlar/IptalIade";
 import { IslemDetaylari } from "@/components/bento/ekranlar/IslemDetaylari";
 import { LinkOdeme } from "@/components/bento/ekranlar/LinkOdeme";
@@ -201,6 +204,12 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
             <BayiOzet role={role} meta={meta} onNavigate={navigate} />
           ) : current === "/raporlar/bayi-fatura-ozet" && role !== ROLES.ALT_BAYI ? (
             <BayiFaturaOzet role={role} meta={meta} onNavigate={navigate} />
+          ) : current === "/odeme/kur" ? (
+            <KurBilgisi meta={meta} onNavigate={navigate} />
+          ) : (current === "/odeme/ana-firma-bakiye" && role === ROLES.BAYI) || (current === "/odeme/bayi-bakiye" && role === ROLES.ALT_BAYI) ? (
+            <BakiyeBorc role={role} meta={meta} onNavigate={navigate} />
+          ) : current === "/ayarlar/firma" && role !== ROLES.ANA_FIRMA ? (
+            <FirmaBilgileri role={role} meta={meta} onNavigate={navigate} />
           ) : current === "/ayarlar/kullanici" ? (
             <KullaniciTanim meta={meta} onNavigate={navigate} />
           ) : current === "/ayarlar/vade-farki" && role === ROLES.ANA_FIRMA ? (

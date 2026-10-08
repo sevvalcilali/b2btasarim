@@ -213,6 +213,59 @@ paths:
               example: { bakiyeKurus: 18420000, borcKurus: 4650000, limitKurus: 40000000, kullanimYuzde: 46, gorunum: UST_CARI }
         "401": { $ref: "#/components/responses/OturumYok" }
 
+  /kurlar:
+    get:
+      tags: [Panel]
+      summary: USD / Euro kur bilgisi (şartname s.2)
+      description: Bilgilendirme amaçlı gösterge kurları; tahsilat TL yapılır. Kaynak ve güncelleme sıklığını backend belirler.
+      responses:
+        "200":
+          description: Kurlar
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  kayitlar:
+                    type: array
+                    items: { $ref: "#/components/schemas/Kur" }
+                  guncelleme: { type: string, format: date-time }
+                  kaynak: { type: string, example: TCMB gösterge }
+
+  /bakiye/ekstre:
+    get:
+      tags: [Panel]
+      summary: Üst cari karşısındaki bakiye, borç ve hareketler (şartname s.2 — Ana Firma / Bayi Bakiye ve Borç)
+      description: Bayi ana firma carisini, alt bayi bayi carisini görür; ana firmanın üst carisi yoktur (403). Hareketler borç yüklemeleri ve bu firmanın yaptığı ödemelerden oluşur.
+      parameters:
+        - { name: donem, in: query, schema: { type: string, enum: [30g, 90g, tumu], default: 30g } }
+      responses:
+        "200":
+          description: Ekstre
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ustCari: { $ref: "#/components/schemas/FirmaOzeti" }
+                  bakiyeKurus: { $ref: "#/components/schemas/Kurus" }
+                  borcKurus: { $ref: "#/components/schemas/Kurus" }
+                  limitKurus: { $ref: "#/components/schemas/Kurus" }
+                  kullanimYuzde: { type: number }
+                  sonGuncelleme: { type: string, format: date-time }
+                  donem: { type: string }
+                  hareketler:
+                    type: array
+                    items: { $ref: "#/components/schemas/BakiyeHareketi" }
+                  donemToplami:
+                    type: object
+                    description: Dönemdeki hareketlerin tür bazında toplamı
+                    properties:
+                      borcKurus: { $ref: "#/components/schemas/Kurus" }
+                      odemeKurus: { $ref: "#/components/schemas/Kurus" }
+                      iadeIptalKurus: { $ref: "#/components/schemas/Kurus" }
+        "403": { $ref: "#/components/responses/YetkiYok" }
+
   /bayiler:
     get:
       tags: [Bayi Tanım]
@@ -319,6 +372,31 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Bayi" }
+
+  /firma/iletisim:
+    put:
+      tags: [Tanımlar]
+      summary: Kendi iletişim bilgisini güncelle (bayi / alt bayi, yalnız Yönetici)
+      description: Şartname s.10 Firma Bilgileri. Unvan, cari / vergi no ve ödeme koşulları üst firmanın bayi tanımında kalır. Ana firma için 403 (klasik panel).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [telefon, email, adres]
+              properties:
+                telefon: { type: string }
+                email: { type: string, format: email }
+                adres: { type: string }
+      responses:
+        "200":
+          description: Güncel firma kaydı
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Bayi" }
+        "403": { $ref: "#/components/responses/YetkiYok" }
+        "422": { $ref: "#/components/responses/IsKurali" }
 
   /kullanicilar:
     get:
@@ -1025,6 +1103,25 @@ components:
     KayitDurumu:
       type: string
       enum: [AKTIF, PASIF]
+
+    Kur:
+      type: object
+      properties:
+        kod: { type: string, example: USD }
+        ad: { type: string, example: Amerikan Doları }
+        alis: { type: number, example: 34.12 }
+        satis: { type: number, example: 34.28 }
+        degisimYuzde: { type: number, example: 0.18, description: Önceki güne göre }
+
+    BakiyeHareketi:
+      type: object
+      properties:
+        hareketId: { type: string }
+        tarih: { type: string, format: date-time }
+        tur: { type: string, enum: [BORC, ODEME, IADE, IPTAL] }
+        aciklama: { type: string }
+        islemNo: { type: [string, "null"], description: Ödeme / iade kaynaklı hareketin işlemi }
+        tutarKurus: { $ref: "#/components/schemas/Kurus", description: Borcu artıran hareket artı, ödeme eksi }
 
     KullaniciGirdisi:
       type: object

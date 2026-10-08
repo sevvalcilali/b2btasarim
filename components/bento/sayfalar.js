@@ -18,6 +18,10 @@ export const SAYFALAR = {
   "islem-detaylari": "/raporlar/islem-detaylari",
   "vade-farki": "/ayarlar/vade-farki",
   "kullanici": "/ayarlar/kullanici",
+  "firma": "/ayarlar/firma",
+  "kur": "/odeme/kur",
+  "ana-firma-bakiye": "/odeme/ana-firma-bakiye",
+  "bayi-bakiye": "/odeme/bayi-bakiye",
 };
 
 export const KALICI_PARAMETRELER = ["role", "theme", "menu"];
