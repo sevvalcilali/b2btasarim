@@ -2,5 +2,9 @@
 import { oturumHandlers } from "./oturum";
 import { panelHandlers } from "./panel";
 import { islemlerHandlers } from "./islemler";
+import { bayilerHandlers } from "./bayiler";
+import { firmaHandlers } from "./firma";
+import { tanimlarHandlers } from "./tanimlar";
+import { musterilerHandlers } from "./musteriler";
 
-export const handlers = [...oturumHandlers, ...panelHandlers, ...islemlerHandlers];
+export const handlers = [...oturumHandlers, ...panelHandlers, ...islemlerHandlers, ...bayilerHandlers, ...firmaHandlers, ...tanimlarHandlers, ...musterilerHandlers];

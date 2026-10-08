@@ -213,9 +213,185 @@ paths:
               example: { bakiyeKurus: 18420000, borcKurus: 4650000, limitKurus: 40000000, kullanimYuzde: 46, gorunum: UST_CARI }
         "401": { $ref: "#/components/responses/OturumYok" }
 
+  /bayiler:
+    get:
+      tags: [Bayi Tanım]
+      summary: Bayi / alt bayi listesi
+      description: |
+        Ana firma `tur=BAYI` ile bayilerini, `tur=ALT_BAYI` ile ağdaki tüm alt bayileri (salt okunur) görür;
+        bayi yalnızca kendi alt bayilerini görür (`tur` yoksayılır); alt bayinin bayi tanımı yoktur (403).
+      parameters:
+        - { name: tur, in: query, schema: { type: string, enum: [BAYI, ALT_BAYI] } }
+        - { name: durum, in: query, schema: { $ref: "#/components/schemas/KayitDurumu" } }
+        - { name: q, in: query, schema: { type: string }, description: Unvan, cari no, vergi no }
+      responses:
+        "200":
+          description: Liste
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Liste"
+                  - type: object
+                    properties:
+                      kayitlar: { type: array, items: { $ref: "#/components/schemas/Bayi" } }
+                      duzenlenebilir: { type: boolean, description: Oturum bu listedeki kayıtları düzenleyebilir mi }
+        "401": { $ref: "#/components/responses/OturumYok" }
+        "403": { $ref: "#/components/responses/YetkiYok" }
+    post:
+      tags: [Bayi Tanım]
+      summary: Bayi (ana firma) ya da alt bayi (yetkili bayi) tanımla
+      description: |
+        Şartname s.5. Alt bayiye verilen taksitler, üye işyerleri ve işlem limiti tanımlayan bayinin kendi
+        sınırlarını aşamaz (422). Cari no ağda tek olmalıdır (409). Yetkisiz rol 403 alır.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BayiGirdisi" }
+            example:
+              tur: BAYI
+              unvan: Eskişehir Lastik Market
+              cariNo: "320.01.006"
+              vergiNo: "6789012345"
+              telefon: 0222 444 10 10
+              email: info@eskisehirlastik.com
+              adres: Organize Sanayi Bölgesi No:5 Eskişehir
+              vadeProfilId: 1
+              taksitler: [1, 2, 3, 6]
+              islemLimitiKurus: 9000000
+              altBayiYetkisi: false
+              uyeIsyerleri: ["320.00.001", "320.00.002"]
+              durum: AKTIF
+      responses:
+        "201":
+          description: Oluşturulan kayıt
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Bayi" }
+        "403": { $ref: "#/components/responses/YetkiYok" }
+        "409":
+          description: Cari no başka bir kayıtta kullanılıyor
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HataCevabi" }
+              example: { hata: { kod: CARI_CAKISMASI, mesaj: Bu cari no başka bir kayıtta kullanılıyor., alanlar: { cariNo: Bu cari no başka bir kayıtta kullanılıyor. } } }
+        "422": { $ref: "#/components/responses/IsKurali" }
+
+  /bayiler/{cariNo}:
+    parameters:
+      - { name: cariNo, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [Bayi Tanım]
+      summary: Tek bayi / alt bayi (düzenleme için)
+      responses:
+        "200":
+          description: Kayıt
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Bayi" }
+        "404": { $ref: "#/components/responses/Bulunamadi" }
+    put:
+      tags: [Bayi Tanım]
+      summary: Bayi / alt bayi güncelle (cari no değişmez)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BayiGirdisi" }
+      responses:
+        "200":
+          description: Güncel kayıt
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Bayi" }
+        "404": { $ref: "#/components/responses/Bulunamadi" }
+        "422": { $ref: "#/components/responses/IsKurali" }
+
+  /firma:
+    get:
+      tags: [Tanımlar]
+      summary: Oturum firmasının kendi kaydı
+      description: Taksit sınırı, işlem limiti, vade profili, üye işyerleri, alt bayi yetkisi, ortaklar — alt bayi tanımında ve ödemede üst sınır olarak kullanılır.
+      responses:
+        "200":
+          description: Firma
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Bayi" }
+
+  /vade-farki-profilleri:
+    get:
+      tags: [Tanımlar]
+      summary: Vade farkı profilleri (şartname s.4, en çok 5)
+      responses:
+        "200":
+          description: Profiller
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  kayitlar:
+                    type: array
+                    items: { $ref: "#/components/schemas/VadeFarkiProfili" }
+
+  /uye-isyerleri:
+    get:
+      tags: [Tanımlar]
+      summary: Ana firmanın üye işyerleri (bayi / alt bayi yalnızca kendisine açılanları görür)
+      responses:
+        "200":
+          description: Üye işyerleri
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  kayitlar:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        cariNo: { type: string, example: "320.00.001" }
+                        ad: { type: string, example: Brisa İş Makinası Lastik }
+
+  /musteriler:
+    get:
+      tags: [Ödeme]
+      summary: Oturum firmasının tanımlı (düzenli) müşterileri
+      parameters:
+        - { name: q, in: query, schema: { type: string }, description: Unvan, cari no, vergi no }
+      responses:
+        "200":
+          description: Liste
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Liste"
+                  - type: object
+                    properties:
+                      kayitlar: { type: array, items: { $ref: "#/components/schemas/Musteri" } }
+    post:
+      tags: [Bayi Tanım]
+      summary: Düzenli müşteri tanımla (bayi tanım ekranında "Müşteri" türü)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/KimlikGirdisi" }
+      responses:
+        "201":
+          description: Oluşturulan müşteri
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Musteri" }
+        "409": { $ref: "#/components/responses/IsKurali" }
+        "422": { $ref: "#/components/responses/IsKurali" }
+
   # --- Sonraki adımlarda eklenecek uç noktalar (docs/api/README.md'deki tablo) ---
-  # /panel/bekleyenler (menü rozetleri — iptal/iade ve fatura ekranları API'ye geçince)
-  # /musteriler · /tahsilat-carileri · /firma/ortaklar · /odeme/taksit-secenekleri · /odemeler · /odeme-linkleri
+  # /panel/bekleyenler (menü rozetleri — iptal/iade ve fatura ekranları API'ye geçince) · /tahsilat-carileri · /firma/ortaklar · /odeme/taksit-secenekleri · /odemeler · /odeme-linkleri
   # /iptal-iade-talepleri · /iptal-iade-talepleri/uygun-islemler · /iptal-iade-talepleri/{id}/onay · /{id}/red
   # /bayiler · /bayiler/{cariNo} · /alt-bayiler · /vade-farki-profilleri · /uye-isyerleri
   # /faturalar · /faturalar/{islemNo}/hatirlatma · /faturalar/{islemNo}/yukleme-linki
@@ -327,6 +503,92 @@ components:
         taksit: { type: integer, minimum: 1, description: 1 = tek çekim }
         tutarKurus: { $ref: "#/components/schemas/Kurus" }
         durum: { $ref: "#/components/schemas/IslemDurumu" }
+
+    KayitDurumu:
+      type: string
+      enum: [AKTIF, PASIF]
+
+    VadeFarkiProfili:
+      type: object
+      properties:
+        id: { type: integer }
+        ad: { type: string, example: Vade Farkı Profil 2 }
+        oranYuzde: { type: number, example: 2.45, description: Aylık vade farkı oranı }
+        aciklama: { type: string }
+        durum: { $ref: "#/components/schemas/KayitDurumu" }
+
+    KimlikGirdisi:
+      type: object
+      required: [unvan, cariNo, vergiNo, telefon, email, adres]
+      properties:
+        unvan: { type: string }
+        cariNo: { type: string, pattern: "^\\d{3}\\.\\d{2}\\.\\d{3}$", description: Ağda tek olmalı }
+        vergiNo: { type: string, pattern: "^\\d{10}$" }
+        telefon: { type: string }
+        email: { type: string, format: email }
+        adres: { type: string }
+
+    BayiGirdisi:
+      allOf:
+        - $ref: "#/components/schemas/KimlikGirdisi"
+        - type: object
+          required: [tur, vadeProfilId, taksitler, islemLimitiKurus, uyeIsyerleri, durum]
+          properties:
+            tur: { type: string, enum: [BAYI, ALT_BAYI], description: Ana firma BAYI, yetkili bayi ALT_BAYI tanımlar }
+            vadeProfilId: { type: integer }
+            taksitler:
+              type: array
+              items: { type: integer, minimum: 1, maximum: 12 }
+              description: Görebileceği taksitler (1 = tek çekim); alt bayide tanımlayan bayinin taksitleri arasından
+            islemLimitiKurus: { $ref: "#/components/schemas/Kurus" }
+            altBayiYetkisi: { type: boolean, description: Yalnızca BAYI için }
+            uyeIsyerleri:
+              type: array
+              items: { type: string }
+              description: Göreceği ana firma üye işyerleri (cari no); alt bayide tanımlayan bayiye açık olanlar arasından
+            durum: { $ref: "#/components/schemas/KayitDurumu" }
+
+    Bayi:
+      type: object
+      description: Bayi, alt bayi ya da (GET /firma için) ana firma kaydı
+      properties:
+        firmaId: { type: string }
+        tur: { $ref: "#/components/schemas/Rol" }
+        unvan: { type: string }
+        cariNo: { type: string }
+        vergiNo: { type: string }
+        telefon: { type: string }
+        email: { type: string }
+        adres: { type: string }
+        vadeProfilId: { type: [integer, "null"] }
+        vadeProfil:
+          oneOf:
+            - $ref: "#/components/schemas/VadeFarkiProfili"
+            - type: "null"
+        taksitler: { type: array, items: { type: integer } }
+        islemLimitiKurus: { oneOf: [{ $ref: "#/components/schemas/Kurus" }, { type: "null" }] }
+        altBayiYetkisi: { type: boolean, description: Yalnızca BAYI }
+        altBayiSayisi: { type: integer, description: Yalnızca BAYI }
+        bagli:
+          oneOf:
+            - $ref: "#/components/schemas/FirmaOzeti"
+            - type: "null"
+        uyeIsyerleri: { type: array, items: { type: string } }
+        ortaklar: { type: array, items: { type: string }, description: Kendi kartı ödemesinde kart sahibi seçenekleri }
+        logoRenk: { type: [string, "null"] }
+        durum: { $ref: "#/components/schemas/KayitDurumu" }
+
+    Musteri:
+      type: object
+      properties:
+        musteriId: { type: string }
+        unvan: { type: string }
+        cariNo: { type: string }
+        vergiNo: { type: string }
+        telefon: { type: string }
+        email: { type: string }
+        adres: { type: [string, "null"] }
+        durum: { $ref: "#/components/schemas/KayitDurumu" }
 
     FirmaOzeti:
       type: object

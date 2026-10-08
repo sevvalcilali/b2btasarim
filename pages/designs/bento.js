@@ -189,6 +189,7 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
               meta={meta}
               tumAltBayiler={current === "/bayi-tanim/alt-bayi-liste"}
               vurgu={parametre("kaydedildi")}
+              kayitAdi={parametre("ad")}
               onNavigate={navigate}
             />
           ) : current === "/raporlar/fatura-yukleme" ? (
