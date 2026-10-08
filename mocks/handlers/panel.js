@@ -2,6 +2,7 @@
 import { http, HttpResponse } from "msw";
 import { depo } from "../db/depo";
 import { faturaDurumu, faturaGerekli, kapsamda, onayimda } from "../kurallar";
+import { okunmamisDuyurular } from "./duyurular";
 import { gecikme, uc, yetkili } from "./yardimci";
 
 const KALEMLER = ["TOPLAM", "BASARILI", "BASARISIZ", "IPTAL", "IADE"];
@@ -37,7 +38,7 @@ export const panelHandlers = [
     });
   }),
 
-  // Menü rozetleri: onayımda bekleyen talepler (s.8) ve faturası bekleyen kendi işlemleri (s.9)
+  // Menü rozetleri: onayımda bekleyen talepler (s.8), faturası bekleyen kendi işlemleri (s.9), okunmamış duyuru (s.2)
   http.get(uc("/panel/bekleyenler"), async ({ request }) => {
     await gecikme();
     const { kim, cevap } = yetkili(request);
@@ -45,6 +46,7 @@ export const panelHandlers = [
     return HttpResponse.json({
       onayBekleyenTalep: depo.tablo("iptalIadeTalepleri").filter((t) => kapsamda(kim, t.girenId) && onayimda(kim, t)).length,
       faturasiBekleyenIslem: depo.tablo("islemler").filter((t) => t.cekimYapanId === kim.firmaId && faturaGerekli(t) && faturaDurumu(t.islemNo).durum !== "YUKLENDI").length,
+      okunmamisDuyuru: okunmamisDuyurular(kim).length,
     });
   }),
 

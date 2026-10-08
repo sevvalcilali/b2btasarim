@@ -35,6 +35,7 @@ tags:
   - name: Bayi Tanım
   - name: Fatura
   - name: Tanımlar
+  - name: Duyuru
 
 paths:
   /oturum:
@@ -212,6 +213,71 @@ paths:
                   gorunum: { type: string, enum: [FIRMA_LIMITI, UST_CARI] }
               example: { bakiyeKurus: 18420000, borcKurus: 4650000, limitKurus: 40000000, kullanimYuzde: 46, gorunum: UST_CARI }
         "401": { $ref: "#/components/responses/OturumYok" }
+
+  /duyurular:
+    get:
+      tags: [Duyuru]
+      summary: Duyurular (şartname s.2)
+      description: Ana firma tüm duyuruları okunma sayısıyla görür; bayi / alt bayi yalnız yayında olup rolüne hedeflenenleri, kendi okundu bilgisiyle görür.
+      responses:
+        "200":
+          description: Duyurular
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  kayitlar:
+                    type: array
+                    items: { $ref: "#/components/schemas/Duyuru" }
+                  duzenlenebilir: { type: boolean, description: Ana firma Yöneticisi }
+    post:
+      tags: [Duyuru]
+      summary: Yeni duyuru (ana firma Yöneticisi)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DuyuruGirdisi" }
+      responses:
+        "201":
+          description: Oluşturuldu
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Duyuru" }
+        "403": { $ref: "#/components/responses/YetkiYok" }
+        "422": { $ref: "#/components/responses/IsKurali" }
+
+  /duyurular/{duyuruId}:
+    put:
+      tags: [Duyuru]
+      summary: Duyuruyu güncelle / arşivle (ana firma Yöneticisi)
+      parameters:
+        - { name: duyuruId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DuyuruGirdisi" }
+      responses:
+        "200":
+          description: Güncellendi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Duyuru" }
+        "403": { $ref: "#/components/responses/YetkiYok" }
+        "404": { $ref: "#/components/responses/Bulunamadi" }
+        "422": { $ref: "#/components/responses/IsKurali" }
+
+  /duyurular/{duyuruId}/okundu:
+    post:
+      tags: [Duyuru]
+      summary: Oturumdaki kullanıcı duyuruyu okudu (pop-up kapatıldı)
+      parameters:
+        - { name: duyuruId, in: path, required: true, schema: { type: string } }
+      responses:
+        "204": { description: Kaydedildi }
+        "404": { $ref: "#/components/responses/Bulunamadi" }
 
   /kurlar:
     get:
@@ -718,7 +784,8 @@ paths:
                 properties:
                   onayBekleyenTalep: { type: integer, description: Oturumun onayını bekleyen iptal / iade talebi }
                   faturasiBekleyenIslem: { type: integer, description: Oturum firmasının faturası yüklenmemiş işlemi }
-              example: { onayBekleyenTalep: 3, faturasiBekleyenIslem: 0 }
+                  okunmamisDuyuru: { type: integer, description: Oturumdaki kullanıcının okumadığı yayındaki duyuru }
+              example: { onayBekleyenTalep: 3, faturasiBekleyenIslem: 0, okunmamisDuyuru: 1 }
 
   /iptal-iade-talepleri:
     get:
@@ -1103,6 +1170,33 @@ components:
     KayitDurumu:
       type: string
       enum: [AKTIF, PASIF]
+
+    DuyuruGirdisi:
+      type: object
+      required: [baslik, icerik, hedef, durum]
+      properties:
+        baslik: { type: string }
+        icerik: { type: string }
+        hedef:
+          type: array
+          minItems: 1
+          items: { type: string, enum: [BAYI, ALT_BAYI] }
+        durum: { type: string, enum: [YAYINDA, ARSIV] }
+
+    Duyuru:
+      allOf:
+        - $ref: "#/components/schemas/DuyuruGirdisi"
+        - type: object
+          properties:
+            duyuruId: { type: string, example: D-001 }
+            tarih: { type: string, format: date }
+            okundu: { type: boolean, description: Bayi / alt bayi cevabında; oturumdaki kullanıcı okudu mu }
+            okunma:
+              type: object
+              description: Ana firma cevabında
+              properties:
+                hedefAdet: { type: integer, description: Hedef rollerdeki aktif kullanıcı }
+                okuyanAdet: { type: integer }
 
     Kur:
       type: object

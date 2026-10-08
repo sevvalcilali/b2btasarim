@@ -12,6 +12,7 @@ import { Pencere } from "../ortak";
 import { isReady } from "../sayfalar";
 import { CARD, FOCUS } from "../tema";
 import { smoothPath, curveThrough, Money, TrendArrow } from "../yardimci";
+import { DuyuruPopup } from "./Duyuru";
 
 // ---- KPI blokları ------------------------------------------------------------------------
 // Küçük renkli KPI blokları (toplam ve başarılı büyük bloklarda ayrı çizilir)
@@ -626,6 +627,8 @@ export function Dashboard({ role, meta, onNavigate }) {
 
   return (
     <>
+      {/* şartname s.2: ana firmanın duyuruları bayi ekranlarına pop-up olarak düşer */}
+      {role !== ROLES.ANA_FIRMA && <DuyuruPopup />}
       <div className="bn-rise mb-4 flex flex-col gap-3 px-1 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-xl font-extrabold tracking-tight text-[var(--fg)]">Ana Sayfa</h1>

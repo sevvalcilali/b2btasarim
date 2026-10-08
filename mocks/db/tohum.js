@@ -1322,7 +1322,6 @@ export const duyurular = [
     baslik: "Sistem Bakımı",
     icerik: "05 Ekim 03:00-05:00 arası planlı bakım yapılacaktır.",
     hedef: [
-      "ANA_FIRMA",
       "BAYI",
       "ALT_BAYI"
     ],
@@ -1339,6 +1338,13 @@ export const duyurular = [
     tarih: "2026-09-20",
     durum: "ARSIV"
   }
+];
+
+// Duyuruyu okuyan kullanıcılar (pop-up "Okudum")
+export const duyuruOkumalari = [
+  { duyuruId: "D-002", kullaniciId: "K-101" },
+  { duyuruId: "D-002", kullaniciId: "K-102" },
+  { duyuruId: "D-001", kullaniciId: "K-102" }
 ];
 
 export const oturumlar = {

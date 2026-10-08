@@ -14,6 +14,7 @@ import { raporlarHandlers } from "./raporlar";
 import { kullanicilarHandlers } from "./kullanicilar";
 import { kurlarHandlers } from "./kurlar";
 import { bakiyeHandlers } from "./bakiye";
+import { duyurularHandlers } from "./duyurular";
 
 export const handlers = [
   ...oturumHandlers,
@@ -31,4 +32,5 @@ export const handlers = [
   ...kullanicilarHandlers,
   ...kurlarHandlers,
   ...bakiyeHandlers,
+  ...duyurularHandlers,
 ];

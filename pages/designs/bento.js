@@ -18,6 +18,7 @@ import { KullaniciTanim } from "@/components/bento/ekranlar/KullaniciTanim";
 import { KurBilgisi } from "@/components/bento/ekranlar/KurBilgisi";
 import { BakiyeBorc } from "@/components/bento/ekranlar/BakiyeBorc";
 import { FirmaBilgileri } from "@/components/bento/ekranlar/FirmaBilgileri";
+import { DuyuruYonetimi, DuyuruPenceresi } from "@/components/bento/ekranlar/Duyuru";
 import { IptalIade } from "@/components/bento/ekranlar/IptalIade";
 import { IslemDetaylari } from "@/components/bento/ekranlar/IslemDetaylari";
 import { LinkOdeme } from "@/components/bento/ekranlar/LinkOdeme";
@@ -34,6 +35,7 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
   const [desktopOpen, setDesktopOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(true);
+  const [duyurularAcik, setDuyurularAcik] = useState(false);
   // rolün demo meta verisi; firma unvanı GET /oturum'dan gelir (ekranlar meta.company ile başlık yazar)
   const oturum = useOturum();
   const meta = { ...ROLE_META[role], company: oturum.data?.firma.unvan || ROLE_META[role].company };
@@ -169,17 +171,27 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
               >
                 <I name={isDark ? "sun" : "moon"} size={16} />
               </button>
-              <button type="button" aria-label="Bildirimler" title="Bildirimler" className={`${GHOST} relative hidden sm:grid`}>
+              <button
+                type="button"
+                onClick={() => setDuyurularAcik(true)}
+                aria-label={bekleyenler.data?.okunmamisDuyuru ? `Duyurular, ${bekleyenler.data.okunmamisDuyuru} okunmamış` : "Duyurular"}
+                title="Duyurular"
+                className={`${GHOST} relative hidden sm:grid`}
+              >
                 <I name="bell" size={16} />
-                <span className="absolute right-1.5 top-1.5 flex h-2 w-2" aria-hidden="true">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--danger)] opacity-60 motion-reduce:hidden" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--danger)] ring-2 ring-[var(--surface)]" />
-                </span>
+                {bekleyenler.data?.okunmamisDuyuru > 0 && (
+                  <span className="absolute right-1.5 top-1.5 flex h-2 w-2" aria-hidden="true">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--danger)] opacity-60 motion-reduce:hidden" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--danger)] ring-2 ring-[var(--surface)]" />
+                  </span>
+                )}
               </button>
               <UserMenu meta={meta} isDark={isDark} onToggleTheme={onToggleTheme} onLogout={onLogout} />
             </div>
           </header>
         </div>
+
+        {duyurularAcik && <DuyuruPenceresi role={role} onClose={() => setDuyurularAcik(false)} />}
 
         {/* key: rol ya da ekran değişince giriş animasyonları yeniden oynar */}
         <main key={`${role}-${current}`} className="mx-auto w-full max-w-[1280px] flex-1 py-4">
@@ -204,6 +216,8 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
             <BayiOzet role={role} meta={meta} onNavigate={navigate} />
           ) : current === "/raporlar/bayi-fatura-ozet" && role !== ROLES.ALT_BAYI ? (
             <BayiFaturaOzet role={role} meta={meta} onNavigate={navigate} />
+          ) : current === "/duyuru" && role === ROLES.ANA_FIRMA ? (
+            <DuyuruYonetimi meta={meta} onNavigate={navigate} />
           ) : current === "/odeme/kur" ? (
             <KurBilgisi meta={meta} onNavigate={navigate} />
           ) : (current === "/odeme/ana-firma-bakiye" && role === ROLES.BAYI) || (current === "/odeme/bayi-bakiye" && role === ROLES.ALT_BAYI) ? (
