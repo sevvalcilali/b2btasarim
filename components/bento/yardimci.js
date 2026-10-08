@@ -1,17 +1,7 @@
-// Küçük yardımcılar: tutar ve tarih biçimleri, sayaç animasyonu, eğri yolu, durum renkleri.
+// Küçük ekran yardımcıları: sayaç animasyonu, eğri yolu, trend oku, kapatma kısayolu, gecikmeli değer.
+// Biçimlendirme (kuruş → ₺, ISO → tarih) lib/bicim.js'te; etiketler lib/etiketler.js'te.
 
 import { useEffect, useState } from "react";
-
-export function pillTone(durum) {
-  if (durum === "Başarılı") return "bg-[var(--success-soft)] text-[var(--success-text)]";
-  if (durum === "Başarısız") return "bg-[var(--danger-soft)] text-[var(--danger-text)]";
-  return "bg-[var(--warning-soft)] text-[var(--warning-text)]"; // İptal / İade
-}
-
-// "₺ 4.284.900" → 4284900
-export function parseAmount(value) {
-  return Number(String(value).replace(/[^\d]/g, "")) || 0;
-}
 
 // Değerleri w×h alana (min–max aralığına) yayıp yumuşak bir eğri yolu üretir.
 export function smoothPath(values, w, h, pad) {
@@ -67,9 +57,9 @@ function useCountUp(target) {
   return val;
 }
 
-// value: "₺ 12.400" biçiminde metin (eski ekranlar) · kurus: API'den gelen kuruş (yeni ekranlar)
-export function Money({ value, kurus }) {
-  const v = useCountUp(kurus != null ? Math.round(kurus / 100) : parseAmount(value));
+/** Kuruş tutarını sayarak gösterir: ₺ 12.400 */
+export function Money({ kurus }) {
+  const v = useCountUp(Math.round((kurus || 0) / 100));
   return <>₺ {v.toLocaleString("tr-TR")}</>;
 }
 
@@ -104,18 +94,4 @@ export function TrendArrow({ up }) {
   );
 }
 
-// "12.400,50" → 12400.5 (boş ya da geçersizse NaN)
-export function tutarCoz(metin) {
-  const t = metin.replace(/[₺\s.]/g, "").replace(",", ".");
-  return t === "" ? NaN : Number(t);
-}
-
-export const tl2 = (n) => `₺ ${n.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-export const rakamlar = (x) => x.replace(/\D/g, "");
-
-// Date → "07.10.2026 16:20"
-export function tarihSaat(d) {
-  const iki = (n) => String(n).padStart(2, "0");
-  return `${iki(d.getDate())}.${iki(d.getMonth() + 1)}.${d.getFullYear()} ${iki(d.getHours())}:${iki(d.getMinutes())}`;
-}
+export const rakamlar = (x) => String(x ?? "").replace(/\D/g, "");

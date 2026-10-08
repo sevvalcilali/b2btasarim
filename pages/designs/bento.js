@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ROLES, ROLE_META, ROLE_ORDER } from "@/lib/roles";
 import { useRole } from "@/components/RoleContext";
-import { anaFirma } from "@/lib/mockData";
+import { useOturum } from "@/lib/sorgular/oturum";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import CompanyLogo from "@/components/CompanyLogo";
@@ -27,7 +27,10 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
   const [desktopOpen, setDesktopOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(true);
-  const meta = ROLE_META[role];
+  // rolün demo meta verisi; firma unvanı GET /oturum'dan gelir (ekranlar meta.company ile başlık yazar)
+  const oturum = useOturum();
+  const meta = { ...ROLE_META[role], company: oturum.data?.firma.unvan || ROLE_META[role].company };
+  const anaFirma = oturum.data?.anaFirma;
 
   // menü rozetleri — GET /panel/bekleyenler (onay / yükleme sonrası ilgili kancalar yeniler)
   const bekleyenler = useBekleyenler();
@@ -112,9 +115,9 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
               aria-hidden={desktopOpen && isDesktop ? "true" : undefined}
             >
               <div className="flex items-center gap-2.5 whitespace-nowrap">
-                <CompanyLogo name={anaFirma.ad} size={32} className="shrink-0" />
+                <CompanyLogo name={anaFirma?.unvan || "N Kolay Bayim"} size={32} className="shrink-0" />
                 <span className="hidden leading-tight sm:block">
-                  <span className="block text-[13.5px] font-extrabold text-[var(--fg)]">{anaFirma.ad}</span>
+                  <span className="block text-[13.5px] font-extrabold text-[var(--fg)]">{anaFirma?.unvan || "…"}</span>
                   <span className="block text-[10.5px] font-medium text-[var(--muted)]">Ana Firma · N Kolay Bayim</span>
                 </span>
               </div>

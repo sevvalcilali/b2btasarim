@@ -57,6 +57,18 @@ Ekran (components/bento/ekranlar)  →  lib/sorgular (React Query kancaları)  �
 | `demo-BAYI` | Murat Aydın (Yönetici) | Ankara Lastik Bayi Ltd. `320.01.001` |
 | `demo-ALT_BAYI` | Kemal Er (Yönetici) | Çankaya Oto Servis `540.02.011` |
 
+Tüm hazır ekranlar bu uç noktalarla çalışır; ekran kodu örnek veriye erişmez. Yeni ekranlar aynı sırayla eklenir:
+sözleşmeye uç nokta → `lib/api` fonksiyonu → `lib/sorgular` kancası → `mocks/handlers` cevabı → ekran.
+
+## Backend ekibine teslim
+
+- **Sözleşme:** `docs/api/openapi.yaml` — Swagger Editor'da açılır; her uç noktanın istek / cevap örneği var.
+- **İş kuralları:** `mocks/kurallar.js` (rol kapsamı, bayi tanım sınırları, ödeme koşulları, onay zinciri, fatura kontrolü)
+  ve `mocks/handlers/*.js` — backend'in uygulaması gereken kurallar, çalışan kod olarak.
+- **Canlı örnek:** uygulamayı açıp Network sekmesinde her ekranın hangi isteği attığı ve ne beklediği görülür.
+- **Geçiş:** `NEXT_PUBLIC_API_MOCK=false` ve `NEXT_PUBLIC_API_URL=<backend>/api/v1`; servisler tek tek de bağlanabilir
+  (MSW eşleşmeyen isteği geçirir).
+
 ## Backend ekibinin netleştireceği noktalar
 
 1. Kimlik doğrulama ve klasik panelle ortak oturum (şartname s.10).

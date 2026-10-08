@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { ROLES, ROLE_META } from "@/lib/roles";
 import { getNav } from "@/lib/nav";
-import { anaFirma } from "@/lib/mockData";
 import CompanyLogo from "@/components/CompanyLogo";
 import I from "@/components/DesignIcons";
 import { SAHTE_BACKEND } from "@/lib/api/istemci";
@@ -147,6 +146,7 @@ export function Sidebar({ role, desktopOpen, mobileOpen, hidden, onClose, onLogo
   // tüm gruplar kapalı başlar; aynı anda tek grup açık kalır. Açık ekranın grubu kapalıyken de başlığı vurgulanır.
   const [openGroup, setOpenGroup] = useState(null);
   const oturum = useOturum();
+  const anaFirma = oturum.data?.anaFirma;
 
   return (
     <>
@@ -168,9 +168,9 @@ export function Sidebar({ role, desktopOpen, mobileOpen, hidden, onClose, onLogo
         {/* ana firma — her rolde göz önünde: mavi kart, büyük logo */}
         <div className="relative mx-3 mt-1 flex shrink-0 items-center gap-3 overflow-hidden rounded-2xl bg-[#0C34E7] p-3 text-white [box-shadow:0_12px_26px_-14px_rgba(12,52,231,0.8)]">
           <div className="pointer-events-none absolute -right-8 -top-10 h-24 w-24 rounded-full bg-[#D4D1FC] opacity-30 blur-2xl" aria-hidden="true" />
-          <CompanyLogo name={anaFirma.ad} size={48} tone="light" className="relative shrink-0" />
+          <CompanyLogo name={anaFirma?.unvan || "N Kolay Bayim"} size={48} tone="light" className="relative shrink-0" />
           <div className="relative min-w-0 leading-tight">
-            <p className="truncate text-[15px] font-extrabold">{anaFirma.ad}</p>
+            <p className="truncate text-[15px] font-extrabold">{anaFirma?.unvan || "…"}</p>
             <p className="mt-0.5 truncate text-[11px] font-medium text-white/75">Ana Firma · B2B Bayi Ağı</p>
           </div>
         </div>

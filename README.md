@@ -56,9 +56,8 @@ lib/
   api/                  uç nokta fonksiyonları (istemci.js tek fetch noktası, hata.js ApiHatasi, oturum.js …)
   sorgular/             React Query kancaları (anahtarlar.js önbellek anahtarları, saglayici.js QueryClient)
   bicim.js              kuruş → ₺, ISO → tarih; etiketler.js kod → ekran etiketi
-  roles.js              3 rol
+  roles.js              3 rol (rol değiştirici etiketleri)
   nav.js                role göre menü (şartname s.2)
-  mockData.js           eski örnek veri — ekranlar API'ye taşındıkça silinecek
 mocks/
   baslat.js             MSW servis çalışanını başlatır (yalnızca tarayıcı, NEXT_PUBLIC_API_MOCK=true)
   db/tohum.js           başlangıç verisi, ham biçim (kuruş, ISO, kod) · db/depo.js bellek içi tablolar + sessionStorage
@@ -80,7 +79,8 @@ yükleniyor / hata / boş durumları `components/bento/durumlar.js`'ten gelir.
 
 ## Notlar
 
-- Bu bir mockup'tır; servis çağrısı yoktur. Hazır olmayan menü öğeleri henüz bir ekrana gitmez.
+- Tüm ekranlar `/api/v1` uç noktalarıyla çalışır; örnek veri yalnızca sahte backend'in tohumunda (`mocks/db/tohum.js`) bulunur,
+  ekranlar ona hiç erişmez. Hazır olmayan menü öğeleri henüz bir ekrana gitmez.
 - Ekran içerikleri ve kuralları N Kolay Bayim şartnamesine (10 sayfalık PDF) göredir.
 - Arşivdeki bir tasarımı geri almak için satır başlarındaki `// ` (boş satırlarda `//`) kaldırılıp
   dosya eski yerine (dosyanın ilk satırlarında yazar) taşınmalı.
