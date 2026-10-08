@@ -23,7 +23,7 @@ function FaturaYukle({ satir, onYuklendi, onClose }) {
   const yukle = useFaturaYukle();
   const [faturaNo, setFaturaNo] = useState("");
   const [faturaTarihi, setFaturaTarihi] = useState("");
-  const [tutarMetni, setTutarMetni] = useState(tl(islem.tutarKurus, { isaret: false }));
+  const [tutarMetni, setTutarMetni] = useState(tl(islem.tutarKurus, { kurusGoster: true, isaret: false }));
   const [dosya, setDosya] = useState(null);
   const [denendi, setDenendi] = useState(false);
   const [sunucuHatalari, setSunucuHatalari] = useState({});

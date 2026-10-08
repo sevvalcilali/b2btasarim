@@ -13,13 +13,13 @@ import { LISTELI, MusteriBolumu, hataBaglayici, useMusteriSecimi } from "../odem
 import { Konum, inputCls, Alan, FormBolum } from "../ortak";
 import { HOME } from "../sayfalar";
 import { CARD, FOCUS } from "../tema";
-import { rakamlar } from "../yardimci";
+import { rakamlar, useGecikmeli } from "../yardimci";
 
 export function ManuelOdeme({ role, meta, onNavigate, onerilenCari }) {
   const m = useMusteriSecimi(role, onerilenCari);
   const { tur, secili, kendi, kendiKarti, cariAdi } = m;
   const [tutarMetni, setTutarMetni] = useState("");
-  const [taksit, setTaksit] = useState(1);
+  const [taksit, setTaksit] = useState(null); // null → listenin ilk seçeneği
   const [aciklama, setAciklama] = useState("");
   const [kart, setKart] = useState({ isim: "", no: "", skt: "", cvv: "" });
   const [beyan, setBeyan] = useState(false);
@@ -32,11 +32,14 @@ export function ManuelOdeme({ role, meta, onNavigate, onerilenCari }) {
 
   const tutarKurus = kurusCoz(tutarMetni);
   const gecerliTutar = Number.isFinite(tutarKurus) && tutarKurus > 0;
-  const kosul = useTaksitSecenekleri({ tutarKurus: gecerliTutar ? tutarKurus : undefined, musteriTuru: tur, musteriCariNo: LISTELI.has(tur) ? secili?.cariNo : undefined });
+  // taksit tablosu tutar yazılırken her tuşta değil, yazma durunca istenir
+  const gecikmeliTutar = useGecikmeli(gecerliTutar ? tutarKurus : "");
+  const kosul = useTaksitSecenekleri({ tutarKurus: gecikmeliTutar || undefined, musteriTuru: tur, musteriCariNo: LISTELI.has(tur) ? secili?.cariNo : undefined });
   const taksitler = kosul.data?.taksitler || [];
   const limit = kosul.data?.limitKurus || null;
   const profil = kosul.data?.vadeProfil || null;
-  const secilenTaksit = taksitler.includes(taksit) ? taksit : 1;
+  // bayinin tek çekimi kapalı olabilir: varsayılan, sunucunun açtığı ilk seçenek
+  const secilenTaksit = taksitler.includes(taksit) ? taksit : taksitler[0] ?? 1;
   const secenek = (n) => kosul.data?.secenekler.find((s) => s.taksit === n) || { taksit: n, vadeFarkiKurus: 0, toplamKurus: gecerliTutar ? tutarKurus : 0, aylikKurus: 0 };
   const ozet = secenek(secilenTaksit);
 
@@ -91,7 +94,7 @@ export function ManuelOdeme({ role, meta, onNavigate, onerilenCari }) {
   const yeniOdeme = () => {
     m.sifirla();
     setTutarMetni("");
-    setTaksit(1);
+    setTaksit(null);
     setAciklama("");
     setKart({ isim: "", no: "", skt: "", cvv: "" });
     setBeyan(false);

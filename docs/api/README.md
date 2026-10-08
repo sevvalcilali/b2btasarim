@@ -69,6 +69,21 @@ sözleşmeye uç nokta → `lib/api` fonksiyonu → `lib/sorgular` kancası → 
 - **Geçiş:** `NEXT_PUBLIC_API_MOCK=false` ve `NEXT_PUBLIC_API_URL=<backend>/api/v1`; servisler tek tek de bağlanabilir
   (MSW eşleşmeyen isteği geçirir).
 
+## Gerçek backend'e geçmeden önce (ön yüzde yapılacaklar)
+
+Sahte backend'de etkisi olmayan, gerçek serviste önem kazanan noktalar (code review, 8 Ekim 2026):
+
+1. **Idempotency-Key** ödeme denemesi başlarken üretilip kesin cevap gelene kadar aynı kalmalı (`lib/api/odemeler.js`);
+   bugün her çağrıda yeni anahtar üretiliyor, zaman aşımı sonrası "Yeniden Dene" ikinci çekim yaratabilir.
+2. **Açılışta rol:** kayıtlı rol mount sonrası uygulanıyor; ilk istekler varsayılan kimlikle gidip sonra tekrarlanıyor
+   (`components/RoleContext.js`). Gerçek kimlik akışı gelince rol / token senkron okunmalı.
+3. **Zaman aşımı uyumluluğu:** `AbortSignal.any` / `AbortSignal.timeout` olmayan tarayıcılar için manuel
+   `AbortController` yedeği (`lib/api/istemci.js`).
+4. **Safari pano:** fatura yükleme linki kopyalama, sunucu cevabı beklendiği için Safari'de reddedilebilir
+   (`FaturaYukleme.js` → `LinkKopyala`); linki önce gösterip `KopyalaDugmesi` ile kopyalatmak yeterli.
+5. **Tekrar:** `BayiTanim`, `IptalIade` ve `FaturaYukleme` kendi hata bağlayıcısını yazıyor; `odeme.js`'teki
+   `hataBaglayici` ortak kullanılmalı.
+
 ## Backend ekibinin netleştireceği noktalar
 
 1. Kimlik doğrulama ve klasik panelle ortak oturum (şartname s.10).

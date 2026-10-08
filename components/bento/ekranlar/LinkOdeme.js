@@ -12,7 +12,7 @@ import { LISTELI, MusteriBolumu, hataBaglayici, useMusteriSecimi } from "../odem
 import { Konum, inputCls, Alan, FormBolum, KopyalaDugmesi } from "../ortak";
 import { HOME } from "../sayfalar";
 import { CARD, FOCUS } from "../tema";
-import { rakamlar } from "../yardimci";
+import { rakamlar, useGecikmeli } from "../yardimci";
 
 const KANALLAR = ["SMS", "EPOSTA", "LINK"];
 const GECERLILIK = [1, 3, 7, 30];
@@ -44,7 +44,8 @@ export function LinkOdeme({ role, meta, onNavigate }) {
 
   const tutarKurus = kurusCoz(tutarMetni);
   const gecerliTutar = Number.isFinite(tutarKurus) && tutarKurus > 0;
-  const kosul = useTaksitSecenekleri({ tutarKurus: gecerliTutar ? tutarKurus : undefined, musteriTuru: tur, musteriCariNo: LISTELI.has(tur) ? secili?.cariNo : undefined });
+  const gecikmeliTutar = useGecikmeli(gecerliTutar ? tutarKurus : "");
+  const kosul = useTaksitSecenekleri({ tutarKurus: gecikmeliTutar || undefined, musteriTuru: tur, musteriCariNo: LISTELI.has(tur) ? secili?.cariNo : undefined });
   const taksitler = kosul.data?.taksitler || [];
   const limit = kosul.data?.limitKurus || null;
   const profil = kosul.data?.vadeProfil || null;
@@ -55,7 +56,8 @@ export function LinkOdeme({ role, meta, onNavigate }) {
   const hatalar = { ...m.hatalar };
   if (!gecerliTutar) hatalar.tutarKurus = "Tutar girin.";
   else if (limit && tutarKurus > limit) hatalar.tutarKurus = `İşlem bazlı ödeme limiti ${tl(limit)}.`;
-  if (taksitler.length && acikTaksitler.length === 0) hatalar.taksitler = "En az bir taksit seçeneği açık olmalı.";
+  if (!kosul.data) hatalar.taksitler = "Taksit seçenekleri yükleniyor; bir an bekleyin.";
+  else if (acikTaksitler.length === 0) hatalar.taksitler = "En az bir taksit seçeneği açık olmalı.";
   if (kanal === "SMS" && rakamlar(tel).length < 10) hatalar.hedef = "Linkin gönderileceği telefonu girin.";
   if (kanal === "EPOSTA" && !/^\S+@\S+\.\S+$/.test(email)) hatalar.hedef = "Linkin gönderileceği e-postayı girin.";
   if (!kendiKarti && !beyan) hatalar.faturaBeyani = "Müşteri kartıyla ödemede beyanı onaylayın.";

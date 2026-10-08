@@ -159,7 +159,11 @@ function ChartCard({ hacim }) {
   const expandRef = useRef(null);
   // grafik bin ₺ ile çizer; eksen 250K'nın katına yuvarlanır
   const week = hacim.gunler.map((g) => ({ d: gunKisa(g.gun), k: Math.round(g.tutarKurus / 100000) }));
-  const axisMax = Math.max(250, Math.ceil(Math.max(...week.map((w) => w.k)) / 250) * 250);
+  const axisMax = Math.max(250, Math.ceil(Math.max(0, ...week.map((w) => w.k)) / 250) * 250);
+  // veri yok ya da tamamı sıfır: grafik çizilmez (yeni firma, hareketsiz hafta)
+  const bos = week.length === 0 || week.every((w) => w.k === 0);
+  const grafik = (large) =>
+    bos ? <BosDurum baslik="Bu hafta işlem hacmi yok" aciklama="Hacim oluştuğunda grafik burada görünür." /> : type === "bar" ? <BarChart week={week} axisMax={axisMax} large={large} /> : <LineChart week={week} large={large} />;
 
   useEffect(() => {
     try {
@@ -207,7 +211,7 @@ function ChartCard({ hacim }) {
         </div>
       </div>
 
-      {type === "bar" ? <BarChart week={week} axisMax={axisMax} /> : <LineChart week={week} />}
+      {grafik(false)}
 
       {expanded && (
         <Pencere baslik="Haftalık İşlem Hacmi" altBaslik={subtitle} onClose={close}>
@@ -215,7 +219,7 @@ function ChartCard({ hacim }) {
             <TrendBadge degisim={hacim.degisimYuzde} />
             <ChartTypeToggle type={type} onChange={choose} />
           </div>
-          {type === "bar" ? <BarChart week={week} axisMax={axisMax} large /> : <LineChart week={week} large />}
+          {grafik(true)}
         </Pencere>
       )}
     </section>
@@ -304,8 +308,8 @@ function LineChart({ week, large = false }) {
   const W = 640;
   const H = 200;
   const values = week.map((w) => w.k);
-  const max = Math.max(...values);
-  const step = (W - 24) / (values.length - 1);
+  const max = Math.max(...values) || 1;
+  const step = (W - 24) / Math.max(values.length - 1, 1);
   const pts = values.map((v, i) => [12 + i * step, H - 12 - (v / max) * (H - 52)]);
   const line = curveThrough(pts);
   const area = `${line} L ${pts[pts.length - 1][0].toFixed(1)} ${H} L ${pts[0][0].toFixed(1)} ${H} Z`;
