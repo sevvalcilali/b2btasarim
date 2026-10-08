@@ -7,6 +7,7 @@ import { ETIKET, durumTonu, etiket } from "@/lib/etiketler";
 import { useIslemler } from "@/lib/sorgular/islemler";
 import { BosDurum, HataKutusu, Yukleniyor } from "../durumlar";
 import { csvIndir, csvTutar } from "@/lib/disaAktar";
+import { SiraliBaslik, siralamaDegistir } from "../tablo";
 import { Konum } from "../ortak";
 import { CARD, FOCUS } from "../tema";
 import { useGecikmeli } from "../yardimci";
@@ -32,8 +33,10 @@ export function IslemDetaylari({ role, meta, onHome }) {
   const [odemeTipi, setOdemeTipi] = useState("");
   const [musteriTuru, setMusteriTuru] = useState("");
   const q = useGecikmeli(arama.trim());
+  const [siralama, setSiralama] = useState({ alan: "tarih", yon: "desc" }); // sayfalı liste: sıralama sunucuda
+  const sirala = (alan) => setSiralama((s) => siralamaDegistir(s, alan, alan === "islemNo" ? "asc" : "desc"));
 
-  const sorgu = useIslemler({ durum: durum === "TUMU" ? undefined : durum, musteriTuru: musteriTuru || undefined, odemeTipi: odemeTipi || undefined, q: q || undefined });
+  const sorgu = useIslemler({ durum: durum === "TUMU" ? undefined : durum, musteriTuru: musteriTuru || undefined, odemeTipi: odemeTipi || undefined, q: q || undefined, sira: `${siralama.alan}:${siralama.yon}` });
   const veri = sorgu.data;
   const satirlar = veri?.kayitlar || [];
   const adet = (d) => veri?.sayaclar?.[d] ?? "–";
@@ -156,14 +159,14 @@ export function IslemDetaylari({ role, meta, onHome }) {
               <table className="min-w-full text-[12.5px]">
                 <thead>
                   <tr className="border-y border-[var(--border)] bg-[var(--soft)] text-left text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                    <th scope="col" className={th}>İşlem No</th>
-                    <th scope="col" className={th}>Tarih</th>
+                    <SiraliBaslik alan="islemNo" siralama={siralama} onSirala={sirala} className={th}>İşlem No</SiraliBaslik>
+                    <SiraliBaslik alan="tarih" siralama={siralama} onSirala={sirala} className={th}>Tarih</SiraliBaslik>
                     {yapanGoster && <th scope="col" className={th}>Çekim Yapan</th>}
                     <th scope="col" className={th}>Müşteri Türü</th>
                     <th scope="col" className={th}>Unvan / Cari No</th>
                     <th scope="col" className={th}>Vergi No</th>
                     <th scope="col" className={th}>Ödeme</th>
-                    <th scope="col" className={`${th} text-right`}>Tutar</th>
+                    <SiraliBaslik alan="tutarKurus" siralama={siralama} onSirala={sirala} className={`${th} text-right`}>Tutar</SiraliBaslik>
                     <th scope="col" className={th}>Durum</th>
                   </tr>
                 </thead>

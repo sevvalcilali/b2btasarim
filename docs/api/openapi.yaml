@@ -76,6 +76,8 @@ paths:
         - { name: musteriTuru, in: query, schema: { $ref: "#/components/schemas/MusteriTuru" } }
         - { name: odemeTipi, in: query, schema: { type: string, enum: [MANUEL, LINK] } }
         - { name: q, in: query, schema: { type: string }, description: İşlem no, unvan, cari no, vergi no, kart son 4 hane, çekim yapan unvanı }
+        - { name: firmaId, in: query, schema: { type: string }, description: Yalnız bu firmanın çekimleri (kapsam içinde) }
+        - { name: sira, in: query, schema: { type: string, default: "tarih:desc" }, description: "alan:yon — tarih, tutarKurus, islemNo; asc | desc" }
         - { name: sayfa, in: query, schema: { type: integer, minimum: 1, default: 1 } }
         - { name: boyut, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
       responses:

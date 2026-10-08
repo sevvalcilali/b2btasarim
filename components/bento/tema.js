@@ -72,6 +72,7 @@ export const MOTION_CSS = `
 @keyframes bn-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 @keyframes bn-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
 @keyframes bn-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes bn-slide { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
 @keyframes bn-pop { from { opacity: 0; transform: translateY(-4px) scale(0.97); } to { opacity: 1; transform: none; } }
 .bn-rise { animation: bn-rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) backwards; animation-delay: calc(var(--i, 0) * 55ms); }
 .bn-grow { transform-origin: bottom; animation: bn-grow 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; animation-delay: calc(var(--i, 0) * 60ms + 180ms); }
@@ -80,8 +81,9 @@ export const MOTION_CSS = `
 .bn-wipe { animation: bn-wipe 1s cubic-bezier(0.3, 0.7, 0.2, 1) backwards; }
 .bn-fade { animation: bn-fade 0.18s ease-out backwards; }
 .bn-pop { animation: bn-pop 0.16s ease-out backwards; }
+.bn-slide { animation: bn-slide 0.22s cubic-bezier(0.2, 0.7, 0.2, 1) backwards; }
 @media (prefers-reduced-motion: reduce) {
-  .bn-rise, .bn-grow, .bn-fill, .bn-draw, .bn-wipe, .bn-fade, .bn-pop { animation: none; }
+  .bn-rise, .bn-grow, .bn-fill, .bn-draw, .bn-wipe, .bn-fade, .bn-pop, .bn-slide { animation: none; }
 }
 `;
 

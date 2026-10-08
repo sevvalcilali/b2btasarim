@@ -9,6 +9,7 @@ import { useBayiFaturaOzeti } from "@/lib/sorgular/raporlar";
 import { BosDurum, HataKutusu, Yukleniyor } from "../durumlar";
 import { Konum } from "../ortak";
 import { HOME } from "../sayfalar";
+import { SiraliBaslik, useSiralama } from "../tablo";
 import { CARD, FOCUS } from "../tema";
 
 const DONEMLER = [
@@ -16,6 +17,17 @@ const DONEMLER = [
   ["30g", "Son 30 gün"],
   ["tumu", "Tümü"],
 ];
+
+const FATURA_SUTUNLARI = {
+  firma: (s) => s.firma.unvan,
+  gereken: (s) => s.gereken,
+  yuklenen: (s) => s.yuklenen,
+  bekleyen: (s) => s.bekleyen,
+  reddedilen: (s) => s.reddedilen,
+  bekleyenKurus: (s) => s.bekleyenKurus,
+  tamamlanma: (s) => (s.gereken ? s.yuklenen / s.gereken : null),
+  durum: (s) => s.durum,
+};
 
 export function BayiFaturaOzet({ role, meta, onNavigate }) {
   const altMi = role === ROLES.BAYI;
@@ -25,6 +37,7 @@ export function BayiFaturaOzet({ role, meta, onNavigate }) {
   const veri = sorgu.data;
   const satirlar = veri?.kayitlar || [];
   const toplam = veri?.toplam;
+  const { sirali, siralama, sirala } = useSiralama(satirlar, FATURA_SUTUNLARI);
   /** Fatura gereken işlem yoksa oran yok (null): çubuk boş, yüzde "—" */
   const tamamlanma = (s) => (s.gereken ? (s.yuklenen / s.gereken) * 100 : null);
   const th = "whitespace-nowrap px-4 py-2";
@@ -88,18 +101,18 @@ export function BayiFaturaOzet({ role, meta, onNavigate }) {
             <table className="min-w-full text-[12.5px]">
               <thead>
                 <tr className="border-y border-[var(--border)] bg-[var(--soft)] text-left text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                  <th scope="col" className={th}>Firma</th>
-                  <th scope="col" className={`${th} text-right`}>Gereken</th>
-                  <th scope="col" className={`${th} text-right`}>Yüklenen</th>
-                  <th scope="col" className={`${th} text-right`}>Bekleyen</th>
-                  <th scope="col" className={`${th} text-right`}>Reddedilen</th>
-                  <th scope="col" className={`${th} text-right`}>Bekleyen Tutar</th>
-                  <th scope="col" className={`${th} min-w-[180px]`}>Tamamlanma</th>
-                  <th scope="col" className={th}>Durum</th>
+                  <SiraliBaslik alan="firma" siralama={siralama} onSirala={sirala} className={th}>Firma</SiraliBaslik>
+                  <SiraliBaslik alan="gereken" siralama={siralama} onSirala={sirala} className={`${th} text-right`}>Gereken</SiraliBaslik>
+                  <SiraliBaslik alan="yuklenen" siralama={siralama} onSirala={sirala} className={`${th} text-right`}>Yüklenen</SiraliBaslik>
+                  <SiraliBaslik alan="bekleyen" siralama={siralama} onSirala={sirala} className={`${th} text-right`}>Bekleyen</SiraliBaslik>
+                  <SiraliBaslik alan="reddedilen" siralama={siralama} onSirala={sirala} className={`${th} text-right`}>Reddedilen</SiraliBaslik>
+                  <SiraliBaslik alan="bekleyenKurus" siralama={siralama} onSirala={sirala} className={`${th} text-right`}>Bekleyen Tutar</SiraliBaslik>
+                  <SiraliBaslik alan="tamamlanma" siralama={siralama} onSirala={sirala} className={`${th} min-w-[180px]`}>Tamamlanma</SiraliBaslik>
+                  <SiraliBaslik alan="durum" siralama={siralama} onSirala={sirala} className={th}>Durum</SiraliBaslik>
                 </tr>
               </thead>
               <tbody>
-                {satirlar.map((s, i) => {
+                {sirali.map((s, i) => {
                   const oran = tamamlanma(s);
                   const acik = s.bekleyen + s.reddedilen > 0;
                   return (

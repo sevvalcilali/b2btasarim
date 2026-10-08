@@ -40,16 +40,22 @@ export const islemlerHandlers = [
     const musteriTuru = s.get("musteriTuru");
     const odemeTipi = s.get("odemeTipi");
     const q = (s.get("q") || "").trim();
+    const firmaId = s.get("firmaId"); // çekimi yapan firma (bayi detay paneli)
+    const [siraAlan, siraYon] = (s.get("sira") || "tarih:desc").split(":");
 
     const kaynak = kapsamdakiIslemler(kim);
     // durum dışındaki filtreler: durum sekmelerinin sayıları bunların üzerinden hesaplanır
     const adaylar = kaynak.filter(
       (t) =>
+        (!firmaId || t.cekimYapanId === firmaId) &&
         (!musteriTuru || t.musteriTuru === musteriTuru) &&
         (!odemeTipi || t.odemeTipi === odemeTipi) &&
         (!q || [t.islemNo, t.musteri.unvan, t.musteri.cariNo, t.musteri.vergiNo, t.kartSon4, firmaOzeti(t.cekimYapanId)?.unvan].some((f) => icerir(f, q)))
     );
     const liste = adaylar.filter((t) => !durum || t.durum === durum);
+    // sıralama sunucuda (liste sayfalı): tarih, tutarKurus, islemNo
+    const al = { tarih: (t) => t.tarih, tutarKurus: (t) => t.tutarKurus, islemNo: (t) => t.islemNo }[siraAlan] || ((t) => t.tarih);
+    liste.sort((a, b) => (al(a) < al(b) ? -1 : al(a) > al(b) ? 1 : 0) * (siraYon === "asc" ? 1 : -1));
     const sayfa = sayfala(liste, s);
     return HttpResponse.json({
       ...sayfa,

@@ -10,6 +10,7 @@ import { BosDurum, HataKutusu, Yukleniyor } from "../durumlar";
 import { csvIndir, csvTutar } from "@/lib/disaAktar";
 import { Konum } from "../ortak";
 import { HOME } from "../sayfalar";
+import { SiraliBaslik, useSiralama } from "../tablo";
 import { CARD, FOCUS } from "../tema";
 
 const DONEMLER = [
@@ -17,6 +18,17 @@ const DONEMLER = [
   ["30g", "Son 30 gün"],
   ["tumu", "Tümü"],
 ];
+
+// sütun → sıralama değeri (rapor ekranda sıralanır; tüm satırlar yüklü)
+const OZET_SUTUNLARI = {
+  firma: (s) => s.firma.unvan,
+  islemAdet: (s) => s.islemAdet,
+  ciroKurus: (s) => s.ciroKurus,
+  vadeFarkiKurus: (s) => s.vadeFarkiKurus,
+  iptalIadeKurus: (s) => s.iptalIadeKurus,
+  hesabaGececekKurus: (s) => s.hesabaGececekKurus,
+  durum: (s) => s.durum,
+};
 
 export function BayiOzet({ role, meta, onNavigate }) {
   const altMi = role === ROLES.BAYI;
@@ -28,6 +40,7 @@ export function BayiOzet({ role, meta, onNavigate }) {
   const satirlar = veri?.kayitlar || [];
   const toplam = veri?.toplam;
   const enYuksek = Math.max(1, ...satirlar.map((s) => s.ciroKurus));
+  const { sirali, siralama, sirala } = useSiralama(satirlar, OZET_SUTUNLARI);
   const basariOrani = (s) => (s.islemAdet ? (s.basariliAdet / s.islemAdet) * 100 : 0);
   const secimCls = (aktif) =>
     `inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[12px] transition ${aktif ? "bg-[var(--brand)] font-bold text-white" : "bg-[var(--soft)] font-semibold text-[var(--fg-2)] hover:text-[var(--brand-text)]"} ${FOCUS}`;
@@ -107,17 +120,17 @@ export function BayiOzet({ role, meta, onNavigate }) {
             <table className="min-w-full text-[12.5px]">
               <thead>
                 <tr className="border-y border-[var(--border)] bg-[var(--soft)] text-left text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                  <th scope="col" className={th}>Firma</th>
-                  <th scope="col" className={th}>İşlem</th>
-                  <th scope="col" className={`${th} min-w-[200px]`}>Ciro (başarılı)</th>
-                  <th scope="col" className={`${th} text-right`}>Vade Farkı</th>
-                  <th scope="col" className={`${th} text-right`}>İptal / İade</th>
-                  <th scope="col" className={`${th} text-right`}>Hesaba Geçecek</th>
-                  <th scope="col" className={th}>Durum</th>
+                  <SiraliBaslik alan="firma" siralama={siralama} onSirala={sirala} className={th}>Firma</SiraliBaslik>
+                  <SiraliBaslik alan="islemAdet" siralama={siralama} onSirala={sirala} className={th}>İşlem</SiraliBaslik>
+                  <SiraliBaslik alan="ciroKurus" siralama={siralama} onSirala={sirala} className={`${th} min-w-[200px]`}>Ciro (başarılı)</SiraliBaslik>
+                  <SiraliBaslik alan="vadeFarkiKurus" siralama={siralama} onSirala={sirala} className={`${th} text-right`}>Vade Farkı</SiraliBaslik>
+                  <SiraliBaslik alan="iptalIadeKurus" siralama={siralama} onSirala={sirala} className={`${th} text-right`}>İptal / İade</SiraliBaslik>
+                  <SiraliBaslik alan="hesabaGececekKurus" siralama={siralama} onSirala={sirala} className={`${th} text-right`}>Hesaba Geçecek</SiraliBaslik>
+                  <SiraliBaslik alan="durum" siralama={siralama} onSirala={sirala} className={th}>Durum</SiraliBaslik>
                 </tr>
               </thead>
               <tbody>
-                {satirlar.map((s, i) => (
+                {sirali.map((s, i) => (
                   <tr key={s.firma.firmaId} className={`transition-colors hover:bg-[var(--soft)] ${i > 0 ? "border-t border-[var(--border)]" : ""}`}>
                     <td className={td}>
                       <span className="block font-semibold text-[var(--fg)]">{s.firma.unvan}</span>

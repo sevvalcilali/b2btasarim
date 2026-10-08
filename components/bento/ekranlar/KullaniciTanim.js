@@ -10,6 +10,7 @@ import { BosDurum, HataKutusu, Yukleniyor } from "../durumlar";
 import { hataBaglayici } from "../odeme";
 import { Alan, Bildirim, Konum, Pencere, inputCls } from "../ortak";
 import { HOME } from "../sayfalar";
+import { SiraliBaslik, useSiralama } from "../tablo";
 import { CARD, FOCUS } from "../tema";
 import { rakamlar, useGecikmeli } from "../yardimci";
 
@@ -19,6 +20,7 @@ const YETKI_TONU = {
   ODEME: "bg-[var(--success-soft)] text-[var(--success-text)]",
   RAPORLAMA: "bg-[var(--soft-2)] text-[var(--fg-2)]",
 };
+const KULLANICI_SUTUNLARI = { adSoyad: (k) => k.adSoyad, yetki: (k) => ["YONETICI", "ODEME", "RAPORLAMA"].indexOf(k.yetki), sonGiris: (k) => k.sonGiris, durum: (k) => k.durum };
 const basHarfler = (ad) =>
   ad
     .split(/\s+/)
@@ -35,6 +37,7 @@ export function KullaniciTanim({ meta, onNavigate }) {
   const veri = sorgu.data;
   const satirlar = veri?.kayitlar || [];
   const duzenlenebilir = veri?.duzenlenebilir ?? false;
+  const { sirali, siralama, sirala } = useSiralama(satirlar, KULLANICI_SUTUNLARI);
   const [duzenlenen, setDuzenlenen] = useState(null); // null: kapalı · "yeni" · kullanıcı kaydı
   const [bildirim, setBildirim] = useState(null);
   const bildirimBitti = useCallback(() => setBildirim(null), []);
@@ -127,16 +130,16 @@ export function KullaniciTanim({ meta, onNavigate }) {
             <table className="min-w-full text-[12.5px]">
               <thead>
                 <tr className="border-y border-[var(--border)] bg-[var(--soft)] text-left text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                  <th scope="col" className={th}>Kullanıcı</th>
+                  <SiraliBaslik alan="adSoyad" siralama={siralama} onSirala={sirala} className={th}>Kullanıcı</SiraliBaslik>
                   <th scope="col" className={th}>Telefon</th>
-                  <th scope="col" className={th}>Yetki</th>
-                  <th scope="col" className={th}>Son Giriş</th>
-                  <th scope="col" className={th}>Durum</th>
+                  <SiraliBaslik alan="yetki" siralama={siralama} onSirala={sirala} className={th}>Yetki</SiraliBaslik>
+                  <SiraliBaslik alan="sonGiris" siralama={siralama} onSirala={sirala} className={th}>Son Giriş</SiraliBaslik>
+                  <SiraliBaslik alan="durum" siralama={siralama} onSirala={sirala} className={th}>Durum</SiraliBaslik>
                   {duzenlenebilir && <th scope="col" className={`${th} text-right`}>İşlem</th>}
                 </tr>
               </thead>
               <tbody>
-                {satirlar.map((k, i) => (
+                {sirali.map((k, i) => (
                   <tr key={k.kullaniciId} className={`transition-colors hover:bg-[var(--soft)] ${i > 0 ? "border-t border-[var(--border)]" : ""}`}>
                     <td className={td}>
                       <span className="flex items-center gap-2.5">

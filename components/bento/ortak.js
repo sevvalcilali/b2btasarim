@@ -62,6 +62,51 @@ export function Pencere({ baslik, altBaslik, onClose, genislik = "max-w-5xl", ch
   );
 }
 
+// Sağdan açılan detay paneli (çekmece): liste satırının ayrıntısı, listeden ayrılmadan. Pencere ile aynı erişilebilirlik.
+export function YanPanel({ baslik, altBaslik, onClose, genislik = "max-w-xl", altBar, children }) {
+  const closeRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const baslikId = `bn-panel-${useId().replace(/:/g, "")}`;
+
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKey = (e) => e.key === "Escape" && onCloseRef.current();
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, []);
+
+  const root = typeof document !== "undefined" ? document.getElementById("bn-root") : null;
+  if (!root) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="bn-fade absolute inset-0 bg-[rgba(15,18,40,0.45)] backdrop-blur-[1px]" onClick={onClose} aria-hidden="true" />
+      <aside role="dialog" aria-modal="true" aria-labelledby={baslikId} className={`bn-slide relative flex h-full w-full flex-col border-l border-[var(--border)] bg-[var(--surface)] [box-shadow:var(--pop-shadow)] ${genislik}`}>
+        <div className="flex items-start justify-between gap-3 border-b border-[var(--border)] px-5 py-4">
+          <div className="min-w-0">
+            <h2 id={baslikId} className="truncate text-base font-bold text-[var(--fg)]">
+              {baslik}
+            </h2>
+            {altBaslik && <p className="mt-0.5 text-xs text-[var(--muted)]">{altBaslik}</p>}
+          </div>
+          <button ref={closeRef} type="button" onClick={onClose} aria-label="Kapat" title="Kapat (Esc)" className={`grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--soft)] text-[var(--fg-2)] ring-1 ring-[var(--border)] transition hover:text-[var(--brand-text)] ${FOCUS}`}>
+            <I name="x" size={16} />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
+        {altBar && <div className="flex flex-col-reverse gap-2 border-t border-[var(--border)] px-5 py-3 sm:flex-row sm:justify-end">{altBar}</div>}
+      </aside>
+    </div>,
+    root
+  );
+}
+
 // Sayfa başlığının üstündeki konum satırı: Ana Sayfa › grup › ekran
 export function Konum({ onHome, yol }) {
   return (

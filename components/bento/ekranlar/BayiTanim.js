@@ -6,12 +6,14 @@ import { useCallback, useEffect, useState } from "react";
 import { ROLES } from "@/lib/roles";
 import I from "@/components/DesignIcons";
 import { ApiHatasi } from "@/lib/api/hata";
-import { kurusCoz, sayi, tl, yuzde } from "@/lib/bicim";
+import { kurusCoz, sayi, tarihSaat, tl, yuzde } from "@/lib/bicim";
 import { durumTonu, etiket } from "@/lib/etiketler";
 import { useBayi, useBayiGuncelle, useBayiOlustur, useBayiler, useMusteriOlustur } from "@/lib/sorgular/bayiler";
+import { useIslemler } from "@/lib/sorgular/islemler";
 import { useFirma, useUyeIsyerleri, useVadeFarkiProfilleri } from "@/lib/sorgular/tanimlar";
 import { BosDurum, HataKutusu, Yukleniyor } from "../durumlar";
-import { Konum, Bildirim, inputCls, Alan, FormBolum } from "../ortak";
+import { Konum, Bildirim, inputCls, Alan, FormBolum, YanPanel } from "../ortak";
+import { EylemMenusu, SiraliBaslik, useSiralama } from "../tablo";
 import { HOME } from "../sayfalar";
 import { CARD, FOCUS } from "../tema";
 import { rakamlar, useGecikmeli } from "../yardimci";
@@ -19,6 +21,15 @@ import { rakamlar, useGecikmeli } from "../yardimci";
 const TUM_TAKSITLER = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 const taksitOzeti = (l) => l.map((n) => (n === 1 ? "Tek" : n)).join(", ");
 const profilAdi = (p) => (p ? `${p.ad.replace("Vade Farkı ", "")} · ${yuzde(p.oranYuzde, 2)}` : "—");
+// sütun → sıralama değeri (liste ekranda sıralanır; tüm kayıtlar yüklü)
+const BAYI_SUTUNLARI = {
+  unvan: (b) => b.unvan,
+  bagli: (b) => b.bagli?.unvan,
+  vadeProfil: (b) => b.vadeProfil?.oranYuzde ?? null,
+  islemLimitiKurus: (b) => b.islemLimitiKurus,
+  altBayiSayisi: (b) => b.altBayiSayisi ?? null,
+  durum: (b) => b.durum,
+};
 
 export function BayiListesi({ role, meta, tumAltBayiler, vurgu, kayitAdi, onNavigate }) {
   const altListe = role === ROLES.BAYI || tumAltBayiler;
@@ -32,6 +43,8 @@ export function BayiListesi({ role, meta, tumAltBayiler, vurgu, kayitAdi, onNavi
   const veri = sorgu.data;
   const satirlar = veri?.kayitlar || [];
   const duzenlenebilir = veri?.duzenlenebilir ?? !tumAltBayiler;
+  const { sirali, siralama, sirala } = useSiralama(satirlar, BAYI_SUTUNLARI);
+  const [detay, setDetay] = useState(null); // sağ panelde açık bayi (cari no)
 
   // tanımlamadan dönüşte: kaydedilen satır vurgulanır, kısa bilgi gösterilir
   const [bildirim, setBildirim] = useState(null);
@@ -116,29 +129,29 @@ export function BayiListesi({ role, meta, tumAltBayiler, vurgu, kayitAdi, onNavi
             <table className="min-w-full text-[12.5px]">
               <thead>
                 <tr className="border-y border-[var(--border)] bg-[var(--soft)] text-left text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                  <th scope="col" className={th}>Unvan / Cari · Vergi No</th>
+                  <SiraliBaslik alan="unvan" siralama={siralama} onSirala={sirala} className={th}>Unvan / Cari · Vergi No</SiraliBaslik>
                   <th scope="col" className={th}>İletişim</th>
-                  {tumAltBayiler && <th scope="col" className={th}>Bağlı Bayi</th>}
-                  <th scope="col" className={th}>Vade Profili</th>
+                  {tumAltBayiler && <SiraliBaslik alan="bagli" siralama={siralama} onSirala={sirala} className={th}>Bağlı Bayi</SiraliBaslik>}
+                  <SiraliBaslik alan="vadeProfil" siralama={siralama} onSirala={sirala} className={th}>Vade Profili</SiraliBaslik>
                   <th scope="col" className={th}>Taksitler</th>
-                  <th scope="col" className={`${th} text-right`}>İşlem Limiti</th>
-                  {!altListe && <th scope="col" className={th}>Alt Bayi</th>}
-                  <th scope="col" className={th}>Durum</th>
-                  {duzenlenebilir && (
-                    <th scope="col" className={th}>
-                      <span className="sr-only">İşlemler</span>
-                    </th>
-                  )}
+                  <SiraliBaslik alan="islemLimitiKurus" siralama={siralama} onSirala={sirala} className={`${th} text-right`}>İşlem Limiti</SiraliBaslik>
+                  {!altListe && <SiraliBaslik alan="altBayiSayisi" siralama={siralama} onSirala={sirala} className={th}>Alt Bayi</SiraliBaslik>}
+                  <SiraliBaslik alan="durum" siralama={siralama} onSirala={sirala} className={th}>Durum</SiraliBaslik>
+                  <th scope="col" className={th}>
+                    <span className="sr-only">İşlemler</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {satirlar.map((b, i) => (
+                {sirali.map((b, i) => (
                   <tr
                     key={b.cariNo}
                     className={`transition-colors hover:bg-[var(--soft)] ${i > 0 ? "border-t border-[var(--border)]" : ""} ${vurgu === b.cariNo ? "bg-[var(--success-soft)]" : ""}`}
                   >
                     <td className={td}>
-                      <span className="block font-semibold text-[var(--fg)]">{b.unvan}</span>
+                      <button type="button" onClick={() => setDetay(b.cariNo)} title="Detayı aç" className={`block rounded text-left font-semibold text-[var(--fg)] hover:text-[var(--brand-text)] hover:underline ${FOCUS}`}>
+                        {b.unvan}
+                      </button>
                       <span className="block text-[11px] tabular-nums text-[var(--muted)]">
                         {b.cariNo} · VKN {b.vergiNo}
                       </span>
@@ -160,30 +173,16 @@ export function BayiListesi({ role, meta, tumAltBayiler, vurgu, kayitAdi, onNavi
                     <td className={td}>
                       <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${durumTonu(b.durum)}`}>{etiket("kayitDurumu", b.durum)}</span>
                     </td>
-                    {duzenlenebilir && (
-                      <td className={`${td} text-right`}>
-                        <div className="flex items-center justify-end gap-1.5">
-                          {b.durum === "AKTIF" && (
-                            <button
-                              type="button"
-                              onClick={() => onNavigate("/odeme/manuel", { musteri: b.cariNo })}
-                              title={`${b.unvan} adına cari karttan ödeme al`}
-                              className={`inline-flex h-8 items-center gap-1 rounded-full bg-[var(--brand)] px-3 text-[12px] font-bold text-white transition hover:brightness-110 ${FOCUS}`}
-                            >
-                              <I name="wallet" size={13} />
-                              Ödeme Al
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => onNavigate("/bayi-tanim/tanimlama", { duzenle: b.cariNo })}
-                            className={`inline-flex h-8 items-center rounded-full border border-[var(--border-strong)] px-3 text-[12px] font-semibold text-[var(--fg-2)] transition hover:border-[var(--brand)] hover:text-[var(--brand-text)] ${FOCUS}`}
-                          >
-                            Düzenle
-                          </button>
-                        </div>
-                      </td>
-                    )}
+                    <td className={`${td} text-right`}>
+                      <EylemMenusu
+                        etiket={`${b.unvan} işlemleri`}
+                        ogeler={[
+                          { etiket: "Detay", ikon: "panel", onClick: () => setDetay(b.cariNo) },
+                          duzenlenebilir && { etiket: "Düzenle", ikon: "edit", onClick: () => onNavigate("/bayi-tanim/tanimlama", { duzenle: b.cariNo }) },
+                          duzenlenebilir && b.durum === "AKTIF" && { etiket: "Ödeme Al", ikon: "wallet", onClick: () => onNavigate("/odeme/manuel", { musteri: b.cariNo }) },
+                        ]}
+                      />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -192,8 +191,103 @@ export function BayiListesi({ role, meta, tumAltBayiler, vurgu, kayitAdi, onNavi
           </div>
         )}
       </section>
+      {detay && <BayiDetayPaneli cariNo={detay} duzenlenebilir={duzenlenebilir} onClose={() => setDetay(null)} onNavigate={onNavigate} />}
       {bildirim && <Bildirim metin={bildirim} onBitti={bildirimBitti} />}
     </>
+  );
+}
+
+// Sağ panel: bayinin kimliği, koşulları ve son işlemleri — veri: GET /bayiler/{cariNo}, GET /islemler?firmaId=&boyut=5
+function BayiDetayPaneli({ cariNo, duzenlenebilir, onClose, onNavigate }) {
+  const bayi = useBayi(cariNo);
+  const islemler = useIslemler({ firmaId: cariNo, boyut: 5 });
+  const b = bayi.data;
+  const Satir = ({ ad, children }) => (
+    <div className="flex items-start justify-between gap-4 py-1.5 text-[12.5px]">
+      <dt className="shrink-0 text-[var(--muted)]">{ad}</dt>
+      <dd className="text-right font-semibold text-[var(--fg)]">{children}</dd>
+    </div>
+  );
+  const dugme = (birincil) =>
+    `inline-flex h-10 items-center justify-center gap-1.5 rounded-full px-5 text-[13px] font-bold transition ${birincil ? "bg-[var(--brand)] text-white hover:brightness-110" : "border border-[var(--border-strong)] text-[var(--fg-2)] hover:border-[var(--brand)]"} ${FOCUS}`;
+  return (
+    <YanPanel
+      baslik={b?.unvan || "Bayi"}
+      altBaslik={b ? `${etiket("firmaTuru", b.tur)} · ${b.cariNo} · VKN ${b.vergiNo}` : undefined}
+      onClose={onClose}
+      altBar={
+        b &&
+        duzenlenebilir && (
+          <>
+            <button type="button" onClick={() => onNavigate("/bayi-tanim/tanimlama", { duzenle: b.cariNo })} className={dugme(false)}>
+              <I name="edit" size={14} />
+              Düzenle
+            </button>
+            {b.durum === "AKTIF" && (
+              <button type="button" onClick={() => onNavigate("/odeme/manuel", { musteri: b.cariNo })} className={dugme(true)}>
+                <I name="wallet" size={14} />
+                Ödeme Al
+              </button>
+            )}
+          </>
+        )
+      }
+    >
+      {bayi.isPending ? (
+        <Yukleniyor satir={6} baslik={false} />
+      ) : bayi.isError ? (
+        <HataKutusu hata={bayi.error} onTekrar={() => bayi.refetch()} />
+      ) : (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-2">
+            <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${durumTonu(b.durum)}`}>{etiket("kayitDurumu", b.durum)}</span>
+            {b.bagli && <span className="text-[11.5px] text-[var(--muted)]">{b.bagli.unvan} ağında</span>}
+          </div>
+          <section>
+            <h3 className="mb-1 text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">İletişim</h3>
+            <dl className="divide-y divide-[var(--border)]">
+              <Satir ad="Telefon"><span className="tabular-nums">{b.telefon}</span></Satir>
+              <Satir ad="E-posta">{b.email}</Satir>
+              <Satir ad="Adres"><span className="block max-w-[260px]">{b.adres}</span></Satir>
+            </dl>
+          </section>
+          <section>
+            <h3 className="mb-1 text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">Ödeme Koşulları</h3>
+            <dl className="divide-y divide-[var(--border)]">
+              <Satir ad="Vade profili">{profilAdi(b.vadeProfil)}</Satir>
+              <Satir ad="Taksitler"><span className="tabular-nums">{taksitOzeti(b.taksitler)}</span></Satir>
+              <Satir ad="İşlem limiti"><span className="tabular-nums">{tl(b.islemLimitiKurus)}</span></Satir>
+              {b.tur === "BAYI" && <Satir ad="Alt bayi">{sayi(b.altBayiSayisi)} · {b.altBayiYetkisi ? "tanımlayabilir" : "yetkisi yok"}</Satir>}
+              <Satir ad="Üye işyerleri"><span className="tabular-nums">{b.uyeIsyerleri.join(", ") || "—"}</span></Satir>
+            </dl>
+          </section>
+          <section>
+            <h3 className="mb-1 text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">Son İşlemler</h3>
+            {islemler.isPending ? (
+              <Yukleniyor satir={3} baslik={false} />
+            ) : (islemler.data?.kayitlar || []).length === 0 ? (
+              <p className="py-2 text-[12.5px] text-[var(--muted)]">Henüz işlemi yok.</p>
+            ) : (
+              <ul className="divide-y divide-[var(--border)]">
+                {islemler.data.kayitlar.map((t) => (
+                  <li key={t.islemNo} className="flex items-center justify-between gap-3 py-2 text-[12.5px]">
+                    <span className="min-w-0">
+                      <span className="block truncate font-semibold text-[var(--fg)]">{t.musteri.unvan}</span>
+                      <span className="block text-[11px] tabular-nums text-[var(--muted)]">{t.islemNo} · {tarihSaat(t.tarih)}</span>
+                    </span>
+                    <span className="shrink-0 text-right">
+                      <span className="block font-bold tabular-nums text-[var(--fg)]">{tl(t.tutarKurus)}</span>
+                      <span className={`inline-flex rounded-full px-1.5 py-px text-[10.5px] font-bold ${durumTonu(t.durum)}`}>{etiket("islemDurumu", t.durum)}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {islemler.data?.toplam > 5 && <p className="mt-1 text-[11.5px] text-[var(--muted)]">Toplam {sayi(islemler.data.toplam)} işlem · tümü İşlem Detayları'nda</p>}
+          </section>
+        </div>
+      )}
+    </YanPanel>
   );
 }
 
