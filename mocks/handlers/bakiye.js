@@ -1,9 +1,12 @@
 // GET /bakiye/ekstre — üst cari karşısındaki bakiye, borç ve hareketler (şartname s.2: Ana Firma / Bayi Bakiye ve Borç).
+// POST /bakiye/toplu(/onizleme) — ana firma bayilerinin, bayi alt bayilerinin bakiye / borç / limitini dosyadan yükler (s.2, s.10).
 // Hareketler: borç yüklemeleri (tohum) + bu firmanın yaptığı ödemeler, iade ve iptaller (işlem tablosu).
 import { http, HttpResponse } from "msw";
 import { depo } from "../db/depo";
 import { firma, firmaOzeti } from "../kurallar";
-import { gecikme, hata, uc, yetkili } from "./yardimci";
+import { gecikme, hata, kuralHatasi, uc, yetkili } from "./yardimci";
+import { dosyadanCsv, tlCoz } from "../csv";
+import { yonetilenler } from "./bayiler";
 
 const GUN = 86400000;
 const DONEMLER = { "30g": 30, "90g": 90, tumu: null };
@@ -15,7 +18,72 @@ function islemHareketi(t) {
   return null;
 }
 
+/** Dosyayı okuyup satırları doğrular: cari yönetilen bir bayi olmalı, tutarlar ≥ 0, borç limiti aşmamalı */
+async function topluCoz(request, kim) {
+  if (kim.rol === "ALT_BAYI") return { cevap: hata(403, "YETKI_YOK", "Alt bayi bakiye yükleyemez.") };
+  const fd = await request.formData().catch(() => null);
+  if (!fd) return { cevap: hata(400, "GECERSIZ_GOVDE", "Form verisi okunamadı.") };
+  const okunan = await dosyadanCsv(fd);
+  if (okunan.hata) return { cevap: kuralHatasi("DOSYA", okunan.hata, { dosya: okunan.hata }) };
+  if (!okunan.basliklar.includes("carino")) return { cevap: kuralHatasi("BASLIK", "Eksik sütun: cariNo. Şablonu kullanın.", { dosya: "Eksik sütun: cariNo" }) };
+  const bayiler = yonetilenler(kim);
+  const gorulen = new Set();
+  const satirlar = okunan.satirlar.map((s, i) => {
+    const cariNo = String(s.carino || "").trim();
+    const bayi = bayiler.find((f) => f.cariNo === cariNo);
+    const mevcut = (bayi && depo.tablo("bakiyeler")[bayi.firmaId]) || { bakiyeKurus: 0, borcKurus: 0, limitKurus: 0 };
+    const oku = (k, eski) => {
+      const v = tlCoz(s[k]);
+      return v === null ? eski : v;
+    };
+    const girdi = { cariNo, unvan: bayi?.unvan || null, bakiyeKurus: oku("bakiyetl", mevcut.bakiyeKurus), borcKurus: oku("borctl", mevcut.borcKurus), limitKurus: oku("limittl", mevcut.limitKurus), aciklama: String(s.aciklama || "").trim() };
+    const hatalar = {};
+    if (!bayi) hatalar.cariNo = "Bu cari no yönettiğiniz bir bayiye ait değil.";
+    else if (gorulen.has(cariNo)) hatalar.cariNo = "Dosyada aynı cari no birden çok kez var.";
+    gorulen.add(cariNo);
+    for (const k of ["bakiyeKurus", "borcKurus", "limitKurus"]) if (!(Number.isInteger(girdi[k]) && girdi[k] >= 0)) hatalar[k] = "Geçerli bir tutar girin (örn. 12.500,00).";
+    if (!hatalar.borcKurus && !hatalar.limitKurus && girdi.limitKurus && girdi.borcKurus > girdi.limitKurus) hatalar.borcKurus = "Borç, limiti aşamaz.";
+    if (tlCoz(s.bakiyetl) === null && tlCoz(s.borctl) === null && tlCoz(s.limittl) === null) hatalar.bakiyeKurus = "Bakiye, borç ya da limitten en az birini girin.";
+    return { sira: i + 2, girdi, eski: bayi ? { ...mevcut } : null, hatalar, gecerli: Object.keys(hatalar).length === 0, firmaId: bayi?.firmaId };
+  });
+  return { satirlar };
+}
+
+const topluOzet = (satirlar) => ({ toplam: satirlar.length, gecerli: satirlar.filter((s) => s.gecerli).length, hatali: satirlar.filter((s) => !s.gecerli).length, satirlar: satirlar.map(({ firmaId, ...s }) => s) });
+
 export const bakiyeHandlers = [
+  http.post(uc("/bakiye/toplu/onizleme"), async ({ request }) => {
+    await gecikme();
+    const { kim, cevap } = yetkili(request);
+    if (cevap) return cevap;
+    const { satirlar, cevap: hataCevabi } = await topluCoz(request, kim);
+    return hataCevabi || HttpResponse.json(topluOzet(satirlar));
+  }),
+
+  http.post(uc("/bakiye/toplu"), async ({ request }) => {
+    await gecikme();
+    const { kim, cevap } = yetkili(request);
+    if (cevap) return cevap;
+    const { satirlar, cevap: hataCevabi } = await topluCoz(request, kim);
+    if (hataCevabi) return hataCevabi;
+    const gecerliler = satirlar.filter((s) => s.gecerli);
+    depo.guncelle("bakiyeler", (b) => {
+      const yeni = { ...b };
+      for (const s of gecerliler) {
+        const { bakiyeKurus, borcKurus, limitKurus } = s.girdi;
+        yeni[s.firmaId] = { bakiyeKurus, borcKurus, limitKurus, kullanimYuzde: limitKurus ? Math.min(100, Math.round((borcKurus / limitKurus) * 100)) : 0 };
+      }
+      return yeni;
+    });
+    // borç artışı ekstreye hareket olarak düşer
+    const simdi = new Date().toISOString();
+    const hareketler = gecerliler
+      .filter((s) => s.girdi.borcKurus > (s.eski?.borcKurus || 0))
+      .map((s, i) => ({ hareketId: `BH-${Date.now()}-${i}`, firmaId: s.firmaId, tarih: simdi, aciklama: s.girdi.aciklama || "Toplu borç yüklemesi", tutarKurus: s.girdi.borcKurus - (s.eski?.borcKurus || 0) }));
+    if (hareketler.length) depo.guncelle("borcHareketleri", (l) => [...hareketler, ...l]);
+    return HttpResponse.json({ ...topluOzet(satirlar), guncellenen: gecerliler.length, atlanan: satirlar.length - gecerliler.length }, { status: 200 });
+  }),
+
   http.get(uc("/bakiye/ekstre"), async ({ request }) => {
     await gecikme();
     const { kim, cevap } = yetkili(request);

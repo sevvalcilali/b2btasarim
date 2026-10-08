@@ -20,6 +20,7 @@ import { BakiyeBorc } from "@/components/bento/ekranlar/BakiyeBorc";
 import { FirmaBilgileri } from "@/components/bento/ekranlar/FirmaBilgileri";
 import { DuyuruYonetimi, DuyuruPenceresi } from "@/components/bento/ekranlar/Duyuru";
 import { BayiCariSecimi } from "@/components/bento/ekranlar/CariSecimi";
+import { TopluBayiEkleme, TopluBakiyeYukleme } from "@/components/bento/ekranlar/TopluYukleme";
 import { IptalIade } from "@/components/bento/ekranlar/IptalIade";
 import { IslemDetaylari } from "@/components/bento/ekranlar/IslemDetaylari";
 import { LinkOdeme } from "@/components/bento/ekranlar/LinkOdeme";
@@ -213,6 +214,10 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
               kayitAdi={parametre("ad")}
               onNavigate={navigate}
             />
+          ) : current === "/bayi-tanim/excel-ekleme" && role !== ROLES.ALT_BAYI ? (
+            <TopluBayiEkleme role={role} meta={meta} onNavigate={navigate} />
+          ) : current === "/bayi-tanim/bakiye-borc-yukleme" && role !== ROLES.ALT_BAYI ? (
+            <TopluBakiyeYukleme role={role} meta={meta} onNavigate={navigate} />
           ) : current === "/raporlar/bayi-ozet" && role !== ROLES.ALT_BAYI ? (
             <BayiOzet role={role} meta={meta} onNavigate={navigate} />
           ) : current === "/raporlar/bayi-fatura-ozet" && role !== ROLES.ALT_BAYI ? (

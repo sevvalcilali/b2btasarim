@@ -53,6 +53,8 @@ Ekran (components/bento/ekranlar)  →  lib/sorgular (React Query kancaları)  �
 | Firma Bilgileri | `GET /firma` · `PUT /firma/iletisim` | ✅ |
 | Kullanıcı Tanım | `GET/POST /kullanicilar` · `PUT /kullanicilar/{kullaniciId}` | ✅ |
 | Vade Farkı Profil Tanım | `GET/POST /vade-farki-profilleri` · `PUT /vade-farki-profilleri/{id}` | ✅ |
+| Excel ile Toplu Bayi / Alt Bayi Ekleme | `POST /bayiler/toplu/onizleme` · `POST /bayiler/toplu` (multipart) | ✅ |
+| Toplu Bakiye ve Borç Yükleme | `POST /bakiye/toplu/onizleme` · `POST /bakiye/toplu` (multipart) | ✅ |
 | Fatura Yükleme | `GET/POST /faturalar` · `POST /faturalar/{islemNo}/hatirlatma` · `POST /faturalar/{islemNo}/yukleme-linki` | ✅ |
 | Yalnız demo | `POST /demo/sifirla` | ✅ (gerçek backend'de yok) |
 
@@ -101,4 +103,5 @@ Sahte backend'de etkisi olmayan, gerçek serviste önem kazanan noktalar (code r
 4. Bakiye / borç ve ekstre hareketlerinin kaynağı (ERP / cari hesap entegrasyonu?) — demo, borç yüklemelerini ve ödemeleri işlem tablosundan türetir; kur bilgisi kaynağı (TCMB?).
 5. Cari seçimi: "Ana Firma Cari Seçimi" / "Bayi Carisi Seçimi" ana firmanın üye işyerlerinden (s.1) birini seçmek olarak yorumlandı; seçim oturumda tutulur ve ödemeler `uyeIsyeriCariNo` ile işlenir.
 6. Firma Bilgileri: bayi / alt bayinin iletişim bilgisini kendisinin güncelleyebildiği varsayıldı (`PUT /firma/iletisim`); tanım alanları üst firmada kalır.
-7. Vade farkı formülü: sunucu `GET /odeme/taksit-secenekleri` ile hesaplar; mockup varsayımı tutar × oran × (taksit − 1).
+7. Toplu yükleme dosyaları: örnek sunucu yalnız CSV okur (`mocks/csv.js`); gerçek backend .xlsx da kabul etmeli. Sütun adları şablonda; satır doğrulama kuralları bayi tanımıyla aynı (`kimlikHatalari`, `kosulHatalari`).
+8. Vade farkı formülü: sunucu `GET /odeme/taksit-secenekleri` ile hesaplar; mockup varsayımı tutar × oran × (taksit − 1).

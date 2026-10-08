@@ -22,6 +22,8 @@ export const SAYFALAR = {
   "duyuru": "/duyuru",
   "kur": "/odeme/kur",
   "bayi-cari": "/odeme/bayi-cari",
+  "excel-ekleme": "/bayi-tanim/excel-ekleme",
+  "bakiye-borc-yukleme": "/bayi-tanim/bakiye-borc-yukleme",
   "ana-firma-bakiye": "/odeme/ana-firma-bakiye",
   "bayi-bakiye": "/odeme/bayi-bakiye",
 };

@@ -350,6 +350,51 @@ paths:
                       iadeIptalKurus: { $ref: "#/components/schemas/Kurus" }
         "403": { $ref: "#/components/responses/YetkiYok" }
 
+  /bakiye/toplu/onizleme:
+    post:
+      tags: [Panel]
+      summary: Toplu bakiye ve borç yükleme — önizleme
+      description: |
+        Şablon sütunları: cariNo, bakiyeTL, borcTL, limitTL, aciklama. Boş bırakılan tutar değişmez. Ana firma bayilerini,
+        bayi alt bayilerini yükler; cari yönetilen bir bayi olmalı, borç limiti aşamaz. Borç artışı ekstreye hareket olarak düşer.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { type: object, required: [dosya], properties: { dosya: { type: string, format: binary } } }
+      responses:
+        "200":
+          description: Satır satır doğrulama sonucu (girdi + eski değerler)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TopluOnizleme" }
+        "403": { $ref: "#/components/responses/YetkiYok" }
+        "422": { $ref: "#/components/responses/IsKurali" }
+
+  /bakiye/toplu:
+    post:
+      tags: [Panel]
+      summary: Toplu bakiye ve borç yükleme — geçerli satırları uygular
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { type: object, required: [dosya], properties: { dosya: { type: string, format: binary } } }
+      responses:
+        "200":
+          description: Uygulandı
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/TopluOnizleme"
+                  - type: object
+                    properties:
+                      guncellenen: { type: integer }
+                      atlanan: { type: integer }
+        "403": { $ref: "#/components/responses/YetkiYok" }
+        "422": { $ref: "#/components/responses/IsKurali" }
+
   /bayiler:
     get:
       tags: [Bayi Tanım]
@@ -413,6 +458,59 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/HataCevabi" }
               example: { hata: { kod: CARI_CAKISMASI, mesaj: Bu cari no başka bir kayıtta kullanılıyor., alanlar: { cariNo: Bu cari no başka bir kayıtta kullanılıyor. } } }
+        "422": { $ref: "#/components/responses/IsKurali" }
+
+  /bayiler/toplu/onizleme:
+    post:
+      tags: [Bayi Tanım]
+      summary: Excel / CSV ile toplu bayi ekleme — önizleme (hiçbir kayıt yazılmaz)
+      description: |
+        Şablon sütunları: unvan, cariNo, vergiNo, telefon, email, adres, vadeProfilId, taksitler ("1,2,3,6"), islemLimitiTL,
+        altBayiYetkisi (Evet/Hayır, yalnız ana firma), durum. Boş koşullar tanımlayanın kendi sınırlarıyla dolar. Satır kuralları
+        tekil tanımla aynıdır. Ana firma bayi, bayi (yetkisi varsa) alt bayi ekler.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { type: object, required: [dosya], properties: { dosya: { type: string, format: binary, description: .csv ya da .xlsx, en çok 2 MB } } }
+      responses:
+        "200":
+          description: Satır satır doğrulama sonucu
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TopluOnizleme" }
+        "403": { $ref: "#/components/responses/YetkiYok" }
+        "422":
+          description: DOSYA (okunamadı / tür / boyut) ya da BASLIK (eksik sütun); alanlar.dosya
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HataCevabi" }
+
+  /bayiler/toplu:
+    post:
+      tags: [Bayi Tanım]
+      summary: Excel / CSV ile toplu bayi ekleme — geçerli satırları kaydeder, hatalıları atlar
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { type: object, required: [dosya], properties: { dosya: { type: string, format: binary } } }
+      responses:
+        "201":
+          description: Eklenen kayıtlar
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/TopluOnizleme"
+                  - type: object
+                    properties:
+                      eklenen: { type: integer }
+                      atlanan: { type: integer }
+                      kayitlar:
+                        type: array
+                        items: { $ref: "#/components/schemas/Bayi" }
+        "403": { $ref: "#/components/responses/YetkiYok" }
         "422": { $ref: "#/components/responses/IsKurali" }
 
   /bayiler/{cariNo}:
@@ -1216,6 +1314,23 @@ components:
               properties:
                 hedefAdet: { type: integer, description: Hedef rollerdeki aktif kullanıcı }
                 okuyanAdet: { type: integer }
+
+    TopluOnizleme:
+      type: object
+      properties:
+        toplam: { type: integer }
+        gecerli: { type: integer }
+        hatali: { type: integer }
+        satirlar:
+          type: array
+          items:
+            type: object
+            properties:
+              sira: { type: integer, description: Dosyadaki satır (başlık 1) }
+              girdi: { type: object, description: Satırdan çözülen kayıt (bayi: BayiGirdisi; bakiye: cariNo, unvan, bakiyeKurus, borcKurus, limitKurus, aciklama) }
+              eski: { type: [object, "null"], description: Bakiye yüklemede mevcut değerler }
+              hatalar: { type: object, additionalProperties: { type: string } }
+              gecerli: { type: boolean }
 
     Kur:
       type: object
