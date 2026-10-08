@@ -12,7 +12,7 @@ import { useBayi, useBayiGuncelle, useBayiOlustur, useBayiler, useMusteriOlustur
 import { useIslemler } from "@/lib/sorgular/islemler";
 import { useFirma, useUyeIsyerleri, useVadeFarkiProfilleri } from "@/lib/sorgular/tanimlar";
 import { BosDurum, HataKutusu, Yukleniyor } from "../durumlar";
-import { Konum, Bildirim, inputCls, Alan, FormBolum, YanPanel } from "../ortak";
+import { Konum, Bildirim, inputCls, Alan, FormBolum, YanPanel, OnayPenceresi } from "../ortak";
 import { EylemMenusu, SiraliBaslik, useSiralama } from "../tablo";
 import { HOME } from "../sayfalar";
 import { CARD, FOCUS } from "../tema";
@@ -21,6 +21,22 @@ import { rakamlar, useGecikmeli } from "../yardimci";
 const TUM_TAKSITLER = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 const taksitOzeti = (l) => l.map((n) => (n === 1 ? "Tek" : n)).join(", ");
 const profilAdi = (p) => (p ? `${p.ad.replace("Vade Farkı ", "")} · ${yuzde(p.oranYuzde, 2)}` : "—");
+/** Liste kaydından PUT /bayiler/{cariNo} gövdesi: yalnız durum değişir, tanım alanları olduğu gibi gider */
+const bayiGovdesi = (b, durum) => ({
+  tur: b.tur,
+  unvan: b.unvan,
+  cariNo: b.cariNo,
+  vergiNo: b.vergiNo,
+  telefon: b.telefon,
+  email: b.email,
+  adres: b.adres,
+  vadeProfilId: b.vadeProfilId,
+  taksitler: b.taksitler,
+  islemLimitiKurus: b.islemLimitiKurus,
+  uyeIsyerleri: b.uyeIsyerleri,
+  altBayiYetkisi: b.tur === "BAYI" ? b.altBayiYetkisi : undefined,
+  durum,
+});
 // sütun → sıralama değeri (liste ekranda sıralanır; tüm kayıtlar yüklü)
 const BAYI_SUTUNLARI = {
   unvan: (b) => b.unvan,
@@ -47,13 +63,31 @@ export function BayiListesi({ role, meta, tumAltBayiler, vurgu, kayitAdi, onNavi
   const [detay, setDetay] = useState(null); // sağ panelde açık bayi (cari no)
 
   // tanımlamadan dönüşte: kaydedilen satır vurgulanır, kısa bilgi gösterilir
-  const [bildirim, setBildirim] = useState(null);
+  const [bildirim, setBildirim] = useState(null); // { metin, eylem? }
   const bildirimBitti = useCallback(() => setBildirim(null), []);
   useEffect(() => {
     if (!vurgu || !veri) return;
     const satir = veri.kayitlar.find((b) => b.cariNo === vurgu);
-    setBildirim(satir ? `${satir.unvan} kaydedildi.` : `${kayitAdi || vurgu} düzenli müşteri olarak kaydedildi.`);
+    setBildirim({ metin: satir ? `${satir.unvan} kaydedildi.` : `${kayitAdi || vurgu} düzenli müşteri olarak kaydedildi.` });
   }, [vurgu, kayitAdi, veri]);
+
+  // durum değişikliği: pasife alma onay ister, bildirimden geri alınabilir; aktife alma doğrudan
+  const guncelle = useBayiGuncelle();
+  const [pasifeAlinacak, setPasifeAlinacak] = useState(null);
+  const durumDegistir = async (b, durum) => {
+    try {
+      await guncelle.mutateAsync({ cariNo: b.cariNo, govde: bayiGovdesi(b, durum) });
+      setBildirim(
+        durum === "PASIF"
+          ? { metin: `${b.unvan} pasife alındı; ödeme ekranlarında görünmez.`, eylem: { etiket: "Geri al", onClick: () => durumDegistir(b, "AKTIF") } }
+          : { metin: `${b.unvan} yeniden aktif.` }
+      );
+    } catch (err) {
+      setBildirim({ metin: err?.message || "Durum değiştirilemedi." });
+    } finally {
+      setPasifeAlinacak(null);
+    }
+  };
 
   const th = "whitespace-nowrap px-4 py-2";
   const td = "whitespace-nowrap px-4 py-2.5 align-top";
@@ -180,6 +214,7 @@ export function BayiListesi({ role, meta, tumAltBayiler, vurgu, kayitAdi, onNavi
                           { etiket: "Detay", ikon: "panel", onClick: () => setDetay(b.cariNo) },
                           duzenlenebilir && { etiket: "Düzenle", ikon: "edit", onClick: () => onNavigate("/bayi-tanim/tanimlama", { duzenle: b.cariNo }) },
                           duzenlenebilir && b.durum === "AKTIF" && { etiket: "Ödeme Al", ikon: "wallet", onClick: () => onNavigate("/odeme/manuel", { musteri: b.cariNo }) },
+                          duzenlenebilir && (b.durum === "AKTIF" ? { etiket: "Pasife al", ikon: "x", tonu: "danger", onClick: () => setPasifeAlinacak(b) } : { etiket: "Aktife al", ikon: "check", onClick: () => durumDegistir(b, "AKTIF") }),
                         ]}
                       />
                     </td>
@@ -207,7 +242,18 @@ export function BayiListesi({ role, meta, tumAltBayiler, vurgu, kayitAdi, onNavi
         )}
       </section>
       {detay && <BayiDetayPaneli cariNo={detay} duzenlenebilir={duzenlenebilir} onClose={() => setDetay(null)} onNavigate={onNavigate} />}
-      {bildirim && <Bildirim metin={bildirim} onBitti={bildirimBitti} />}
+      {pasifeAlinacak && (
+        <OnayPenceresi
+          baslik={`${pasifeAlinacak.unvan} pasife alınsın mı?`}
+          mesaj={`Pasif ${altListe ? "alt bayi" : "bayi"} ödeme ekranlarındaki müşteri listesinden kalkar; kayıt ve geçmiş işlemler silinmez. Bildirimdeki "Geri al" ile ya da Düzenle'den yeniden aktif edebilirsiniz.`}
+          onayEtiketi="Pasife Al"
+          tonu="danger"
+          mesgul={guncelle.isPending}
+          onOnay={() => durumDegistir(pasifeAlinacak, "PASIF")}
+          onClose={() => setPasifeAlinacak(null)}
+        />
+      )}
+      {bildirim && <Bildirim metin={bildirim.metin} eylem={bildirim.eylem} onBitti={bildirimBitti} />}
     </>
   );
 }

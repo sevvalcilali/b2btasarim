@@ -304,18 +304,53 @@ export function KopyalaDugmesi({ metin, kucuk = false }) {
   );
 }
 
-// Ekranın altında beliren kısa bilgi (toast)
-export function Bildirim({ metin, onBitti }) {
+// Geri alınamayan ya da başkasını etkileyen işlem öncesi onay: arşivleme, pasife alma, talep onayı
+export function OnayPenceresi({ baslik, mesaj, onayEtiketi = "Onayla", tonu = "brand", mesgul = false, onOnay, onClose }) {
+  return (
+    <Pencere baslik={baslik} onClose={onClose} genislik="max-w-md">
+      <p className="text-[13px] leading-relaxed text-[var(--fg-2)]">{mesaj}</p>
+      <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <button type="button" onClick={onClose} className={`inline-flex h-10 items-center justify-center rounded-full border border-[var(--border-strong)] px-5 text-[13px] font-semibold text-[var(--fg-2)] hover:border-[var(--brand)] ${FOCUS}`}>
+          Vazgeç
+        </button>
+        <button
+          type="button"
+          disabled={mesgul}
+          onClick={onOnay}
+          className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-full px-6 text-[13px] font-bold text-white hover:brightness-110 disabled:cursor-wait disabled:opacity-70 ${tonu === "danger" ? "bg-[var(--danger)]" : "bg-[var(--brand)]"} ${FOCUS}`}
+        >
+          {mesgul ? "İşleniyor…" : onayEtiketi}
+        </button>
+      </div>
+    </Pencere>
+  );
+}
+
+// Ekranın altında beliren kısa bilgi (toast). eylem: { etiket, onClick } — "Geri al" gibi; varsa daha uzun kalır.
+export function Bildirim({ metin, onBitti, eylem }) {
+  const eylemVar = !!eylem;
   useEffect(() => {
-    const z = setTimeout(onBitti, 3500);
+    const z = setTimeout(onBitti, eylemVar ? 7000 : 3500);
     return () => clearTimeout(z);
-  }, [metin, onBitti]);
+  }, [metin, onBitti, eylemVar]);
   const root = typeof document !== "undefined" ? document.getElementById("bn-root") : null;
   if (!root) return null;
   return createPortal(
-    <div role="status" className="bn-pop fixed inset-x-3 bottom-4 z-50 mx-auto flex max-w-md items-start gap-2.5 rounded-2xl bg-[var(--fg)] px-4 py-3 text-[12.5px] font-semibold text-[var(--bg)] [box-shadow:var(--pop-shadow)]">
-      <I name="check" size={16} className="mt-px shrink-0" />
-      {metin}
+    <div role="status" className="bn-pop fixed inset-x-3 bottom-4 z-50 mx-auto flex max-w-md items-center gap-2.5 rounded-2xl bg-[var(--fg)] px-4 py-3 text-[12.5px] font-semibold text-[var(--bg)] [box-shadow:var(--pop-shadow)]">
+      <I name="check" size={16} className="shrink-0" />
+      <span className="flex-1">{metin}</span>
+      {eylem && (
+        <button
+          type="button"
+          onClick={() => {
+            onBitti();
+            eylem.onClick();
+          }}
+          className={`shrink-0 rounded-full bg-white/15 px-3 py-1 text-[12px] font-bold text-[var(--bg)] transition hover:bg-white/25 ${FOCUS}`}
+        >
+          {eylem.etiket}
+        </button>
+      )}
     </div>,
     root
   );

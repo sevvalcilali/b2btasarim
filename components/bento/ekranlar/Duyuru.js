@@ -9,7 +9,7 @@ import { durumTonu, etiket } from "@/lib/etiketler";
 import { useDuyuruGuncelle, useDuyuruOkundu, useDuyuruOlustur, useDuyurular } from "@/lib/sorgular/duyurular";
 import { BosDurum, HataKutusu, Yukleniyor } from "../durumlar";
 import { hataBaglayici } from "../odeme";
-import { Alan, Bildirim, Konum, Pencere, inputCls } from "../ortak";
+import { Alan, Bildirim, Konum, Pencere, inputCls, OnayPenceresi } from "../ortak";
 import { HOME } from "../sayfalar";
 import { CARD, FOCUS } from "../tema";
 
@@ -36,13 +36,17 @@ export function DuyuruYonetimi({ meta, onNavigate }) {
   const bildirimBitti = useCallback(() => setBildirim(null), []);
   const yayinda = kayitlar.filter((d) => d.durum === "YAYINDA").length;
 
+  const [arsivlenecek, setArsivlenecek] = useState(null); // onay bekleyen arşivleme
   const durumDegistir = async (d) => {
     const durum = d.durum === "YAYINDA" ? "ARSIV" : "YAYINDA";
     try {
       await guncelle.mutateAsync({ duyuruId: d.duyuruId, govde: { baslik: d.baslik, icerik: d.icerik, hedef: d.hedef, durum } });
-      setBildirim(durum === "YAYINDA" ? `"${d.baslik}" yeniden yayında.` : `"${d.baslik}" arşivlendi.`);
+      // arşivleme geri alınabilir: bildirimdeki "Geri al" duyuruyu yeniden yayına alır
+      setBildirim(durum === "YAYINDA" ? { metin: `"${d.baslik}" yeniden yayında.` } : { metin: `"${d.baslik}" arşivlendi.`, eylem: { etiket: "Geri al", onClick: () => durumDegistir({ ...d, durum: "ARSIV" }) } });
     } catch (err) {
-      setBildirim(err?.message || "Güncellenemedi.");
+      setBildirim({ metin: err?.message || "Güncellenemedi." });
+    } finally {
+      setArsivlenecek(null);
     }
   };
   const th = "whitespace-nowrap px-4 py-2";
@@ -112,7 +116,7 @@ export function DuyuruYonetimi({ meta, onNavigate }) {
                             <I name="edit" size={13} />
                             Düzenle
                           </button>
-                          <button type="button" onClick={() => durumDegistir(d)} disabled={guncelle.isPending} className={`inline-flex h-8 items-center rounded-full border border-[var(--border-strong)] px-3 text-[12px] font-semibold text-[var(--fg-2)] transition hover:border-[var(--brand)] hover:text-[var(--brand-text)] disabled:opacity-60 ${FOCUS}`}>
+                          <button type="button" onClick={() => (d.durum === "YAYINDA" ? setArsivlenecek(d) : durumDegistir(d))} disabled={guncelle.isPending} className={`inline-flex h-8 items-center rounded-full border border-[var(--border-strong)] px-3 text-[12px] font-semibold text-[var(--fg-2)] transition hover:border-[var(--brand)] hover:text-[var(--brand-text)] disabled:opacity-60 ${FOCUS}`}>
                             {d.durum === "YAYINDA" ? "Arşivle" : "Yayına Al"}
                           </button>
                         </span>
@@ -132,11 +136,21 @@ export function DuyuruYonetimi({ meta, onNavigate }) {
           onClose={() => setDuzenlenen(null)}
           onKaydedildi={(d, yeniMi) => {
             setDuzenlenen(null);
-            setBildirim(yeniMi ? (d.durum === "YAYINDA" ? `"${d.baslik}" yayınlandı; hedef ekranlarda pop-up olarak görünecek.` : `"${d.baslik}" arşive kaydedildi.`) : `"${d.baslik}" kaydedildi.`);
+            setBildirim({ metin: yeniMi ? (d.durum === "YAYINDA" ? `"${d.baslik}" yayınlandı; hedef ekranlarda pop-up olarak görünecek.` : `"${d.baslik}" arşive kaydedildi.`) : `"${d.baslik}" kaydedildi.` });
           }}
         />
       )}
-      {bildirim && <Bildirim metin={bildirim} onBitti={bildirimBitti} />}
+      {arsivlenecek && (
+        <OnayPenceresi
+          baslik={`"${arsivlenecek.baslik}" arşivlensin mi?`}
+          mesaj="Arşivlenen duyuru bayi ekranlarından kalkar; okunmamış olanlara pop-up açılmaz. Daha sonra yeniden yayına alabilirsiniz."
+          onayEtiketi="Arşivle"
+          mesgul={guncelle.isPending}
+          onOnay={() => durumDegistir(arsivlenecek)}
+          onClose={() => setArsivlenecek(null)}
+        />
+      )}
+      {bildirim && <Bildirim metin={bildirim.metin} eylem={bildirim.eylem} onBitti={bildirimBitti} />}
     </>
   );
 }

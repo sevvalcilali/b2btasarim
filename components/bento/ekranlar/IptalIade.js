@@ -8,7 +8,7 @@ import { kurusCoz, tarihSaat, tl } from "@/lib/bicim";
 import { durumTonu, etiket } from "@/lib/etiketler";
 import { useTalepOlustur, useTalepOnayla, useTalepReddet, useTalepUygunIslemler, useTalepler } from "@/lib/sorgular/talepler";
 import { BosDurum, HataKutusu, Yukleniyor } from "../durumlar";
-import { Konum, Pencere, Bildirim, inputCls, Alan } from "../ortak";
+import { Konum, Pencere, Bildirim, inputCls, Alan, OnayPenceresi } from "../ortak";
 import { HOME } from "../sayfalar";
 import { CARD, FOCUS } from "../tema";
 
@@ -167,12 +167,15 @@ export function IptalIade({ role, meta, mod, onNavigate }) {
   const sayac = (k) => sorgu.data?.sayaclar?.[k] ?? "–";
   const girenGoster = role !== ROLES.ALT_BAYI;
 
+  const [onayTalep, setOnayTalep] = useState(null); // onay penceresinde bekleyen talep
   const onayliTalep = async (t) => {
     try {
       const sonuc = await onayla.mutateAsync(t.talepNo);
       setBildirim(`${t.talepNo}: ${sonuc.bildirim}`);
     } catch (err) {
       setBildirim(err?.message || "Onay verilemedi.");
+    } finally {
+      setOnayTalep(null);
     }
   };
   const reddetTalep = async () => {
@@ -306,7 +309,7 @@ export function IptalIade({ role, meta, mod, onNavigate }) {
                                 <button
                                   type="button"
                                   disabled={mesgul}
-                                  onClick={() => onayliTalep(t)}
+                                  onClick={() => setOnayTalep(t)}
                                   className={`inline-flex h-8 items-center gap-1 rounded-full bg-[var(--success)] px-3 text-[12px] font-bold text-white transition hover:brightness-110 disabled:opacity-60 ${FOCUS}`}
                                 >
                                   <I name="check" size={13} strokeWidth={2.4} />
@@ -403,6 +406,20 @@ export function IptalIade({ role, meta, mod, onNavigate }) {
       )}
 
       {yeni && <YeniTalep role={role} meta={meta} onKaydedildi={talepKaydedildi} onClose={() => setYeni(false)} />}
+      {onayTalep && (
+        <OnayPenceresi
+          baslik={`${onayTalep.talepNo} talebini onayla`}
+          mesaj={
+            role === ROLES.BAYI
+              ? `${onayTalep.giren?.unvan} · ${etiket("talepTuru", onayTalep.tur)} · ${tl(onayTalep.tutarKurus)}. Onayınız talebi ana firmanın onayına iletir; bu adım geri alınamaz.`
+              : `${onayTalep.giren?.unvan} · ${etiket("talepTuru", onayTalep.tur)} · ${tl(onayTalep.tutarKurus)}. Onayladığınızda işlem ${onayTalep.tur === "IADE" ? "iade edilir" : "iptal edilir"} ve geri alınamaz.`
+          }
+          onayEtiketi={role === ROLES.BAYI ? "Onayla ve İlet" : "Onayla"}
+          mesgul={onayla.isPending}
+          onOnay={() => onayliTalep(onayTalep)}
+          onClose={() => setOnayTalep(null)}
+        />
+      )}
       {bildirim && <Bildirim metin={bildirim} onBitti={bildirimBitti} />}
     </>
   );
