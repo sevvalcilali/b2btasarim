@@ -3,7 +3,9 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import I from "@/components/DesignIcons";
-import { tarihSaat } from "@/lib/bicim";
+import { tarihSaat, yuzde } from "@/lib/bicim";
+import { DONEM_SECENEKLERI, donemAraligi, gunKisaMetni, ozelAralik } from "@/lib/donem";
+import { TrendArrow } from "./yardimci";
 import { CARD, FOCUS } from "./tema";
 
 // Ortak pencere (modal): büyütülmüş grafik, iptal/iade talebi, red gerekçesi. Temanın renk değişkenleri için
@@ -105,6 +107,70 @@ export function YanPanel({ baslik, altBaslik, onClose, genislik = "max-w-xl", al
       </aside>
     </div>,
     root
+  );
+}
+
+// Rapor dönemi seçici: hazır seçenekler + özel aralık. deger: { kod, baslangic, bitis } ya da null (tumu açıkken "Tümü")
+export function TarihAraligi({ deger, onChange, tumu = false }) {
+  const [ozel, setOzel] = useState(deger?.kod === "ozel");
+  const kod = deger ? (ozel ? "ozel" : deger.kod) : "tumu";
+  const cls = (secili) => `inline-flex h-8 items-center rounded-full px-3 text-[12px] transition ${secili ? "bg-[var(--brand)] font-bold text-white" : "bg-[var(--soft)] font-semibold text-[var(--fg-2)] hover:text-[var(--brand-text)]"} ${FOCUS}`;
+  const girdi = "h-8 rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-2.5 text-[12px] tabular-nums text-[var(--fg)] outline-none focus:border-[var(--brand)]";
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      <div role="group" aria-label="Dönem" className="flex flex-wrap gap-1">
+        {tumu && (
+          <button type="button" aria-pressed={kod === "tumu"} onClick={() => { setOzel(false); onChange(null); }} className={cls(kod === "tumu")}>
+            Tümü
+          </button>
+        )}
+        {DONEM_SECENEKLERI.map(([k, ad]) => (
+          <button key={k} type="button" aria-pressed={kod === k} onClick={() => { setOzel(false); onChange(donemAraligi(k)); }} className={cls(kod === k)}>
+            {ad}
+          </button>
+        ))}
+        <button type="button" aria-pressed={kod === "ozel"} onClick={() => { setOzel(true); if (!deger) onChange(donemAraligi("30g")); }} className={cls(kod === "ozel")}>
+          Özel
+        </button>
+      </div>
+      {ozel && deger && (
+        <div className="flex items-center gap-1 text-[12px] text-[var(--muted)]">
+          <label className="sr-only" htmlFor="bn-aralik-bas">Başlangıç</label>
+          <input id="bn-aralik-bas" type="date" value={deger.baslangic} max={deger.bitis} onChange={(e) => e.target.value && onChange(ozelAralik(e.target.value, deger.bitis))} className={girdi} />
+          <span aria-hidden="true">–</span>
+          <label className="sr-only" htmlFor="bn-aralik-bit">Bitiş</label>
+          <input id="bn-aralik-bit" type="date" value={deger.bitis} min={deger.baslangic} onChange={(e) => e.target.value && onChange(ozelAralik(deger.baslangic, e.target.value))} className={girdi} />
+        </div>
+      )}
+      {deger && !ozel && (
+        <span className="ml-1 text-[11.5px] tabular-nums text-[var(--muted)]">
+          {gunKisaMetni(deger.baslangic)} – {gunKisaMetni(deger.bitis)}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// Önceki döneme göre değişim rozeti: ▲ %12 / ▼ %8; önceki 0 ise "yeni", tersi: düşüş iyidir (bekleyen fatura gibi)
+export function DegisimRozeti({ simdiki, onceki, tersi = false, koyu = false }) {
+  if (onceki == null || simdiki == null) return null;
+  const s = Number(simdiki);
+  const o = Number(onceki);
+  if (!o && !s) return null;
+  const artis = s >= o;
+  const iyi = tersi ? !artis : artis;
+  const renk = koyu ? "bg-white/20 text-white" : iyi ? "bg-[var(--success-soft)] text-[var(--success-text)]" : "bg-[var(--danger-soft)] text-[var(--danger-text)]";
+  return (
+    <span className={`inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-px text-[10.5px] font-bold tabular-nums ${renk}`} title="Önceki döneme göre">
+      {o ? (
+        <>
+          <TrendArrow up={artis} />
+          {yuzde(Math.abs(((s - o) / o) * 100), 0)}
+        </>
+      ) : (
+        "yeni"
+      )}
+    </span>
   );
 }
 

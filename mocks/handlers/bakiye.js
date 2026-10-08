@@ -3,13 +3,11 @@
 // Hareketler: borç yüklemeleri (tohum) + bu firmanın yaptığı ödemeler, iade ve iptaller (işlem tablosu).
 import { http, HttpResponse } from "msw";
 import { depo } from "../db/depo";
-import { firma, firmaOzeti, simdi } from "../kurallar";
+import { firma, firmaOzeti, simdi, tarihAraligi } from "../kurallar";
 import { gecikme, hata, kuralHatasi, uc, yetkiGerekli, yetkili } from "./yardimci";
 import { dosyadanCsv, tlCoz } from "../csv";
 import { yonetilenler } from "./bayiler";
 
-const GUN = 86400000;
-const DONEMLER = { "30g": 30, "90g": 90, tumu: null };
 
 /** İşlem → hareket: ödeme borcu düşürür, iade / iptal geri ekler */
 function islemHareketi(t) {
@@ -91,9 +89,7 @@ export const bakiyeHandlers = [
     if (cevap) return cevap;
     const f = firma(kim.firmaId);
     if (!f?.bagliFirmaId) return hata(403, "YETKI_YOK", "Ana firmanın üst carisi yoktur; firma limiti ana sayfada gösterilir.");
-    const s = new URL(request.url).searchParams;
-    const donem = DONEMLER[s.get("donem")] === undefined ? "30g" : s.get("donem");
-    const esik = DONEMLER[donem] ? simdi(Date.now() - DONEMLER[donem] * GUN) : null;
+    const aralik = tarihAraligi(new URL(request.url).searchParams);
     const b = depo.tablo("bakiyeler")[kim.firmaId] || { bakiyeKurus: 0, borcKurus: 0, limitKurus: 0, kullanimYuzde: 0 };
 
     const hepsi = [
@@ -107,7 +103,7 @@ export const bakiyeHandlers = [
         })
         .filter(Boolean),
     ].sort((a, b2) => b2.tarih.localeCompare(a.tarih));
-    const hareketler = hepsi.filter((h) => !esik || h.tarih >= esik);
+    const hareketler = hepsi.filter((h) => aralik.icinde(h.tarih));
     const toplam = (f2) => hareketler.filter(f2).reduce((t, h) => t + Math.abs(h.tutarKurus), 0);
     return HttpResponse.json({
       ustCari: firmaOzeti(f.bagliFirmaId),
@@ -116,7 +112,7 @@ export const bakiyeHandlers = [
       limitKurus: b.limitKurus,
       kullanimYuzde: b.kullanimYuzde,
       sonGuncelleme: simdi(Date.now() - 35 * 60000),
-      donem,
+      aralik: { baslangic: aralik.baslangic, bitis: aralik.bitis, gun: aralik.gun },
       hareketler,
       donemToplami: { borcKurus: toplam((h) => h.tur === "BORC"), odemeKurus: toplam((h) => h.tur === "ODEME"), iadeIptalKurus: toplam((h) => h.tur === "IADE" || h.tur === "IPTAL") },
     });

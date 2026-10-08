@@ -2,11 +2,9 @@
 // Ana firma tüm bayi / alt bayileri, bayi kendisini ve alt bayilerini görür; alt bayinin özet raporu yoktur (403).
 import { http, HttpResponse } from "msw";
 import { depo } from "../db/depo";
-import { altBayileri, faturaDurumu, faturaGerekli, firma, firmaOzeti, kapsamda, simdi, taksitHesabi } from "../kurallar";
+import { altBayileri, faturaDurumu, faturaGerekli, firma, firmaOzeti, kapsamda, taksitHesabi, tarihAraligi } from "../kurallar";
 import { gecikme, hata, uc, yetkili } from "./yardimci";
 
-const GUN = 86400000;
-const DONEMLER = { "7g": 7, "30g": 30, tumu: null };
 
 /** İşlemin vade farkı: çekimi yapan firmanın profiliyle (ana firma bayiden çekimde o bayinin profili) */
 function vadeFarki(t) {
@@ -36,16 +34,16 @@ function topla(ozet, t) {
   return ozet;
 }
 
-/** Rolün rapor satırı firmaları ve dönem eşiği (iki özet raporunda ortak) */
+/** Rolün rapor satırı firmaları ve tarih aralığı (iki özet raporunda ortak) */
 function raporKapsami(kim, s) {
-  const donem = DONEMLER[s.get("donem")] === undefined ? "30g" : s.get("donem");
-  const gunSayisi = DONEMLER[donem];
+  const aralik = tarihAraligi(s);
   const firmalar =
     kim.rol === "ANA_FIRMA"
       ? depo.tablo("firmalar").filter((f) => f.tur !== "ANA_FIRMA")
       : [firma(kim.firmaId), ...altBayileri(kim.firmaId)].filter(Boolean);
-  return { donem, esik: gunSayisi ? simdi(Date.now() - gunSayisi * GUN) : null, firmalar };
+  return { aralik, firmalar };
 }
+const aralikCevabi = (a) => ({ baslangic: a.baslangic, bitis: a.bitis, gun: a.gun, onceki: { baslangic: a.onceki.baslangic, bitis: a.onceki.bitis } });
 
 export const raporlarHandlers = [
   // Şartname s.2 / s.9: bayi başına fatura durumu — gereken, yüklenen, bekleyen, reddedilen; bekleyen tutar
@@ -54,8 +52,9 @@ export const raporlarHandlers = [
     const { kim, cevap } = yetkili(request);
     if (cevap) return cevap;
     if (kim.rol === "ALT_BAYI") return hata(403, "YETKI_YOK", "Alt bayinin fatura özet raporu yoktur; Fatura Yükleme Detay ekranını kullanın.");
-    const { donem, esik, firmalar } = raporKapsami(kim, new URL(request.url).searchParams);
-    const islemler = depo.tablo("islemler").filter((t) => kapsamda(kim, t.cekimYapanId) && faturaGerekli(t) && (!esik || t.tarih >= esik));
+    const { aralik, firmalar } = raporKapsami(kim, new URL(request.url).searchParams);
+    const kapsamdakiler = depo.tablo("islemler").filter((t) => kapsamda(kim, t.cekimYapanId) && faturaGerekli(t));
+    const islemler = kapsamdakiler.filter((t) => aralik.icinde(t.tarih));
     const bos = () => ({ gereken: 0, yuklenen: 0, bekleyen: 0, reddedilen: 0, bekleyenKurus: 0 });
     const topla = (o, t) => {
       const d = faturaDurumu(t.islemNo).durum;
@@ -76,7 +75,12 @@ export const raporlarHandlers = [
         ...islemler.filter((t) => t.cekimYapanId === f.firmaId).reduce(topla, bos()),
       }))
       .sort((a, b) => b.bekleyen + b.reddedilen - (a.bekleyen + a.reddedilen) || b.gereken - a.gereken);
-    return HttpResponse.json({ donem, kayitlar, toplam: { ...islemler.reduce(topla, bos()), firmaAdet: kayitlar.length } });
+    return HttpResponse.json({
+      aralik: aralikCevabi(aralik),
+      kayitlar,
+      toplam: { ...islemler.reduce(topla, bos()), firmaAdet: kayitlar.length },
+      onceki: kapsamdakiler.filter((t) => aralik.onceki.icinde(t.tarih)).reduce(topla, bos()), // önceki döneme göre değişim için
+    });
   }),
 
   http.get(uc("/raporlar/bayi-ozet"), async ({ request }) => {
@@ -86,16 +90,10 @@ export const raporlarHandlers = [
     if (kim.rol === "ALT_BAYI") return hata(403, "YETKI_YOK", "Alt bayinin özet raporu yoktur; işlem detaylarını kullanın.");
     const s = new URL(request.url).searchParams;
     const musteriTuru = s.get("musteriTuru");
-    const donem = DONEMLER[s.get("donem") || "30g"] === undefined ? "30g" : s.get("donem") || "30g";
-    const gunSayisi = DONEMLER[donem];
-    const esik = gunSayisi ? simdi(Date.now() - gunSayisi * GUN) : null;
-
     // rapor satırları: ana firma → bayiler + tüm alt bayiler; bayi → kendisi + alt bayileri
-    const firmalar =
-      kim.rol === "ANA_FIRMA"
-        ? depo.tablo("firmalar").filter((f) => f.tur !== "ANA_FIRMA")
-        : [firma(kim.firmaId), ...altBayileri(kim.firmaId)].filter(Boolean);
-    const islemler = depo.tablo("islemler").filter((t) => kapsamda(kim, t.cekimYapanId) && (!esik || t.tarih >= esik) && (!musteriTuru || t.musteriTuru === musteriTuru));
+    const { aralik, firmalar } = raporKapsami(kim, s);
+    const kapsamdakiler = depo.tablo("islemler").filter((t) => kapsamda(kim, t.cekimYapanId) && (!musteriTuru || t.musteriTuru === musteriTuru));
+    const islemler = kapsamdakiler.filter((t) => aralik.icinde(t.tarih));
 
     const kayitlar = firmalar
       .map((f) => {
@@ -105,9 +103,10 @@ export const raporlarHandlers = [
       .sort((a, b) => b.ciroKurus - a.ciroKurus);
     const toplam = islemler.reduce(topla, BOS());
     return HttpResponse.json({
-      donem,
+      aralik: aralikCevabi(aralik),
       kayitlar,
       toplam: { ...toplam, firmaAdet: kayitlar.length },
+      onceki: kapsamdakiler.filter((t) => aralik.onceki.icinde(t.tarih)).reduce(topla, BOS()),
       musteriTurleri: [...new Set(depo.tablo("islemler").filter((t) => kapsamda(kim, t.cekimYapanId)).map((t) => t.musteriTuru))],
     });
   }),

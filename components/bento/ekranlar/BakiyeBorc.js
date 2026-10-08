@@ -6,16 +6,12 @@ import { tarihSaat, tl, yuzde } from "@/lib/bicim";
 import { etiket } from "@/lib/etiketler";
 import { useBakiyeEkstresi } from "@/lib/sorgular/bakiye";
 import { BosDurum, HataKutusu, Yukleniyor } from "../durumlar";
-import { Konum } from "../ortak";
+import { aralikSorgusu, donemAraligi } from "@/lib/donem";
+import { Konum, TarihAraligi } from "../ortak";
 import { HOME } from "../sayfalar";
 import { CARD, FOCUS } from "../tema";
 import { Money } from "../yardimci";
 
-const DONEMLER = [
-  ["30g", "Son 30 gün"],
-  ["90g", "Son 90 gün"],
-  ["tumu", "Tümü"],
-];
 const HAREKET_TONU = {
   BORC: "bg-[var(--warning-soft)] text-[var(--warning-text)]",
   ODEME: "bg-[var(--success-soft)] text-[var(--success-text)]",
@@ -25,8 +21,8 @@ const HAREKET_TONU = {
 
 export function BakiyeBorc({ role, meta, onNavigate }) {
   const baslik = role === ROLES.ALT_BAYI ? "Bayi Bakiye ve Borç" : "Ana Firma Bakiye ve Borç";
-  const [donem, setDonem] = useState("30g");
-  const sorgu = useBakiyeEkstresi({ donem });
+  const [aralik, setAralik] = useState(() => donemAraligi("30g"));
+  const sorgu = useBakiyeEkstresi(aralikSorgusu(aralik));
   const veri = sorgu.data;
   const hareketler = veri?.hareketler || [];
   const th = "whitespace-nowrap px-4 py-2";
@@ -77,22 +73,10 @@ export function BakiyeBorc({ role, meta, onNavigate }) {
           <section style={{ "--i": 3 }} className={`bn-rise mt-3 overflow-hidden ${CARD} hover:!translate-y-0`} aria-label="Hareketler" aria-busy={sorgu.isFetching}>
             <div className="flex flex-col gap-3 p-3 sm:p-4 md:flex-row md:items-center md:justify-between">
               <h2 className="text-sm font-bold text-[var(--fg)]">Hareketler</h2>
-              <div role="group" aria-label="Dönem" className="flex gap-1">
-                {DONEMLER.map(([kod, ad]) => (
-                  <button
-                    key={kod}
-                    type="button"
-                    onClick={() => setDonem(kod)}
-                    aria-pressed={donem === kod}
-                    className={`inline-flex h-8 items-center rounded-full px-3 text-[12px] transition ${donem === kod ? "bg-[var(--brand)] font-bold text-white" : "bg-[var(--soft)] font-semibold text-[var(--fg-2)] hover:text-[var(--brand-text)]"} ${FOCUS}`}
-                  >
-                    {ad}
-                  </button>
-                ))}
-              </div>
+              <TarihAraligi deger={aralik} onChange={setAralik} />
             </div>
             {hareketler.length === 0 ? (
-              <BosDurum baslik="Bu dönemde hareket yok" ikon="check" tonu="success" eylemler={[donem !== "tumu" && { etiket: "Tüm hareketleri göster", onClick: () => setDonem("tumu") }]} />
+              <BosDurum baslik="Bu dönemde hareket yok" ikon="check" tonu="success" eylemler={[aralik.kod !== "90g" && { etiket: "Son 90 günü göster", onClick: () => setAralik(donemAraligi("90g")) }]} />
             ) : (
               <div className={`overflow-x-auto transition-opacity ${sorgu.isFetching ? "opacity-60" : ""}`}>
                 <table className="min-w-full text-[12.5px]">

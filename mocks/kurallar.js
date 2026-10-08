@@ -240,6 +240,32 @@ export function simdi(ms = Date.now()) {
   return new Date(ms + 3 * 3600000).toISOString().replace(/\.\d{3}Z$/, "+03:00");
 }
 
+const GUN_MS = 86400000;
+const gunMetni = (ms) => simdi(ms).slice(0, 10);
+const gunSonrasi = (g, n = 1) => gunMetni(Date.parse(`${g}T12:00:00+03:00`) + n * GUN_MS);
+
+/**
+ * Rapor tarih aralığı: ?baslangic=YYYY-AA-GG&bitis=YYYY-AA-GG (ikisi de dahil). Verilmezse son `varsayilanGun` gün;
+ * eski ?donem=7g|30g|90g da kabul edilir. Dönüş: icinde(tarihISO) süzgeci ve aynı uzunluktaki önceki dönem.
+ * Karşılaştırma metin üzerinden (tüm tarihler +03:00 biçiminde).
+ */
+export function tarihAraligi(s, varsayilanGun = 30) {
+  const gecerli = (x) => /^\d{4}-\d{2}-\d{2}$/.test(x || "");
+  let bas = s.get("baslangic");
+  let bit = s.get("bitis");
+  if (!gecerli(bas) || !gecerli(bit)) {
+    const gun = { "7g": 7, "30g": 30, "90g": 90 }[s.get("donem")] || varsayilanGun;
+    bit = gunMetni(Date.now());
+    bas = gunSonrasi(bit, -(gun - 1));
+  }
+  if (bas > bit) [bas, bit] = [bit, bas];
+  const gun = Math.round((Date.parse(bit) - Date.parse(bas)) / GUN_MS) + 1;
+  const aralik = (a, b) => (tarih) => tarih >= a && tarih < gunSonrasi(b);
+  const oncekiBit = gunSonrasi(bas, -1);
+  const oncekiBas = gunSonrasi(bas, -gun);
+  return { baslangic: bas, bitis: bit, gun, icinde: aralik(bas, bit), onceki: { baslangic: oncekiBas, bitis: oncekiBit, icinde: aralik(oncekiBas, oncekiBit) } };
+}
+
 /** Denetim izi: kaydı kim, ne zaman oluşturdu / değiştirdi (sözleşme: Denetim) */
 export const denetim = (kim) => ({ kullaniciId: kim.kullaniciId, adSoyad: kim.adSoyad, tarih: simdi() });
 

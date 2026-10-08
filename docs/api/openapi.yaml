@@ -77,6 +77,8 @@ paths:
         - { name: odemeTipi, in: query, schema: { type: string, enum: [MANUEL, LINK] } }
         - { name: q, in: query, schema: { type: string }, description: İşlem no, unvan, cari no, vergi no, kart son 4 hane, çekim yapan unvanı }
         - { name: firmaId, in: query, schema: { type: string }, description: Yalnız bu firmanın çekimleri (kapsam içinde) }
+        - { name: baslangic, in: query, schema: { type: string, format: date }, description: Tarih aralığı (dahil); verilmezse tüm geçmiş }
+        - { name: bitis, in: query, schema: { type: string, format: date } }
         - { name: sira, in: query, schema: { type: string, default: "tarih:desc" }, description: "alan:yon — tarih, tutarKurus, islemNo; asc | desc" }
         - { name: sayfa, in: query, schema: { type: integer, minimum: 1, default: 1 } }
         - { name: boyut, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
@@ -155,7 +157,7 @@ paths:
                 type: object
                 required: [donem, kalemler, basariOraniYuzde, ortalamaIslemKurus]
                 properties:
-                  donem: { type: string }
+                  aralik: { $ref: "#/components/schemas/RaporAraligi" }
                   kalemler:
                     type: object
                     description: TOPLAM, BASARILI, BASARISIZ, IPTAL, IADE anahtarları
@@ -324,7 +326,8 @@ paths:
       summary: Üst cari karşısındaki bakiye, borç ve hareketler (şartname s.2 — Ana Firma / Bayi Bakiye ve Borç)
       description: Bayi ana firma carisini, alt bayi bayi carisini görür; ana firmanın üst carisi yoktur (403). Hareketler borç yüklemeleri ve bu firmanın yaptığı ödemelerden oluşur.
       parameters:
-        - { name: donem, in: query, schema: { type: string, enum: [30g, 90g, tumu], default: 30g } }
+        - { name: baslangic, in: query, schema: { type: string, format: date }, description: Dahil; bitis ile birlikte verilir }
+        - { name: bitis, in: query, schema: { type: string, format: date }, description: Dahil; verilmezse son 30 gün }
       responses:
         "200":
           description: Ekstre
@@ -339,7 +342,7 @@ paths:
                   limitKurus: { $ref: "#/components/schemas/Kurus" }
                   kullanimYuzde: { type: number }
                   sonGuncelleme: { type: string, format: date-time }
-                  donem: { type: string }
+                  aralik: { $ref: "#/components/schemas/RaporAraligi" }
                   hareketler:
                     type: array
                     items: { $ref: "#/components/schemas/BakiyeHareketi" }
@@ -1027,7 +1030,8 @@ paths:
         alt bayileri, bayi kendisini ve alt bayilerini görür; alt bayinin özet raporu yoktur (403).
         Hesaba geçecek = başarılı ciro + vade farkı − iptal/iade — DEMO VARSAYIMI, kesin hesabı backend belirler.
       parameters:
-        - { name: donem, in: query, schema: { type: string, enum: [7g, 30g, tumu], default: 30g } }
+        - { name: baslangic, in: query, schema: { type: string, format: date }, description: Dahil; bitis ile birlikte verilir }
+        - { name: bitis, in: query, schema: { type: string, format: date }, description: Dahil; verilmezse son 30 gün }
         - { name: musteriTuru, in: query, schema: { $ref: "#/components/schemas/MusteriTuru" } }
       responses:
         "200":
@@ -1037,10 +1041,11 @@ paths:
               schema:
                 type: object
                 properties:
-                  donem: { type: string }
+                  aralik: { $ref: "#/components/schemas/RaporAraligi" }
                   kayitlar:
                     type: array
                     items: { $ref: "#/components/schemas/BayiOzetSatiri" }
+                  onceki: { description: Önceki dönemin toplamı (BayiOzetToplami ile aynı alanlar), type: object }
                   toplam:
                     allOf:
                       - $ref: "#/components/schemas/OzetRakamlari"
@@ -1058,7 +1063,8 @@ paths:
       summary: Bayi / alt bayi fatura özet raporu (şartname s.2, s.9)
       description: Firma başına fatura gereken, yüklenen, bekleyen ve reddedilen işlem sayısı ile bekleyen tutar. Kapsam bayi özetiyle aynı; alt bayide yoktur (403).
       parameters:
-        - { name: donem, in: query, schema: { type: string, enum: [7g, 30g, tumu], default: 30g } }
+        - { name: baslangic, in: query, schema: { type: string, format: date }, description: Dahil; bitis ile birlikte verilir }
+        - { name: bitis, in: query, schema: { type: string, format: date }, description: Dahil; verilmezse son 30 gün }
       responses:
         "200":
           description: Özet
@@ -1067,7 +1073,8 @@ paths:
               schema:
                 type: object
                 properties:
-                  donem: { type: string }
+                  aralik: { $ref: "#/components/schemas/RaporAraligi" }
+                  onceki: { $ref: "#/components/schemas/FaturaOzetRakamlari", description: Önceki (aynı uzunluktaki) dönemin toplamı }
                   kayitlar:
                     type: array
                     items:
@@ -1571,6 +1578,14 @@ components:
         vadeFarkiKurus: { $ref: "#/components/schemas/Kurus" }
         iptalIadeKurus: { $ref: "#/components/schemas/Kurus" }
         hesabaGececekKurus: { $ref: "#/components/schemas/Kurus" }
+
+    RaporAraligi:
+      type: object
+      properties:
+        baslangic: { type: string, format: date }
+        bitis: { type: string, format: date }
+        gun: { type: integer }
+        onceki: { type: object, properties: { baslangic: { type: string, format: date }, bitis: { type: string, format: date } } }
 
     FaturaOzetRakamlari:
       type: object

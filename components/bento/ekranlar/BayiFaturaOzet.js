@@ -7,16 +7,11 @@ import { sayi, tl, yuzde } from "@/lib/bicim";
 import { durumTonu, etiket } from "@/lib/etiketler";
 import { useBayiFaturaOzeti } from "@/lib/sorgular/raporlar";
 import { BosDurum, HataKutusu, Yukleniyor } from "../durumlar";
-import { Konum } from "../ortak";
+import { aralikSorgusu, donemAraligi } from "@/lib/donem";
+import { Konum, TarihAraligi, DegisimRozeti } from "../ortak";
 import { HOME } from "../sayfalar";
 import { SiraliBaslik, useSiralama } from "../tablo";
 import { CARD, FOCUS } from "../tema";
-
-const DONEMLER = [
-  ["7g", "Son 7 gün"],
-  ["30g", "Son 30 gün"],
-  ["tumu", "Tümü"],
-];
 
 const FATURA_SUTUNLARI = {
   firma: (s) => s.firma.unvan,
@@ -32,8 +27,8 @@ const FATURA_SUTUNLARI = {
 export function BayiFaturaOzet({ role, meta, onNavigate }) {
   const altMi = role === ROLES.BAYI;
   const baslik = altMi ? "Alt Bayi Fatura Özet" : "Bayi Fatura Özet";
-  const [donem, setDonem] = useState("30g");
-  const sorgu = useBayiFaturaOzeti({ donem });
+  const [aralik, setAralik] = useState(() => donemAraligi("30g"));
+  const sorgu = useBayiFaturaOzeti(aralikSorgusu(aralik));
   const veri = sorgu.data;
   const satirlar = veri?.kayitlar || [];
   const toplam = veri?.toplam;
@@ -65,31 +60,24 @@ export function BayiFaturaOzet({ role, meta, onNavigate }) {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
-          { label: "Fatura gereken işlem", value: toplam ? sayi(toplam.gereken) : "—", wrap: "bg-[var(--brand-soft)]", ink: "text-[var(--brand-text)]" },
-          { label: "Yüklenen", value: toplam ? sayi(toplam.yuklenen) : "—", wrap: "bg-[var(--success-soft)]", ink: "text-[var(--success-text)]" },
+          { label: "Fatura gereken işlem", value: toplam ? sayi(toplam.gereken) : "—", degisim: [toplam?.gereken, veri?.onceki?.gereken], wrap: "bg-[var(--brand-soft)]", ink: "text-[var(--brand-text)]" },
+          { label: "Yüklenen", value: toplam ? sayi(toplam.yuklenen) : "—", degisim: [toplam?.yuklenen, veri?.onceki?.yuklenen], wrap: "bg-[var(--success-soft)]", ink: "text-[var(--success-text)]" },
           { label: "Bekleyen / reddedilen", value: toplam ? `${sayi(toplam.bekleyen)} / ${sayi(toplam.reddedilen)}` : "—", wrap: "bg-[var(--warning-soft)]", ink: "text-[var(--warning-text)]" },
-          { label: "Bekleyen tutar", value: toplam ? tl(toplam.bekleyenKurus) : "—", wrap: "border border-[var(--border)] bg-[var(--surface)]", ink: "text-[var(--brand-text)]" },
+          { label: "Bekleyen tutar", value: toplam ? tl(toplam.bekleyenKurus) : "—", degisim: [toplam?.bekleyenKurus, veri?.onceki?.bekleyenKurus], tersi: true, wrap: "border border-[var(--border)] bg-[var(--surface)]", ink: "text-[var(--brand-text)]" },
         ].map((k, i) => (
           <div key={k.label} style={{ "--i": i }} className={`bn-rise rounded-2xl p-3 sm:p-4 ${k.wrap}`}>
-            <p className={`text-[11.5px] font-semibold sm:text-[12.5px] ${k.ink}`}>{k.label}</p>
+            <p className={`flex items-center justify-between gap-1 text-[11.5px] font-semibold sm:text-[12.5px] ${k.ink}`}>
+              {k.label}
+              {k.degisim && <DegisimRozeti simdiki={k.degisim[0]} onceki={k.degisim[1]} tersi={k.tersi} />}
+            </p>
             <p className={`mt-1.5 text-[15px] font-extrabold leading-none tracking-tight tabular-nums text-[var(--fg)] sm:text-[19px] ${sorgu.isFetching ? "opacity-60" : ""}`}>{k.value}</p>
           </div>
         ))}
       </div>
 
       <section style={{ "--i": 4 }} className={`bn-rise mt-3 overflow-hidden ${CARD} hover:!translate-y-0`} aria-label={baslik} aria-busy={sorgu.isFetching}>
-        <div role="group" aria-label="Dönem" className="flex gap-1 p-3 sm:p-4">
-          {DONEMLER.map(([kod, ad]) => (
-            <button
-              key={kod}
-              type="button"
-              onClick={() => setDonem(kod)}
-              aria-pressed={donem === kod}
-              className={`inline-flex h-8 items-center rounded-full px-3 text-[12px] transition ${donem === kod ? "bg-[var(--brand)] font-bold text-white" : "bg-[var(--soft)] font-semibold text-[var(--fg-2)] hover:text-[var(--brand-text)]"} ${FOCUS}`}
-            >
-              {ad}
-            </button>
-          ))}
+        <div className="p-3 sm:p-4">
+          <TarihAraligi deger={aralik} onChange={setAralik} />
         </div>
 
         {sorgu.isPending ? (
@@ -159,7 +147,7 @@ export function BayiFaturaOzet({ role, meta, onNavigate }) {
                 </tfoot>
               )}
             </table>
-            {satirlar.length === 0 && <BosDurum baslik="Bu dönemde fatura gereken işlem yok" ikon="check" tonu="success" eylemler={[donem !== "tumu" && { etiket: "Tüm dönemi göster", onClick: () => setDonem("tumu") }]} />}
+            {satirlar.length === 0 && <BosDurum baslik="Bu dönemde fatura gereken işlem yok" ikon="check" tonu="success" eylemler={[aralik.kod !== "90g" && { etiket: "Son 90 günü göster", onClick: () => setAralik(donemAraligi("90g")) }]} />}
           </div>
         )}
       </section>

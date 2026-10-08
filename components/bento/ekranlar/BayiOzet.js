@@ -8,16 +8,12 @@ import { durumTonu, etiket } from "@/lib/etiketler";
 import { useBayiOzeti } from "@/lib/sorgular/raporlar";
 import { BosDurum, HataKutusu, Yukleniyor } from "../durumlar";
 import { csvIndir, csvTutar } from "@/lib/disaAktar";
-import { Konum } from "../ortak";
+import { aralikSorgusu, donemAraligi } from "@/lib/donem";
+import { Konum, TarihAraligi, DegisimRozeti } from "../ortak";
 import { HOME } from "../sayfalar";
 import { SiraliBaslik, useSiralama } from "../tablo";
 import { CARD, FOCUS } from "../tema";
 
-const DONEMLER = [
-  ["7g", "Son 7 gün"],
-  ["30g", "Son 30 gün"],
-  ["tumu", "Tümü"],
-];
 
 // sütun → sıralama değeri (rapor ekranda sıralanır; tüm satırlar yüklü)
 const OZET_SUTUNLARI = {
@@ -33,9 +29,9 @@ const OZET_SUTUNLARI = {
 export function BayiOzet({ role, meta, onNavigate }) {
   const altMi = role === ROLES.BAYI;
   const baslik = altMi ? "Alt Bayi Özet" : "Bayi Özet";
-  const [donem, setDonem] = useState("30g");
+  const [aralik, setAralik] = useState(() => donemAraligi("30g"));
   const [musteriTuru, setMusteriTuru] = useState("");
-  const sorgu = useBayiOzeti({ donem, musteriTuru: musteriTuru || undefined });
+  const sorgu = useBayiOzeti({ ...aralikSorgusu(aralik), musteriTuru: musteriTuru || undefined });
   const veri = sorgu.data;
   const satirlar = veri?.kayitlar || [];
   const toplam = veri?.toplam;
@@ -78,13 +74,16 @@ export function BayiOzet({ role, meta, onNavigate }) {
       {/* dönem toplamları — sunucudan */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
-          { label: "İşlem", value: toplam ? `${sayi(toplam.islemAdet)} · ${sayi(toplam.basariliAdet)} başarılı` : "—", wrap: "bg-[var(--brand-soft)]", ink: "text-[var(--brand-text)]" },
-          { label: "Ciro (başarılı)", value: toplam ? tl(toplam.ciroKurus) : "—", wrap: "bg-[var(--success-soft)]", ink: "text-[var(--success-text)]" },
-          { label: "Vade farkı", value: toplam ? tl(toplam.vadeFarkiKurus) : "—", wrap: "border border-[var(--border)] bg-[var(--surface)]", ink: "text-[var(--brand-text)]" },
-          { label: "Hesaba geçecek", value: toplam ? tl(toplam.hesabaGececekKurus) : "—", wrap: "bg-[linear-gradient(135deg,#0C34E7,#0A23A8)] text-white", ink: "text-white/80", vurgu: true },
+          { label: "İşlem", value: toplam ? `${sayi(toplam.islemAdet)} · ${sayi(toplam.basariliAdet)} başarılı` : "—", degisim: [toplam?.islemAdet, veri?.onceki?.islemAdet], wrap: "bg-[var(--brand-soft)]", ink: "text-[var(--brand-text)]" },
+          { label: "Ciro (başarılı)", value: toplam ? tl(toplam.ciroKurus) : "—", degisim: [toplam?.ciroKurus, veri?.onceki?.ciroKurus], wrap: "bg-[var(--success-soft)]", ink: "text-[var(--success-text)]" },
+          { label: "Vade farkı", value: toplam ? tl(toplam.vadeFarkiKurus) : "—", degisim: [toplam?.vadeFarkiKurus, veri?.onceki?.vadeFarkiKurus], wrap: "border border-[var(--border)] bg-[var(--surface)]", ink: "text-[var(--brand-text)]" },
+          { label: "Hesaba geçecek", value: toplam ? tl(toplam.hesabaGececekKurus) : "—", degisim: [toplam?.hesabaGececekKurus, veri?.onceki?.hesabaGececekKurus], wrap: "bg-[linear-gradient(135deg,#0C34E7,#0A23A8)] text-white", ink: "text-white/80", vurgu: true },
         ].map((k, i) => (
           <div key={k.label} style={{ "--i": i }} className={`bn-rise rounded-2xl p-3 sm:p-4 ${k.wrap}`}>
-            <p className={`text-[11.5px] font-semibold sm:text-[12.5px] ${k.ink}`}>{k.label}</p>
+            <p className={`flex items-center justify-between gap-1 text-[11.5px] font-semibold sm:text-[12.5px] ${k.ink}`}>
+              {k.label}
+              {k.degisim && <DegisimRozeti simdiki={k.degisim[0]} onceki={k.degisim[1]} koyu={k.vurgu} />}
+            </p>
             <p className={`mt-1.5 text-[15px] font-extrabold leading-none tracking-tight tabular-nums sm:text-[19px] ${k.vurgu ? "text-white" : "text-[var(--fg)]"} ${sorgu.isFetching ? "opacity-60" : ""}`}>{k.value}</p>
           </div>
         ))}
@@ -92,13 +91,7 @@ export function BayiOzet({ role, meta, onNavigate }) {
 
       <section style={{ "--i": 4 }} className={`bn-rise mt-3 overflow-hidden ${CARD} hover:!translate-y-0`} aria-label={baslik} aria-busy={sorgu.isFetching}>
         <div className="flex flex-col gap-3 p-3 sm:p-4 lg:flex-row lg:items-center lg:justify-between">
-          <div role="group" aria-label="Dönem" className="flex gap-1">
-            {DONEMLER.map(([kod, ad]) => (
-              <button key={kod} type="button" onClick={() => setDonem(kod)} aria-pressed={donem === kod} className={secimCls(donem === kod)}>
-                {ad}
-              </button>
-            ))}
-          </div>
+          <TarihAraligi deger={aralik} onChange={setAralik} />
           <div role="group" aria-label="Müşteri türü" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-0.5">
             <button type="button" onClick={() => setMusteriTuru("")} aria-pressed={musteriTuru === ""} className={secimCls(musteriTuru === "")}>
               Tüm müşteri türleri
@@ -177,7 +170,7 @@ export function BayiOzet({ role, meta, onNavigate }) {
               )}
             </table>
             {satirlar.length === 0 && (
-              <BosDurum baslik="Bu dönemde işlem yok" aciklama="Dönemi genişletin ya da müşteri türü filtresini kaldırın." eylemler={[donem !== "tumu" && { etiket: "Tüm dönemi göster", onClick: () => setDonem("tumu") }, musteriTuru && { etiket: "Müşteri türü filtresini kaldır", onClick: () => setMusteriTuru("") }]} />
+              <BosDurum baslik="Bu dönemde işlem yok" aciklama="Dönemi genişletin ya da müşteri türü filtresini kaldırın." eylemler={[aralik.kod !== "90g" && { etiket: "Son 90 günü göster", onClick: () => setAralik(donemAraligi("90g")) }, musteriTuru && { etiket: "Müşteri türü filtresini kaldır", onClick: () => setMusteriTuru("") }]} />
             )}
           </div>
         )}

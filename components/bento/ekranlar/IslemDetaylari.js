@@ -8,7 +8,8 @@ import { useIslemler } from "@/lib/sorgular/islemler";
 import { BosDurum, HataKutusu, Yukleniyor } from "../durumlar";
 import { csvIndir, csvTutar } from "@/lib/disaAktar";
 import { SiraliBaslik, siralamaDegistir } from "../tablo";
-import { Konum } from "../ortak";
+import { aralikSorgusu } from "@/lib/donem";
+import { Konum, TarihAraligi } from "../ortak";
 import { CARD, FOCUS } from "../tema";
 import { useGecikmeli } from "../yardimci";
 
@@ -32,23 +33,25 @@ export function IslemDetaylari({ role, meta, onHome }) {
   const [durum, setDurum] = useState("TUMU");
   const [odemeTipi, setOdemeTipi] = useState("");
   const [musteriTuru, setMusteriTuru] = useState("");
+  const [aralik, setAralik] = useState(null); // null: tüm geçmiş
   const q = useGecikmeli(arama.trim());
   const [siralama, setSiralama] = useState({ alan: "tarih", yon: "desc" }); // sayfalı liste: sıralama sunucuda
   const sirala = (alan) => setSiralama((s) => siralamaDegistir(s, alan, alan === "islemNo" ? "asc" : "desc"));
 
-  const sorgu = useIslemler({ durum: durum === "TUMU" ? undefined : durum, musteriTuru: musteriTuru || undefined, odemeTipi: odemeTipi || undefined, q: q || undefined, sira: `${siralama.alan}:${siralama.yon}` });
+  const sorgu = useIslemler({ durum: durum === "TUMU" ? undefined : durum, musteriTuru: musteriTuru || undefined, odemeTipi: odemeTipi || undefined, q: q || undefined, ...aralikSorgusu(aralik), sira: `${siralama.alan}:${siralama.yon}` });
   const veri = sorgu.data;
   const satirlar = veri?.kayitlar || [];
   const adet = (d) => veri?.sayaclar?.[d] ?? "–";
 
   // alt bayi yalnızca kendi işlemlerini gördüğü için "çekim yapan" sütunu ona gösterilmez
   const yapanGoster = role !== ROLES.ALT_BAYI;
-  const filtreVar = arama !== "" || durum !== "TUMU" || odemeTipi !== "" || musteriTuru !== "";
+  const filtreVar = arama !== "" || durum !== "TUMU" || odemeTipi !== "" || musteriTuru !== "" || aralik !== null;
   const temizle = () => {
     setArama("");
     setDurum("TUMU");
     setOdemeTipi("");
     setMusteriTuru("");
+    setAralik(null);
   };
   const selectCls = `h-9 rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-[12.5px] font-medium text-[var(--fg-2)] ${FOCUS}`;
   const th = "whitespace-nowrap px-4 py-2";
@@ -147,6 +150,9 @@ export function IslemDetaylari({ role, meta, onHome }) {
               <option value="LINK">Link ile ödeme</option>
             </select>
           </div>
+        </div>
+        <div className="border-t border-[var(--border)] px-3 py-2.5 sm:px-4">
+          <TarihAraligi deger={aralik} onChange={setAralik} tumu />
         </div>
 
         {sorgu.isPending ? (

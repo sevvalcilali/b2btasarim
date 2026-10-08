@@ -1,7 +1,7 @@
 // GET /islemler — şartname s.7: müşteri türü, cari no, unvan, vergi no; rol kapsamı sunucuda
 import { http, HttpResponse } from "msw";
 import { depo } from "../db/depo";
-import { firmaOzeti, icerir, kapsamda, sayaclar, sayfala } from "../kurallar";
+import { firmaOzeti, icerir, kapsamda, sayaclar, sayfala, tarihAraligi } from "../kurallar";
 import { gecikme, uc, yetkili } from "./yardimci";
 
 const DURUMLAR = ["BASARILI", "BASARISIZ", "IPTAL", "IADE"];
@@ -42,12 +42,14 @@ export const islemlerHandlers = [
     const q = (s.get("q") || "").trim();
     const firmaId = s.get("firmaId"); // çekimi yapan firma (bayi detay paneli)
     const [siraAlan, siraYon] = (s.get("sira") || "tarih:desc").split(":");
+    const aralik = s.get("baslangic") || s.get("bitis") || s.get("donem") ? tarihAraligi(s) : null; // verilmezse tüm geçmiş
 
     const kaynak = kapsamdakiIslemler(kim);
     // durum dışındaki filtreler: durum sekmelerinin sayıları bunların üzerinden hesaplanır
     const adaylar = kaynak.filter(
       (t) =>
         (!firmaId || t.cekimYapanId === firmaId) &&
+        (!aralik || aralik.icinde(t.tarih)) &&
         (!musteriTuru || t.musteriTuru === musteriTuru) &&
         (!odemeTipi || t.odemeTipi === odemeTipi) &&
         (!q || [t.islemNo, t.musteri.unvan, t.musteri.cariNo, t.musteri.vergiNo, t.kartSon4, firmaOzeti(t.cekimYapanId)?.unvan].some((f) => icerir(f, q)))
