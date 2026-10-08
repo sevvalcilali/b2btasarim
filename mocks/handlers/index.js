@@ -11,6 +11,7 @@ import { linklerHandlers } from "./linkler";
 import { taleplerHandlers } from "./talepler";
 import { faturalarHandlers } from "./faturalar";
 import { raporlarHandlers } from "./raporlar";
+import { kullanicilarHandlers } from "./kullanicilar";
 
 export const handlers = [
   ...oturumHandlers,
@@ -25,4 +26,5 @@ export const handlers = [
   ...taleplerHandlers,
   ...faturalarHandlers,
   ...raporlarHandlers,
+  ...kullanicilarHandlers,
 ];

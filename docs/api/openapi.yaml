@@ -320,6 +320,78 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Bayi" }
 
+  /kullanicilar:
+    get:
+      tags: [Tanımlar]
+      summary: Firmanın kullanıcıları (şartname s.3)
+      description: Her rol yalnız kendi firmasının kullanıcılarını görür. duzenlenebilir = oturumdaki kullanıcı Yönetici.
+      parameters:
+        - { name: durum, in: query, schema: { $ref: "#/components/schemas/KayitDurumu" } }
+        - { name: q, in: query, schema: { type: string }, description: Ad soyad ya da e-posta }
+      responses:
+        "200":
+          description: Kullanıcılar
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  kayitlar:
+                    type: array
+                    items: { $ref: "#/components/schemas/Kullanici" }
+                  toplam: { type: integer }
+                  sayaclar: { type: object, properties: { TUMU: { type: integer }, AKTIF: { type: integer }, PASIF: { type: integer } } }
+                  duzenlenebilir: { type: boolean }
+    post:
+      tags: [Tanımlar]
+      summary: Yeni kullanıcı (yalnız Yönetici)
+      description: Şifre belirleme / davet e-postasını backend gönderir.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/KullaniciGirdisi" }
+      responses:
+        "201":
+          description: Oluşturuldu
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Kullanici" }
+        "403": { $ref: "#/components/responses/YetkiYok" }
+        "409":
+          description: EPOSTA_CAKISMASI — e-posta başka bir kullanıcıda
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HataCevabi" }
+        "422": { $ref: "#/components/responses/IsKurali" }
+
+  /kullanicilar/{kullaniciId}:
+    put:
+      tags: [Tanımlar]
+      summary: Kullanıcıyı güncelle (yalnız Yönetici)
+      description: Kullanıcı kendi yetkisini ve durumunu değiştiremez (422, alanlar.yetki / alanlar.durum); düzenleyen hep aktif bir Yönetici olduğundan firma yöneticisiz kalmaz.
+      parameters:
+        - { name: kullaniciId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/KullaniciGirdisi" }
+      responses:
+        "200":
+          description: Güncellendi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Kullanici" }
+        "403": { $ref: "#/components/responses/YetkiYok" }
+        "404": { $ref: "#/components/responses/Bulunamadi" }
+        "409":
+          description: EPOSTA_CAKISMASI
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HataCevabi" }
+        "422": { $ref: "#/components/responses/IsKurali" }
+
   /vade-farki-profilleri:
     get:
       tags: [Tanımlar]
@@ -953,6 +1025,25 @@ components:
     KayitDurumu:
       type: string
       enum: [AKTIF, PASIF]
+
+    KullaniciGirdisi:
+      type: object
+      required: [adSoyad, email, yetki, durum]
+      properties:
+        adSoyad: { type: string }
+        email: { type: string, format: email, description: Ağda tek olmalı }
+        telefon: { type: string }
+        yetki: { $ref: "#/components/schemas/Yetki" }
+        durum: { $ref: "#/components/schemas/KayitDurumu" }
+
+    Kullanici:
+      allOf:
+        - $ref: "#/components/schemas/KullaniciGirdisi"
+        - type: object
+          properties:
+            kullaniciId: { type: string, example: K-102 }
+            kendisi: { type: boolean, description: Oturumdaki kullanıcının kendi kaydı }
+            sonGiris: { type: [string, "null"], format: date-time }
 
     VadeFarkiProfiliGirdisi:
       type: object

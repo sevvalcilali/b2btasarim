@@ -46,6 +46,7 @@ Ekran (components/bento/ekranlar)  →  lib/sorgular (React Query kancaları)  �
 | Link ile Ödeme | + `GET /odeme-linkleri` · `POST /odeme-linkleri` | ✅ |
 | İptal / İade | `GET /iptal-iade-talepleri` · `GET …/uygun-islemler` · `POST …` · `POST …/{talepNo}/onay` · `POST …/{talepNo}/red` | ✅ |
 | Bayi Tanım | `GET/POST /bayiler` · `GET/PUT /bayiler/{cariNo}` · `GET /firma` · `GET /vade-farki-profilleri` · `GET /uye-isyerleri` · `POST /musteriler` | ✅ |
+| Kullanıcı Tanım | `GET/POST /kullanicilar` · `PUT /kullanicilar/{kullaniciId}` | ✅ |
 | Vade Farkı Profil Tanım | `GET/POST /vade-farki-profilleri` · `PUT /vade-farki-profilleri/{id}` | ✅ |
 | Fatura Yükleme | `GET/POST /faturalar` · `POST /faturalar/{islemNo}/hatirlatma` · `POST /faturalar/{islemNo}/yukleme-linki` | ✅ |
 | Yalnız demo | `POST /demo/sifirla` | ✅ (gerçek backend'de yok) |
@@ -91,4 +92,5 @@ Sahte backend'de etkisi olmayan, gerçek serviste önem kazanan noktalar (code r
 
 1. Kimlik doğrulama ve klasik panelle ortak oturum (şartname s.10).
 2. Ödemede kart tokenı: kart numarası backend'e açık gitmez; tokenı hangi sağlayıcı / 3D Secure akışı üretir?
-3. Vade farkı formülü: sunucu `GET /odeme/taksit-secenekleri` ile hesaplar; mockup varsayımı tutar × oran × (taksit − 1).
+3. Yeni kullanıcının şifresi: `POST /kullanicilar` kullanıcıyı açar; şifre belirleme / davet e-postasını backend gönderir (ekranda yalnız not var).
+4. Vade farkı formülü: sunucu `GET /odeme/taksit-secenekleri` ile hesaplar; mockup varsayımı tutar × oran × (taksit − 1).

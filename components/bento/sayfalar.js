@@ -17,6 +17,7 @@ export const SAYFALAR = {
   "alt-bayi-liste": "/bayi-tanim/alt-bayi-liste",
   "islem-detaylari": "/raporlar/islem-detaylari",
   "vade-farki": "/ayarlar/vade-farki",
+  "kullanici": "/ayarlar/kullanici",
 };
 
 export const KALICI_PARAMETRELER = ["role", "theme", "menu"];

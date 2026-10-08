@@ -1284,42 +1284,15 @@ export const kurlar = [
 ];
 
 export const kullanicilar = [
-  {
-    kullaniciId: "K-001",
-    firmaId: "100.00.001",
-    adSoyad: "Mehmet Yılmaz",
-    email: "mehmet.yilmaz@brisa.com",
-    yetki: "YONETICI",
-    yetkiNotu: "Tüm Ekranlar",
-    durum: "AKTIF"
-  },
-  {
-    kullaniciId: "K-002",
-    firmaId: "100.00.001",
-    adSoyad: "Ayşe Demir",
-    email: "ayse.demir@brisa.com",
-    yetki: "ODEME",
-    yetkiNotu: "Ödeme + Raporlar",
-    durum: "AKTIF"
-  },
-  {
-    kullaniciId: "K-003",
-    firmaId: "100.00.001",
-    adSoyad: "Can Kaya",
-    email: "can.kaya@brisa.com",
-    yetki: "RAPORLAMA",
-    yetkiNotu: "Sadece Raporlar",
-    durum: "AKTIF"
-  },
-  {
-    kullaniciId: "K-004",
-    firmaId: "100.00.001",
-    adSoyad: "Elif Şahin",
-    email: "elif.sahin@brisa.com",
-    yetki: "ODEME",
-    yetkiNotu: "Ödeme (İade Hariç)",
-    durum: "PASIF"
-  }
+  { kullaniciId: "K-001", firmaId: "100.00.001", adSoyad: "Mehmet Yılmaz", email: "mehmet.yilmaz@brisa.com", telefon: "0532 411 20 01", yetki: "YONETICI", durum: "AKTIF", sonGiris: "2026-10-08T08:42:00+03:00" },
+  { kullaniciId: "K-002", firmaId: "100.00.001", adSoyad: "Ayşe Demir", email: "ayse.demir@brisa.com", telefon: "0533 204 18 77", yetki: "ODEME", durum: "AKTIF", sonGiris: "2026-10-07T17:05:00+03:00" },
+  { kullaniciId: "K-003", firmaId: "100.00.001", adSoyad: "Can Kaya", email: "can.kaya@brisa.com", telefon: "0542 318 40 12", yetki: "RAPORLAMA", durum: "AKTIF", sonGiris: "2026-10-02T09:30:00+03:00" },
+  { kullaniciId: "K-004", firmaId: "100.00.001", adSoyad: "Elif Şahin", email: "elif.sahin@brisa.com", telefon: "0536 772 51 90", yetki: "ODEME", durum: "PASIF", sonGiris: "2026-08-19T14:12:00+03:00" },
+  { kullaniciId: "K-101", firmaId: "320.01.001", adSoyad: "Murat Aydın", email: "murat@ankaralastik.com", telefon: "0312 440 11 20", yetki: "YONETICI", durum: "AKTIF", sonGiris: "2026-10-08T09:10:00+03:00" },
+  { kullaniciId: "K-102", firmaId: "320.01.001", adSoyad: "Selin Koç", email: "selin@ankaralastik.com", telefon: "0532 605 33 41", yetki: "ODEME", durum: "AKTIF", sonGiris: "2026-10-06T11:48:00+03:00" },
+  { kullaniciId: "K-103", firmaId: "320.01.001", adSoyad: "Burak Öz", email: "burak@ankaralastik.com", telefon: "0544 219 70 05", yetki: "RAPORLAMA", durum: "AKTIF", sonGiris: null },
+  { kullaniciId: "K-201", firmaId: "540.02.011", adSoyad: "Kemal Er", email: "kemal@cankayaotoservis.com", telefon: "0312 231 44 10", yetki: "YONETICI", durum: "AKTIF", sonGiris: "2026-10-07T16:20:00+03:00" },
+  { kullaniciId: "K-202", firmaId: "540.02.011", adSoyad: "Derya Ak", email: "derya@cankayaotoservis.com", telefon: "0535 118 62 34", yetki: "ODEME", durum: "AKTIF", sonGiris: "2026-10-05T10:02:00+03:00" }
 ];
 
 export const duyurular = [
