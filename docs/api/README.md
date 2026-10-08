@@ -38,8 +38,9 @@ Ekran (components/bento/ekranlar)  →  lib/sorgular (React Query kancaları)  �
 | --- | --- | --- |
 | Oturum / kabuk | `GET /oturum` | ✅ sözleşme + sahte backend |
 | | `GET /panel/bekleyenler` | ⏳ adım 2 |
-| Ana Sayfa | `GET /panel/ozet` · `GET /panel/haftalik-hacim` · `GET /islemler?boyut=6` | ⏳ adım 2 |
-| İşlem Detayları | `GET /islemler` | ⏳ adım 1 |
+| Ana Sayfa | `GET /islemler?boyut=6` (Son İşlemler) | ✅ |
+| | `GET /panel/ozet` · `GET /panel/haftalik-hacim` | ⏳ adım 2 |
+| İşlem Detayları | `GET /islemler` | ✅ sözleşme + sahte backend + ekran |
 | Manuel Ödeme | `GET /musteriler` · `GET /tahsilat-carileri` · `GET /firma/ortaklar` · `GET /odeme/taksit-secenekleri` · `POST /odemeler` | ⏳ adım 4 |
 | Link ile Ödeme | + `GET /odeme-linkleri` · `POST /odeme-linkleri` | ⏳ adım 4 |
 | İptal / İade | `GET /iptal-iade-talepleri` · `GET …/uygun-islemler` · `POST …` · `POST …/{id}/onay` · `POST …/{id}/red` | ⏳ adım 5 |

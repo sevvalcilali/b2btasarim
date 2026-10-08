@@ -72,6 +72,20 @@ export function Money({ value }) {
   return <>₺ {v.toLocaleString("tr-TR")}</>;
 }
 
+// Değeri `ms` boyunca değişmeyince döner: arama kutusu her tuşta değil, yazma durunca istek atar.
+export function useGecikmeli(deger, ms = 300) {
+  const [gecikmeli, setGecikmeli] = useState(deger);
+  useEffect(() => {
+    if (deger === "") {
+      setGecikmeli(""); // temizleme beklemez: eski arama bir an bile gönderilmez
+      return undefined;
+    }
+    const z = setTimeout(() => setGecikmeli(deger), ms);
+    return () => clearTimeout(z);
+  }, [deger, ms]);
+  return deger === "" ? "" : gecikmeli;
+}
+
 export function useDismiss(open, close) {
   useEffect(() => {
     if (!open) return undefined;

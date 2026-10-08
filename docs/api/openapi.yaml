@@ -62,9 +62,64 @@ paths:
                 yetkiler: [ODEME, RAPOR, IPTAL_IADE_GIRIS, IPTAL_IADE_ONAY, BAYI_TANIM, KULLANICI_TANIM, AYARLAR]
         "401": { $ref: "#/components/responses/OturumYok" }
 
+  /islemler:
+    get:
+      tags: [İşlemler]
+      summary: İşlem listesi (rapor ve Son İşlemler)
+      description: |
+        Rol kapsamındaki ödeme işlemleri, en yeniden eskiye. Filtre, arama ve sayfalama sunucuda.
+        `sayaclar` durum sekmelerinin sayılarıdır ve durum dışındaki filtrelere göre hesaplanır;
+        `ozet` filtreye uyan tüm kayıtların (sayfadan bağımsız) toplamıdır.
+      parameters:
+        - { name: durum, in: query, schema: { $ref: "#/components/schemas/IslemDurumu" } }
+        - { name: musteriTuru, in: query, schema: { $ref: "#/components/schemas/MusteriTuru" } }
+        - { name: odemeTipi, in: query, schema: { type: string, enum: [MANUEL, LINK] } }
+        - { name: q, in: query, schema: { type: string }, description: İşlem no, unvan, cari no, vergi no, kart son 4 hane, çekim yapan unvanı }
+        - { name: sayfa, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: boyut, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        "200":
+          description: Sayfalı işlem listesi
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Liste"
+                  - type: object
+                    required: [sayaclar, ozet, musteriTurleri]
+                    properties:
+                      kayitlar: { type: array, items: { $ref: "#/components/schemas/Islem" } }
+                      ozet:
+                        type: object
+                        properties:
+                          toplamKurus: { $ref: "#/components/schemas/Kurus" }
+                          basariliKurus: { $ref: "#/components/schemas/Kurus" }
+                      musteriTurleri:
+                        type: array
+                        items: { $ref: "#/components/schemas/MusteriTuru" }
+                        description: Kapsamda görülen müşteri türleri (filtre seçenekleri)
+              example:
+                kayitlar:
+                  - islemNo: TRX-90241
+                    tarih: "2026-09-30T14:22:00+03:00"
+                    cekimYapan: { firmaId: "320.01.001", unvan: Ankara Lastik Bayi Ltd., tur: BAYI }
+                    musteriTuru: DUZENLI_MUSTERI
+                    musteri: { unvan: Yılmaz Otomotiv, cariNo: "120.01.045", vergiNo: "4820193746" }
+                    kart: { son4: "4821" }
+                    odemeTipi: MANUEL
+                    taksit: 3
+                    tutarKurus: 1240000
+                    durum: BASARILI
+                toplam: 14
+                sayfa: 1
+                boyut: 50
+                sayaclar: { TUMU: 22, BASARILI: 14, BASARISIZ: 3, IPTAL: 3, IADE: 2 }
+                ozet: { toplamKurus: 24587000, basariliKurus: 21000000 }
+                musteriTurleri: [BAYI, ALT_BAYI, DUZENLI_MUSTERI, DUZENSIZ_MUSTERI, KENDI_KARTI]
+        "401": { $ref: "#/components/responses/OturumYok" }
+
   # --- Sonraki adımlarda eklenecek uç noktalar (docs/api/README.md'deki tablo) ---
   # /panel/ozet · /panel/haftalik-hacim · /panel/bekleyenler
-  # /islemler
   # /musteriler · /tahsilat-carileri · /firma/ortaklar · /odeme/taksit-secenekleri · /odemeler · /odeme-linkleri
   # /iptal-iade-talepleri · /iptal-iade-talepleri/uygun-islemler · /iptal-iade-talepleri/{id}/onay · /{id}/red
   # /bayiler · /bayiler/{cariNo} · /alt-bayiler · /vade-farki-profilleri · /uye-isyerleri
@@ -143,6 +198,40 @@ components:
       type: string
       enum: [YONETICI, ODEME, RAPORLAMA]
       description: Şartname s.3 — Yönetici tüm ekranlar; Ödeme ödeme + rapor; Raporlama yalnız rapor
+
+    IslemDurumu:
+      type: string
+      enum: [BASARILI, BASARISIZ, IPTAL, IADE]
+
+    MusteriTuru:
+      type: string
+      enum: [BAYI, ALT_BAYI, DUZENLI_MUSTERI, DUZENSIZ_MUSTERI, KENDI_KARTI, MUSTERI_KARTI]
+      description: Şartname s.6 — rolün seçebildiği türler ekranda sınırlanır
+
+    Islem:
+      type: object
+      required: [islemNo, tarih, cekimYapan, musteriTuru, musteri, kart, odemeTipi, taksit, tutarKurus, durum]
+      properties:
+        islemNo: { type: string, example: TRX-90241 }
+        tarih: { type: string, format: date-time }
+        cekimYapan: { $ref: "#/components/schemas/FirmaOzeti", description: Çekimi yapan firma }
+        musteriTuru: { $ref: "#/components/schemas/MusteriTuru" }
+        musteri:
+          type: object
+          required: [unvan, cariNo, vergiNo]
+          properties:
+            unvan: { type: string }
+            cariNo: { type: string, example: "120.01.045" }
+            vergiNo: { type: string, example: "4820193746" }
+        kart:
+          type: object
+          required: [son4]
+          properties:
+            son4: { type: string, minLength: 4, maxLength: 4, description: Kart numarasının yalnızca son 4 hanesi }
+        odemeTipi: { type: string, enum: [MANUEL, LINK] }
+        taksit: { type: integer, minimum: 1, description: 1 = tek çekim }
+        tutarKurus: { $ref: "#/components/schemas/Kurus" }
+        durum: { $ref: "#/components/schemas/IslemDurumu" }
 
     FirmaOzeti:
       type: object

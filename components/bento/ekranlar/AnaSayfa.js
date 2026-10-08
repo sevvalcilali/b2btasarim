@@ -4,11 +4,14 @@ import { useEffect, useId, useRef, useState } from "react";
 import { ROLES } from "@/lib/roles";
 import { kpis, bakiyeOzet } from "@/lib/mockData";
 import I from "@/components/DesignIcons";
-import { rolIslemleri } from "../ag";
+import { tl, tarihSaat } from "@/lib/bicim";
+import { durumTonu, etiket } from "@/lib/etiketler";
+import { useIslemler } from "@/lib/sorgular/islemler";
+import { BosDurum, HataKutusu, Yukleniyor } from "../durumlar";
 import { Pencere } from "../ortak";
 import { isReady } from "../sayfalar";
 import { CARD, FOCUS } from "../tema";
-import { pillTone, parseAmount, smoothPath, curveThrough, Money, TrendArrow } from "../yardimci";
+import { parseAmount, smoothPath, curveThrough, Money, TrendArrow } from "../yardimci";
 
 // ---- veri yardımcıları -------------------------------------------------------------------
 // Haftalık hacim (bin ₺)
@@ -460,15 +463,18 @@ function BalanceCard({ role }) {
   );
 }
 
-function TransactionsCard({ role, onSeeAll }) {
+// Son İşlemler — veri: GET /islemler?boyut=6 (rol kapsamı sunucuda)
+function TransactionsCard({ onSeeAll }) {
+  const sorgu = useIslemler({ boyut: 6 });
+  const satirlar = sorgu.data?.kayitlar || [];
   return (
-    <section style={{ "--i": 7 }} className={`bn-rise overflow-hidden lg:col-span-2 ${CARD} hover:!translate-y-0`} aria-labelledby="bn-tx-title">
+    <section style={{ "--i": 7 }} className={`bn-rise overflow-hidden lg:col-span-2 ${CARD} hover:!translate-y-0`} aria-labelledby="bn-tx-title" aria-busy={sorgu.isFetching}>
       <div className="flex items-center justify-between gap-3 px-4 py-3">
         <div>
           <h2 id="bn-tx-title" className="text-sm font-bold text-[var(--fg)]">
             Son İşlemler
           </h2>
-          <p className="mt-0.5 text-xs text-[var(--muted)]">En güncel 6 işlem</p>
+          <p className="mt-0.5 text-xs text-[var(--muted)]">{sorgu.data ? `En güncel ${satirlar.length} işlem` : "Yükleniyor…"}</p>
         </div>
         <button
           type="button"
@@ -479,37 +485,44 @@ function TransactionsCard({ role, onSeeAll }) {
           <I name="chevronRight" size={13} className="transition-transform group-hover:translate-x-0.5" />
         </button>
       </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-[12.5px]">
-          <thead>
-            <tr className="border-y border-[var(--border)] bg-[var(--soft)] text-left text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
-              <th scope="col" className="whitespace-nowrap px-4 py-2">İşlem No</th>
-              <th scope="col" className="whitespace-nowrap px-4 py-2">Müşteri</th>
-              <th scope="col" className="whitespace-nowrap px-4 py-2">Tarih</th>
-              <th scope="col" className="whitespace-nowrap px-4 py-2">Taksit</th>
-              <th scope="col" className="whitespace-nowrap px-4 py-2 text-right">Tutar</th>
-              <th scope="col" className="whitespace-nowrap px-4 py-2">Durum</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rolIslemleri(role).slice(0, 6).map((t, i) => (
-              <tr key={t.id} className={`transition-colors hover:bg-[var(--soft)] ${i > 0 ? "border-t border-[var(--border)]" : ""}`}>
-                <td className="whitespace-nowrap px-4 py-2.5 font-bold text-[var(--brand-text)]">{t.id}</td>
-                <td className="whitespace-nowrap px-4 py-2.5">
-                  <span className="block font-semibold text-[var(--fg)]">{t.musteri}</span>
-                  <span className="block text-[11px] tabular-nums text-[var(--muted)]">{t.cari}</span>
-                </td>
-                <td className="whitespace-nowrap px-4 py-2.5 tabular-nums text-[var(--muted)]">{t.tarih}</td>
-                <td className="whitespace-nowrap px-4 py-2.5 text-[var(--fg-2)]">{t.taksit}</td>
-                <td className="whitespace-nowrap px-4 py-2.5 text-right font-bold tabular-nums text-[var(--fg)]">{t.tutar}</td>
-                <td className="whitespace-nowrap px-4 py-2.5">
-                  <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${pillTone(t.durum)}`}>{t.durum}</span>
-                </td>
+      {sorgu.isPending ? (
+        <Yukleniyor satir={6} baslik={false} />
+      ) : sorgu.isError ? (
+        <HataKutusu hata={sorgu.error} onTekrar={() => sorgu.refetch()} />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-[12.5px]">
+            <thead>
+              <tr className="border-y border-[var(--border)] bg-[var(--soft)] text-left text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                <th scope="col" className="whitespace-nowrap px-4 py-2">İşlem No</th>
+                <th scope="col" className="whitespace-nowrap px-4 py-2">Müşteri</th>
+                <th scope="col" className="whitespace-nowrap px-4 py-2">Tarih</th>
+                <th scope="col" className="whitespace-nowrap px-4 py-2">Taksit</th>
+                <th scope="col" className="whitespace-nowrap px-4 py-2 text-right">Tutar</th>
+                <th scope="col" className="whitespace-nowrap px-4 py-2">Durum</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {satirlar.map((t, i) => (
+                <tr key={t.islemNo} className={`transition-colors hover:bg-[var(--soft)] ${i > 0 ? "border-t border-[var(--border)]" : ""}`}>
+                  <td className="whitespace-nowrap px-4 py-2.5 font-bold text-[var(--brand-text)]">{t.islemNo}</td>
+                  <td className="whitespace-nowrap px-4 py-2.5">
+                    <span className="block font-semibold text-[var(--fg)]">{t.musteri.unvan}</span>
+                    <span className="block text-[11px] tabular-nums text-[var(--muted)]">{t.musteri.cariNo}</span>
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-2.5 tabular-nums text-[var(--muted)]">{tarihSaat(t.tarih)}</td>
+                  <td className="whitespace-nowrap px-4 py-2.5 text-[var(--fg-2)]">{t.taksit === 1 ? "Tek Çekim" : t.taksit}</td>
+                  <td className="whitespace-nowrap px-4 py-2.5 text-right font-bold tabular-nums text-[var(--fg)]">{tl(t.tutarKurus)}</td>
+                  <td className="whitespace-nowrap px-4 py-2.5">
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${durumTonu(t.durum)}`}>{etiket("islemDurumu", t.durum)}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {satirlar.length === 0 && <BosDurum baslik="Henüz işlem yok" />}
+        </div>
+      )}
     </section>
   );
 }
@@ -653,7 +666,7 @@ export function Dashboard({ role, meta, onNavigate }) {
       </div>
 
       <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <TransactionsCard role={role} onSeeAll={() => onNavigate("/raporlar/islem-detaylari")} />
+        <TransactionsCard onSeeAll={() => onNavigate("/raporlar/islem-detaylari")} />
         <div className="flex flex-col gap-3">
           <QuickCard onNavigate={onNavigate} />
           <DistributionCard stats={stats} />
