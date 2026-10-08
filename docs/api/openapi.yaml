@@ -510,8 +510,222 @@ paths:
               schema: { $ref: "#/components/schemas/OdemeLinki" }
         "422": { $ref: "#/components/responses/IsKurali" }
 
-  # --- Sonraki adımlarda eklenecek uç noktalar (docs/api/README.md'deki tablo) ---
-  # /panel/bekleyenler (menü rozetleri — iptal/iade ve fatura ekranları API'ye geçince) · /tahsilat-carileri · /firma/ortaklar · /odeme/taksit-secenekleri · /odemeler · /odeme-linkleri
+  /panel/bekleyenler:
+    get:
+      tags: [Panel]
+      summary: Menü rozetleri
+      responses:
+        "200":
+          description: Bekleyen iş sayıları
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  onayBekleyenTalep: { type: integer, description: Oturumun onayını bekleyen iptal / iade talebi }
+                  faturasiBekleyenIslem: { type: integer, description: Oturum firmasının faturası yüklenmemiş işlemi }
+              example: { onayBekleyenTalep: 3, faturasiBekleyenIslem: 0 }
+
+  /iptal-iade-talepleri:
+    get:
+      tags: [İptal / İade]
+      summary: İptal / iade talepleri (takip raporu ve onay listesi)
+      description: |
+        Rol kapsamındaki talepler. `gorunum` sekmeyi seçer; `sayaclar` her görünümün sayısını verir. Onay ekranı
+        `gorunum=ONAYIMDA` kullanır. Her kayıtta `onayimda` oturumun onay / red verebileceğini söyler (şartname s.7–8).
+      parameters:
+        - { name: gorunum, in: query, schema: { type: string, enum: [TUMU, ONAYIMDA, UST_ONAYA_ILETILEN, ONAY_BEKLEYEN, ONAYLANDI, REDDEDILDI], default: TUMU } }
+      responses:
+        "200":
+          description: Liste
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Liste"
+                  - type: object
+                    properties:
+                      kayitlar: { type: array, items: { $ref: "#/components/schemas/Talep" } }
+    post:
+      tags: [İptal / İade]
+      summary: Talep gir
+      description: |
+        Şartname s.8. Alt bayinin talebi BAYI_ONAYINDA, bayinin talebi ANA_FIRMA_ONAYINDA başlar; ana firmanın kendi
+        talebi onay gerektirmeden ONAYLANDI olur ve işlem durumu değişir. İPTAL işlemin tamamı içindir; İADE kısmi olabilir.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [islemNo, tur, tutarKurus, aciklama]
+              properties:
+                islemNo: { type: string }
+                tur: { type: string, enum: [IADE, IPTAL] }
+                tutarKurus: { $ref: "#/components/schemas/Kurus" }
+                aciklama: { type: string }
+      responses:
+        "201":
+          description: Oluşturulan talep
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Talep" }
+        "422": { $ref: "#/components/responses/IsKurali" }
+
+  /iptal-iade-talepleri/uygun-islemler:
+    get:
+      tags: [İptal / İade]
+      summary: Talep girilebilecek işlemler (kendi başarılı çekimleri, açık / onaylı talebi olmayanlar)
+      responses:
+        "200":
+          description: İşlemler
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  kayitlar:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        islemNo: { type: string }
+                        tarih: { type: string, format: date-time }
+                        musteriUnvan: { type: string }
+                        tutarKurus: { $ref: "#/components/schemas/Kurus" }
+
+  /iptal-iade-talepleri/{talepNo}/onay:
+    post:
+      tags: [İptal / İade]
+      summary: Onayla
+      description: Bayi onaylarsa talep ana firma onayına iletilir; ana firma onaylarsa sonuçlanır ve işlem durumu değişir. Talebi giren e-posta ile bilgilendirilir.
+      parameters:
+        - { name: talepNo, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Güncel talep (+ bildirim metni)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Talep"
+                  - type: object
+                    properties:
+                      bildirim: { type: string }
+        "403": { $ref: "#/components/responses/YetkiYok" }
+        "404": { $ref: "#/components/responses/Bulunamadi" }
+
+  /iptal-iade-talepleri/{talepNo}/red:
+    post:
+      tags: [İptal / İade]
+      summary: Reddet (gerekçe zorunlu)
+      parameters:
+        - { name: talepNo, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [gerekce]
+              properties:
+                gerekce: { type: string }
+      responses:
+        "200":
+          description: Güncel talep (+ bildirim metni)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Talep" }
+        "403": { $ref: "#/components/responses/YetkiYok" }
+        "422": { $ref: "#/components/responses/IsKurali" }
+
+  /faturalar:
+    get:
+      tags: [Fatura]
+      summary: Fatura yükleme durumu (şartname s.9)
+      description: |
+        Fatura gereken işlemler: bayi / alt bayi çekimi, kendi kartı olmayan, başarılı. Kaydı olmayan işlem BEKLIYOR.
+        Fatura içeriği yalnızca yükleyen firmaya döner; bayi ve ana firma `icerikGizli: true` görür.
+      parameters:
+        - { name: durum, in: query, schema: { type: string, enum: [YUKLENMEMIS, YUKLENEN, TUMU], default: YUKLENMEMIS } }
+      responses:
+        "200":
+          description: Liste
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Liste"
+                  - type: object
+                    properties:
+                      kayitlar: { type: array, items: { $ref: "#/components/schemas/FaturaSatiri" } }
+                      ozet:
+                        type: object
+                        properties:
+                          bekleyen: { type: integer }
+                          bekleyenKurus: { $ref: "#/components/schemas/Kurus" }
+                          yuklenen: { type: integer }
+                          kendiBekleyen: { type: integer, description: Oturum firmasının kendi bekleyen faturaları }
+    post:
+      tags: [Fatura]
+      summary: Fatura yükle (multipart/form-data)
+      description: Şeklen kontrol sunucuda — fatura no 16 karakter, tarih işlem tarihinden önce değil, tutar işlem tutarına eşit, dosya PDF/JPG/PNG ve en çok 5 MB. Uygun olmayan fatura alınmaz (422, alan alan).
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [islemNo, faturaNo, faturaTarihi, tutarKurus, dosya]
+              properties:
+                islemNo: { type: string }
+                faturaNo: { type: string, pattern: "^[A-Z0-9]{3}\\d{13}$" }
+                faturaTarihi: { type: string, format: date }
+                tutarKurus: { type: integer }
+                dosya: { type: string, format: binary }
+      responses:
+        "201":
+          description: Fatura kaydı
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Fatura" }
+        "404": { $ref: "#/components/responses/Bulunamadi" }
+        "422": { $ref: "#/components/responses/IsKurali" }
+
+  /faturalar/{islemNo}/hatirlatma:
+    post:
+      tags: [Fatura]
+      summary: Çekimi yapan firmaya fatura hatırlatması gönder (e-posta)
+      parameters:
+        - { name: islemNo, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Gönderildi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  gonderildi: { type: boolean }
+                  firma: { $ref: "#/components/schemas/FirmaOzeti" }
+                  kanal: { type: string, enum: [EPOSTA] }
+
+  /faturalar/{islemNo}/yukleme-linki:
+    post:
+      tags: [Fatura]
+      summary: Faturayı link üzerinden yükletmek için yükleme linki üret (şartname s.10)
+      parameters:
+        - { name: islemNo, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Link
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url: { type: string, format: uri }
+                  sonGecerlilik: { type: string, format: date-time } · /tahsilat-carileri · /firma/ortaklar · /odeme/taksit-secenekleri · /odemeler · /odeme-linkleri
   # /iptal-iade-talepleri · /iptal-iade-talepleri/uygun-islemler · /iptal-iade-talepleri/{id}/onay · /{id}/red
   # /bayiler · /bayiler/{cariNo} · /alt-bayiler · /vade-farki-profilleri · /uye-isyerleri
   # /faturalar · /faturalar/{islemNo}/hatirlatma · /faturalar/{islemNo}/yukleme-linki
@@ -792,6 +1006,54 @@ components:
         taksitler: { type: [array, "null"], items: { type: integer } }
         tahsilatCarisi: { type: [object, "null"] }
         durum: { type: string, enum: [BEKLIYOR, ODENDI, SURESI_DOLDU, IPTAL_EDILDI] }
+
+    Talep:
+      type: object
+      properties:
+        talepNo: { type: string, example: TLP-4418 }
+        tarih: { type: string, format: date-time }
+        islemNo: { type: string }
+        giren: { $ref: "#/components/schemas/FirmaOzeti" }
+        musteriUnvan: { type: string }
+        islemTutariKurus: { $ref: "#/components/schemas/Kurus" }
+        tutarKurus: { $ref: "#/components/schemas/Kurus" }
+        tur: { type: string, enum: [IADE, IPTAL] }
+        aciklama: { type: string }
+        durum: { type: string, enum: [BAYI_ONAYINDA, ANA_FIRMA_ONAYINDA, ONAYLANDI, REDDEDILDI] }
+        onayimda: { type: boolean, description: Oturum bu talebe onay / red verebilir }
+        gecmis:
+          type: array
+          items:
+            type: object
+            properties:
+              tarih: { type: string, format: date-time }
+              firma: { $ref: "#/components/schemas/FirmaOzeti" }
+              olay: { type: string, enum: [TALEP_GIRILDI, ONAYLADI_ILETTI, ONAYLADI, REDDETTI] }
+              not: { type: [string, "null"], description: Red gerekçesi vb. }
+
+    Fatura:
+      type: object
+      description: Yükleyen firma tüm alanları görür; diğerleri yalnızca durum + icerikGizli
+      properties:
+        durum: { type: string, enum: [YUKLENDI, REDDEDILDI] }
+        yukleme: { type: string, format: date-time }
+        redNedeni: { type: [string, "null"] }
+        faturaNo: { type: string }
+        faturaTarihi: { type: string, format: date }
+        tutarKurus: { $ref: "#/components/schemas/Kurus" }
+        dosyaAdi: { type: string }
+        icerikGizli: { type: boolean }
+
+    FaturaSatiri:
+      type: object
+      properties:
+        islem: { $ref: "#/components/schemas/Islem" }
+        fatura:
+          oneOf:
+            - $ref: "#/components/schemas/Fatura"
+            - type: "null"
+        durum: { type: string, enum: [BEKLIYOR, YUKLENDI, REDDEDILDI] }
+        kendi: { type: boolean, description: İşlemi oturum firması yaptı (yükleyebilir) }
 
     Musteri:
       type: object

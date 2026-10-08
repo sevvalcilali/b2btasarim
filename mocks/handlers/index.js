@@ -8,6 +8,8 @@ import { tanimlarHandlers } from "./tanimlar";
 import { musterilerHandlers } from "./musteriler";
 import { odemelerHandlers } from "./odemeler";
 import { linklerHandlers } from "./linkler";
+import { taleplerHandlers } from "./talepler";
+import { faturalarHandlers } from "./faturalar";
 
 export const handlers = [
   ...oturumHandlers,
@@ -19,4 +21,6 @@ export const handlers = [
   ...musterilerHandlers,
   ...odemelerHandlers,
   ...linklerHandlers,
+  ...taleplerHandlers,
+  ...faturalarHandlers,
 ];

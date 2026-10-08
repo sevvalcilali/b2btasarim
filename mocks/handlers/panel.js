@@ -1,6 +1,7 @@
 // GET /panel/ozet · /panel/haftalik-hacim · /panel/bakiye
 import { http, HttpResponse } from "msw";
 import { depo } from "../db/depo";
+import { faturaDurumu, faturaGerekli, kapsamda, onayimda } from "../kurallar";
 import { gecikme, uc, yetkili } from "./yardimci";
 
 const KALEMLER = ["TOPLAM", "BASARILI", "BASARISIZ", "IPTAL", "IADE"];
@@ -33,6 +34,17 @@ export const panelHandlers = [
       gunler,
       toplamKurus: gunler.reduce((a, g) => a + g.tutarKurus, 0),
       degisimYuzde: 12.4, // geçen haftaya göre — örnek veri
+    });
+  }),
+
+  // Menü rozetleri: onayımda bekleyen talepler (s.8) ve faturası bekleyen kendi işlemleri (s.9)
+  http.get(uc("/panel/bekleyenler"), async ({ request }) => {
+    await gecikme();
+    const { kim, cevap } = yetkili(request);
+    if (cevap) return cevap;
+    return HttpResponse.json({
+      onayBekleyenTalep: depo.tablo("iptalIadeTalepleri").filter((t) => kapsamda(kim, t.girenId) && onayimda(kim, t)).length,
+      faturasiBekleyenIslem: depo.tablo("islemler").filter((t) => t.cekimYapanId === kim.firmaId && faturaGerekli(t) && faturaDurumu(t.islemNo).durum !== "YUKLENDI").length,
     });
   }),
 

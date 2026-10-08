@@ -174,6 +174,46 @@ export function tahsilatCarileri(kim) {
   return { etiket: "Bayi Carisi", kayitlar: bayi ? [{ cariNo: bayi.cariNo, ad: bayi.unvan }] : [] };
 }
 
+// ---- iptal / iade (şartname s.8) ------------------------------------------------------------------
+// Alt bayi → BAYI_ONAYINDA → bayi onaylayıp iletir → ANA_FIRMA_ONAYINDA → ONAYLANDI | REDDEDILDI.
+// Bayinin talebi doğrudan ana firma onayına düşer; ana firmanın kendi talebi onay gerektirmeden sonuçlanır.
+
+/** Talep bu oturumun onayını mı bekliyor? */
+export function onayimda(kim, t) {
+  if (kim.rol === "ANA_FIRMA") return t.durum === "ANA_FIRMA_ONAYINDA";
+  if (kim.rol === "BAYI") return t.durum === "BAYI_ONAYINDA" && altBayileri(kim.firmaId).some((a) => a.firmaId === t.girenId);
+  return false;
+}
+
+/** Depodaki talep → sözleşmedeki Talep cevabı */
+export function talepCevabi(t, kim) {
+  const islem = depo.tablo("islemler").find((i) => i.islemNo === t.islemNo);
+  return {
+    talepNo: t.talepNo,
+    tarih: t.tarih,
+    islemNo: t.islemNo,
+    giren: firmaOzeti(t.girenId),
+    musteriUnvan: islem?.musteri.unvan || "—",
+    islemTutariKurus: islem?.tutarKurus ?? null,
+    tutarKurus: t.tutarKurus,
+    tur: t.tur,
+    aciklama: t.aciklama,
+    durum: t.durum,
+    onayimda: onayimda(kim, t),
+    gecmis: t.gecmis.map((g) => ({ tarih: g.tarih, firma: firmaOzeti(g.firmaId), olay: g.olay, not: g.not || null })),
+  };
+}
+
+// ---- fatura (şartname s.9) ---------------------------------------------------------------------
+/** Fatura gereken işlem: bayi / alt bayi çekimi, kendi kartı olmayan, başarılı */
+export const faturaGerekli = (islem) => firma(islem.cekimYapanId)?.tur !== "ANA_FIRMA" && islem.musteriTuru !== "KENDI_KARTI" && islem.durum === "BASARILI";
+
+/** İşlemin fatura kaydı ve durumu (kaydı yoksa BEKLIYOR) */
+export function faturaDurumu(islemNo) {
+  const kayit = depo.tablo("faturalar").find((f) => f.islemNo === islemNo) || null;
+  return { kayit, durum: kayit ? kayit.durum : "BEKLIYOR" };
+}
+
 /** Sayfalama: { kayitlar, toplam, sayfa, boyut } */
 export function sayfala(liste, sorgu) {
   const sayfa = Math.max(1, Number(sorgu.get("sayfa")) || 1);

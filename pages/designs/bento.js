@@ -1,22 +1,22 @@
 import { useEffect, useState } from "react";
 import { ROLES, ROLE_META, ROLE_ORDER } from "@/lib/roles";
 import { useRole } from "@/components/RoleContext";
-import { anaFirma, iptalIadeTalepleri, faturaYuklemeleri } from "@/lib/mockData";
+import { anaFirma } from "@/lib/mockData";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import CompanyLogo from "@/components/CompanyLogo";
 import I from "@/components/DesignIcons";
 import { LoginView } from "@/components/bento/Giris";
 import { Sidebar, UserMenu } from "@/components/bento/Kabuk";
-import { useAg, kapsamda } from "@/components/bento/ag";
 import { Dashboard } from "@/components/bento/ekranlar/AnaSayfa";
 import { BayiListesi, BayiTanimlama } from "@/components/bento/ekranlar/BayiTanim";
-import { FaturaYukleme, faturaGerekenler, faturaDurumu } from "@/components/bento/ekranlar/FaturaYukleme";
-import { onayimda, IptalIade } from "@/components/bento/ekranlar/IptalIade";
+import { FaturaYukleme } from "@/components/bento/ekranlar/FaturaYukleme";
+import { IptalIade } from "@/components/bento/ekranlar/IptalIade";
 import { IslemDetaylari } from "@/components/bento/ekranlar/IslemDetaylari";
 import { LinkOdeme } from "@/components/bento/ekranlar/LinkOdeme";
 import { ManuelOdeme } from "@/components/bento/ekranlar/ManuelOdeme";
 import { HOME, SAYFALAR, KALICI_PARAMETRELER } from "@/components/bento/sayfalar";
+import { useBekleyenler } from "@/lib/sorgular/panel";
 import { light, dark, MOTION_CSS, FOCUS, GHOST } from "@/components/bento/tema";
 
 // N Kolay Bayim paneli — seçilen tasarım: Bento (Tasarım 03). Diğer tasarımlar arsiv/ klasöründe.
@@ -29,14 +29,12 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
   const [isDesktop, setIsDesktop] = useState(true);
   const meta = ROLE_META[role];
 
-  useAg(); // bayi ağı deposuna abone: tanım değişince tüm panel yeniden çizilir
-
-  // iptal / iade talepleri panel düzeyinde: rol değiştirerek onay zinciri uçtan uca izlenebilir
-  const [talepler, setTalepler] = useState(iptalIadeTalepleri);
-  const bekleyenOnay = talepler.filter((t) => kapsamda(role, t.giren) && onayimda(role, t)).length;
-  // yüklenen faturalar da panel düzeyinde; rozet: rolün kendi işlemlerinden faturası beklenenler
-  const [faturalar, setFaturalar] = useState(faturaYuklemeleri);
-  const bekleyenFatura = faturaGerekenler(role).filter((t) => t.yapan === meta.company && faturaDurumu(faturalar, t.id).durum !== "Yüklendi").length;
+  // menü rozetleri — GET /panel/bekleyenler (onay / yükleme sonrası ilgili kancalar yeniler)
+  const bekleyenler = useBekleyenler();
+  const rozetler = {
+    "/iptal-iade/onay": bekleyenler.data?.onayBekleyenTalep || 0,
+    "/raporlar/fatura-yukleme": bekleyenler.data?.faturasiBekleyenIslem || 0,
+  };
 
   // açık ekran adres çubuğunda (?sayfa=) tutulur: yenileme ve geri tuşu çalışır
   const router = useRouter();
@@ -88,7 +86,7 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
         onLogout={onLogout}
         current={current}
         onNavigate={navigate}
-        rozetler={{ "/iptal-iade/onay": bekleyenOnay, "/raporlar/fatura-yukleme": bekleyenFatura }}
+        rozetler={rozetler}
       />
 
       <div className="flex min-w-0 flex-1 flex-col px-3 lg:px-4">
@@ -193,14 +191,12 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
               onNavigate={navigate}
             />
           ) : current === "/raporlar/fatura-yukleme" ? (
-            <FaturaYukleme role={role} meta={meta} faturalar={faturalar} setFaturalar={setFaturalar} onNavigate={navigate} />
+            <FaturaYukleme role={role} meta={meta} onNavigate={navigate} />
           ) : current === "/iptal-iade/onay" || current === "/iptal-iade/takip" ? (
             <IptalIade
               role={role}
               meta={meta}
               mod={current === "/iptal-iade/onay" ? "onay" : "takip"}
-              talepler={talepler}
-              setTalepler={setTalepler}
               onNavigate={navigate}
             />
           ) : (
