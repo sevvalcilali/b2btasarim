@@ -639,6 +639,40 @@ paths:
         "403": { $ref: "#/components/responses/YetkiYok" }
         "422": { $ref: "#/components/responses/IsKurali" }
 
+  /raporlar/bayi-ozet:
+    get:
+      tags: [İşlemler]
+      summary: Bayi / alt bayi özet raporu (şartname s.7)
+      description: |
+        Firma başına işlem adedi, başarılı ciro, vade farkı, iptal/iade ve hesaba geçecek tutar. Ana firma tüm bayi ve
+        alt bayileri, bayi kendisini ve alt bayilerini görür; alt bayinin özet raporu yoktur (403).
+        Hesaba geçecek = başarılı ciro + vade farkı − iptal/iade — DEMO VARSAYIMI, kesin hesabı backend belirler.
+      parameters:
+        - { name: donem, in: query, schema: { type: string, enum: [7g, 30g, tumu], default: 30g } }
+        - { name: musteriTuru, in: query, schema: { $ref: "#/components/schemas/MusteriTuru" } }
+      responses:
+        "200":
+          description: Özet
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  donem: { type: string }
+                  kayitlar:
+                    type: array
+                    items: { $ref: "#/components/schemas/BayiOzetSatiri" }
+                  toplam:
+                    allOf:
+                      - $ref: "#/components/schemas/OzetRakamlari"
+                      - type: object
+                        properties:
+                          firmaAdet: { type: integer }
+                  musteriTurleri:
+                    type: array
+                    items: { $ref: "#/components/schemas/MusteriTuru" }
+        "403": { $ref: "#/components/responses/YetkiYok" }
+
   /faturalar:
     get:
       tags: [Fatura]
@@ -1006,6 +1040,30 @@ components:
         taksitler: { type: [array, "null"], items: { type: integer } }
         tahsilatCarisi: { type: [object, "null"] }
         durum: { type: string, enum: [BEKLIYOR, ODENDI, SURESI_DOLDU, IPTAL_EDILDI] }
+
+    OzetRakamlari:
+      type: object
+      properties:
+        islemAdet: { type: integer }
+        basariliAdet: { type: integer }
+        basarisizAdet: { type: integer }
+        ciroKurus: { $ref: "#/components/schemas/Kurus", description: Başarılı işlemlerin toplamı }
+        vadeFarkiKurus: { $ref: "#/components/schemas/Kurus" }
+        iptalIadeKurus: { $ref: "#/components/schemas/Kurus" }
+        hesabaGececekKurus: { $ref: "#/components/schemas/Kurus" }
+
+    BayiOzetSatiri:
+      allOf:
+        - $ref: "#/components/schemas/OzetRakamlari"
+        - type: object
+          properties:
+            firma: { $ref: "#/components/schemas/FirmaOzeti" }
+            bagli:
+              oneOf:
+                - $ref: "#/components/schemas/FirmaOzeti"
+                - type: "null"
+            vadeProfil: { type: [string, "null"], example: Profil 2 }
+            durum: { $ref: "#/components/schemas/KayitDurumu" }
 
     Talep:
       type: object

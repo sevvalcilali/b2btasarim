@@ -11,6 +11,7 @@ import { Sidebar, UserMenu } from "@/components/bento/Kabuk";
 import { Dashboard } from "@/components/bento/ekranlar/AnaSayfa";
 import { BayiListesi, BayiTanimlama } from "@/components/bento/ekranlar/BayiTanim";
 import { FaturaYukleme } from "@/components/bento/ekranlar/FaturaYukleme";
+import { BayiOzet } from "@/components/bento/ekranlar/BayiOzet";
 import { IptalIade } from "@/components/bento/ekranlar/IptalIade";
 import { IslemDetaylari } from "@/components/bento/ekranlar/IslemDetaylari";
 import { LinkOdeme } from "@/components/bento/ekranlar/LinkOdeme";
@@ -193,6 +194,8 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
               kayitAdi={parametre("ad")}
               onNavigate={navigate}
             />
+          ) : current === "/raporlar/bayi-ozet" && role !== ROLES.ALT_BAYI ? (
+            <BayiOzet role={role} meta={meta} onNavigate={navigate} />
           ) : current === "/raporlar/fatura-yukleme" ? (
             <FaturaYukleme role={role} meta={meta} onNavigate={navigate} />
           ) : current === "/iptal-iade/onay" || current === "/iptal-iade/takip" ? (

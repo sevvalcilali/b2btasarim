@@ -40,6 +40,7 @@ Ekran (components/bento/ekranlar)  →  lib/sorgular (React Query kancaları)  �
 | | `GET /panel/bekleyenler` (menü rozetleri) | ✅ |
 | Ana Sayfa | `GET /panel/ozet` · `GET /panel/haftalik-hacim` · `GET /panel/bakiye` · `GET /islemler?boyut=6` | ✅ |
 | İşlem Detayları | `GET /islemler` | ✅ sözleşme + sahte backend + ekran |
+| Bayi Özet / Alt Bayi Özet | `GET /raporlar/bayi-ozet` | ✅ |
 | Manuel Ödeme | `GET /bayiler` · `GET /musteriler` · `GET /tahsilat-carileri` · `GET /firma` (ortaklar) · `GET /odeme/taksit-secenekleri` · `POST /odemeler` | ✅ |
 | Link ile Ödeme | + `GET /odeme-linkleri` · `POST /odeme-linkleri` | ✅ |
 | İptal / İade | `GET /iptal-iade-talepleri` · `GET …/uygun-islemler` · `POST …` · `POST …/{talepNo}/onay` · `POST …/{talepNo}/red` | ✅ |
