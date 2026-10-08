@@ -1,8 +1,9 @@
 # N Kolay Bayim — B2B Panel
 
 pay'n kolay **N Kolay Bayim** B2B ödeme paneli. Seçilen tasarım: **Bento (Tasarım 03)**.
-Next.js (Pages Router) + Tailwind CSS. Yalnızca ön yüz: servis / API çağrısı **yok**, tüm veriler
-`lib/mockData.js` içinde örnek veridir.
+Next.js (Pages Router) + Tailwind CSS + React Query. Ekranlar veriyi `/api/v1` uç noktalarından
+HTTP ile alır; şimdilik bu istekleri tarayıcıdaki **sahte backend** (MSW, `mocks/`) örnek veriyle cevaplar.
+Sözleşme: [`docs/api/openapi.yaml`](docs/api/openapi.yaml) · özet: [`docs/api/README.md`](docs/api/README.md).
 
 ## Çalıştırma
 
@@ -12,6 +13,16 @@ npm run dev      # http://localhost:3000
 ```
 
 Ana adres (`/`) Bento panelini açar (`/designs/bento` ile aynı sayfa).
+
+### Veri kaynağı
+
+| Ortam | Ayar (`.env.local`, bkz. `.env.example`) | Sonuç |
+| --- | --- | --- |
+| Geliştirme / demo (öntanımlı) | `NEXT_PUBLIC_API_MOCK=true` | Sahte backend `/api/v1` adresine cevap verir; veri sekme oturumu boyunca kalıcıdır |
+| Backend entegrasyonu | `NEXT_PUBLIC_API_MOCK=false` · `NEXT_PUBLIC_API_URL=https://…/api/v1` | Gerçek backend; ekran kodu değişmez |
+
+Kullanıcı menüsündeki **Demo verisini sıfırla** sahte backend'i başlangıç verisine döndürür.
+Üst bardaki rol değiştirici isteklere `Authorization: Bearer demo-<ROL>` yazar; gerçek ortamda gizlenir.
 
 ## Özellikler
 
@@ -42,9 +53,19 @@ components/
     ekranlar/           AnaSayfa, IslemDetaylari, ManuelOdeme, LinkOdeme,
                         IptalIade, BayiTanim, FaturaYukleme
 lib/
+  api/                  uç nokta fonksiyonları (istemci.js tek fetch noktası, hata.js ApiHatasi, oturum.js …)
+  sorgular/             React Query kancaları (anahtarlar.js önbellek anahtarları, saglayici.js QueryClient)
+  bicim.js              kuruş → ₺, ISO → tarih; etiketler.js kod → ekran etiketi
   roles.js              3 rol
   nav.js                role göre menü (şartname s.2)
-  mockData.js           örnek veri
+  mockData.js           eski örnek veri — ekranlar API'ye taşındıkça silinecek
+mocks/
+  baslat.js             MSW servis çalışanını başlatır (yalnızca tarayıcı, NEXT_PUBLIC_API_MOCK=true)
+  db/tohum.js           başlangıç verisi, ham biçim (kuruş, ISO, kod) · db/depo.js bellek içi tablolar + sessionStorage
+  kurallar.js           sunucu kuralları: oturum, rol kapsamı, sayfalama
+  handlers/             uç nokta cevapları (lib/api ile aynı dosya adları)
+docs/api/               openapi.yaml (sözleşme) · README.md (özet, uç nokta durumu)
+public/mockServiceWorker.js   MSW servis çalışanı (üretilmiş dosya, elle değiştirilmez)
 styles/globals.css      Tailwind + yazı tipi
 arsiv/                  seçilmeyen tasarımlar ve galeri — yorum satırında, derlemeye dahil değil
 ```
@@ -52,6 +73,10 @@ arsiv/                  seçilmeyen tasarımlar ve galeri — yorum satırında,
 Yeni bir ekran eklemek için: `components/bento/ekranlar/` altına ekranı yazın, `sayfalar.js`'teki
 `SAYFALAR` tablosuna adresini ekleyin ve `pages/designs/bento.js`'te ilgili koşulda çizdirin.
 Menüdeki öğe kendiliğinden tıklanabilir olur.
+
+Ekranın verisi için sıra: `docs/api/openapi.yaml`'a uç noktayı yaz → `lib/api/<kaynak>.js` fonksiyonu →
+`lib/sorgular/<kaynak>.js` kancası → `mocks/handlers/<kaynak>.js` cevabı. Ekran yalnızca kancayı çağırır;
+yükleniyor / hata / boş durumları `components/bento/durumlar.js`'ten gelir.
 
 ## Notlar
 

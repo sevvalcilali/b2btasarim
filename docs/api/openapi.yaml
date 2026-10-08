@@ -1,0 +1,194 @@
+openapi: 3.1.0
+info:
+  title: N Kolay Bayim B2B Panel API
+  version: 0.1.0
+  description: |
+    Panel ekranlarının kullandığı uç noktalar. Ekranlar bu sözleşmeye göre yazılmıştır; sahte backend (mocks/)
+    aynı sözleşmeye göre cevap verir. Backend servisleri bu dosyaya göre yazılınca ekran kodu değişmeden bağlanır.
+
+    Genel kurallar
+    - Alan adları camelCase; durum ve tür değerleri kod (ör. BASARILI, ALT_BAYI). Ekran etiketleri: lib/etiketler.js
+    - Para: kuruş cinsinden tam sayı (tutarKurus: 1240000 = ₺ 12.400,00)
+    - Tarih: ISO 8601, saat dilimli (2026-09-30T14:22:00+03:00); yalnız gün için YYYY-AA-GG
+    - Liste cevabı: { kayitlar, toplam, sayfa, boyut, sayaclar? }; filtre ve arama sorgu parametresiyle, sunucuda
+    - Hata: { hata: { kod, mesaj, alanlar? } } + HTTP durumu (400 biçim, 401 oturum yok, 403 yetki yok,
+      404 yok, 409 çakışma, 422 iş kuralı, 500 sunucu)
+    - Kimlik: Authorization: Bearer <token>; rol ve firma tokendan çıkarılır, istemci göndermez
+    - Rol kapsamı (şartname s.7): ana firma tüm ağı, bayi kendisi + alt bayileri, alt bayi yalnızca kendisi görür.
+      Kapsam dışı kayıt listelerde yer almaz, tekil istekte 404 döner.
+
+    Backend ekibinin netleştireceği noktalar
+    - Kimlik doğrulama: token nasıl alınır, klasik panelle ortak oturum (şartname s.10)
+    - Ödeme: kart numarası yerine kart tokenı (PCI); tokenı hangi sağlayıcı / 3D Secure akışı üretir
+    - Vade farkı formülü: sunucu /odeme/taksit-secenekleri ile hesaplar; mockup varsayımı tutar × oran × (taksit − 1)
+servers:
+  - url: /api/v1
+    description: Sahte backend (MSW) — geliştirme ve demo
+security:
+  - bearer: []
+tags:
+  - name: Oturum
+  - name: Panel
+  - name: İşlemler
+  - name: Ödeme
+  - name: İptal / İade
+  - name: Bayi Tanım
+  - name: Fatura
+  - name: Tanımlar
+
+paths:
+  /oturum:
+    get:
+      tags: [Oturum]
+      summary: Giriş yapmış kullanıcı, rolü, firması ve yetkileri
+      responses:
+        "200":
+          description: Oturum
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Oturum" }
+              example:
+                kullanici: { kullaniciId: K-101, adSoyad: Murat Aydın, email: murat@ankaralastik.com, yetki: YONETICI }
+                rol: BAYI
+                firma:
+                  firmaId: "320.01.001"
+                  unvan: Ankara Lastik Bayi Ltd.
+                  tur: BAYI
+                  cariNo: "320.01.001"
+                  vergiNo: "1234567890"
+                  logoRenk: "#C2630F"
+                  bagli: { firmaId: "100.00.001", unvan: Brisa A.Ş., tur: ANA_FIRMA }
+                anaFirma: { firmaId: "100.00.001", unvan: Brisa A.Ş., kisaAd: Brisa, aciklama: Lastik & Otomotiv Bayi Ağı, logoRenk: "#4F9B7C" }
+                yetkiler: [ODEME, RAPOR, IPTAL_IADE_GIRIS, IPTAL_IADE_ONAY, BAYI_TANIM, KULLANICI_TANIM, AYARLAR]
+        "401": { $ref: "#/components/responses/OturumYok" }
+
+  # --- Sonraki adımlarda eklenecek uç noktalar (docs/api/README.md'deki tablo) ---
+  # /panel/ozet · /panel/haftalik-hacim · /panel/bekleyenler
+  # /islemler
+  # /musteriler · /tahsilat-carileri · /firma/ortaklar · /odeme/taksit-secenekleri · /odemeler · /odeme-linkleri
+  # /iptal-iade-talepleri · /iptal-iade-talepleri/uygun-islemler · /iptal-iade-talepleri/{id}/onay · /{id}/red
+  # /bayiler · /bayiler/{cariNo} · /alt-bayiler · /vade-farki-profilleri · /uye-isyerleri
+  # /faturalar · /faturalar/{islemNo}/hatirlatma · /faturalar/{islemNo}/yukleme-linki
+
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+
+  responses:
+    OturumYok:
+      description: Oturum yok ya da süresi dolmuş
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/HataCevabi" }
+          example: { hata: { kod: OTURUM_YOK, mesaj: Oturum bulunamadı. Yeniden giriş yapın. } }
+    YetkiYok:
+      description: Bu işlem için yetki yok
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/HataCevabi" }
+    Bulunamadi:
+      description: Kayıt yok ya da kapsam dışında
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/HataCevabi" }
+    IsKurali:
+      description: İş kuralı ihlali; alanlar form alanlarına eşlenir
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/HataCevabi" }
+          example: { hata: { kod: LIMIT_ASILDI, mesaj: İşlem bazlı ödeme limiti aşıldı., alanlar: { tutarKurus: "İşlem bazlı ödeme limiti ₺ 150.000." } } }
+
+  schemas:
+    HataCevabi:
+      type: object
+      required: [hata]
+      properties:
+        hata:
+          type: object
+          required: [kod, mesaj]
+          properties:
+            kod: { type: string, description: Makine tarafından okunur hata kodu, SABIT_BUYUK_HARF }
+            mesaj: { type: string, description: Kullanıcıya gösterilebilir Türkçe mesaj }
+            alanlar:
+              type: object
+              additionalProperties: { type: string }
+              description: Alan adı → o alana ait mesaj
+
+    Liste:
+      type: object
+      description: Sayfalı liste zarfı; kayitlar'ın öğe tipi uç noktaya göre değişir
+      required: [kayitlar, toplam, sayfa, boyut]
+      properties:
+        kayitlar: { type: array, items: {} }
+        toplam: { type: integer, description: Filtreye uyan toplam kayıt }
+        sayfa: { type: integer, minimum: 1 }
+        boyut: { type: integer, minimum: 1, maximum: 200 }
+        sayaclar:
+          type: object
+          additionalProperties: { type: integer }
+          description: Durum sekmelerinin sayıları; TUMU her zaman vardır
+
+    Kurus:
+      type: integer
+      description: Kuruş cinsinden tutar (1240000 = ₺ 12.400,00)
+      minimum: 0
+
+    Rol:
+      type: string
+      enum: [ANA_FIRMA, BAYI, ALT_BAYI]
+
+    Yetki:
+      type: string
+      enum: [YONETICI, ODEME, RAPORLAMA]
+      description: Şartname s.3 — Yönetici tüm ekranlar; Ödeme ödeme + rapor; Raporlama yalnız rapor
+
+    FirmaOzeti:
+      type: object
+      required: [firmaId, unvan, tur]
+      properties:
+        firmaId: { type: string, description: Firma kimliği (örnek veride cari no) }
+        unvan: { type: string }
+        tur: { $ref: "#/components/schemas/Rol" }
+
+    Oturum:
+      type: object
+      required: [kullanici, rol, firma, anaFirma, yetkiler]
+      properties:
+        kullanici:
+          type: object
+          required: [kullaniciId, adSoyad, email, yetki]
+          properties:
+            kullaniciId: { type: string }
+            adSoyad: { type: string }
+            email: { type: string, format: email }
+            yetki: { $ref: "#/components/schemas/Yetki" }
+        rol: { $ref: "#/components/schemas/Rol" }
+        firma:
+          allOf:
+            - $ref: "#/components/schemas/FirmaOzeti"
+            - type: object
+              properties:
+                cariNo: { type: string }
+                vergiNo: { type: string }
+                logoRenk: { type: [string, "null"], description: Logo yoksa baş harf kutusunun rengi }
+                bagli:
+                  oneOf:
+                    - $ref: "#/components/schemas/FirmaOzeti"
+                    - type: "null"
+                  description: Bağlı olunan üst firma (bayi → ana firma, alt bayi → bayi)
+        anaFirma:
+          type: object
+          description: Ağın ana firması; şartname s.1 gereği her rolde logo + adıyla görünür
+          properties:
+            firmaId: { type: string }
+            unvan: { type: string }
+            kisaAd: { type: string }
+            aciklama: { type: string }
+            logoRenk: { type: [string, "null"] }
+        yetkiler:
+          type: array
+          items:
+            type: string
+            enum: [ODEME, RAPOR, IPTAL_IADE_GIRIS, IPTAL_IADE_ONAY, BAYI_TANIM, KULLANICI_TANIM, AYARLAR]

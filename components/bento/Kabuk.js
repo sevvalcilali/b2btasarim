@@ -6,6 +6,9 @@ import { getNav } from "@/lib/nav";
 import { anaFirma } from "@/lib/mockData";
 import CompanyLogo from "@/components/CompanyLogo";
 import I from "@/components/DesignIcons";
+import { SAHTE_BACKEND } from "@/lib/api/istemci";
+import { etiket } from "@/lib/etiketler";
+import { useDemoVerisiniSifirla, useOturum } from "@/lib/sorgular/oturum";
 import { isReady } from "./sayfalar";
 import { FOCUS, GHOST, MENU_ITEM } from "./tema";
 import { useDismiss } from "./yardimci";
@@ -143,6 +146,7 @@ export function Sidebar({ role, desktopOpen, mobileOpen, hidden, onClose, onLogo
   const manage = nav.filter((e) => MANAGE_ICONS.has(e.icon));
   // tüm gruplar kapalı başlar; aynı anda tek grup açık kalır. Açık ekranın grubu kapalıyken de başlığı vurgulanır.
   const [openGroup, setOpenGroup] = useState(null);
+  const oturum = useOturum();
 
   return (
     <>
@@ -188,14 +192,25 @@ export function Sidebar({ role, desktopOpen, mobileOpen, hidden, onClose, onLogo
           <NavSection label="Yönetim" entries={manage} openGroup={openGroup} setOpenGroup={setOpenGroup} current={current} onNavigate={onNavigate} rozetler={rozetler} />
         </nav>
 
-        {/* kullanıcı */}
+        {/* kullanıcı — GET /oturum */}
         <div className="m-3 mt-0 flex shrink-0 items-center gap-2.5 rounded-xl border border-[var(--border)] p-2">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--brand)] text-[10px] font-extrabold text-white">
-            {meta.short}
+            {basHarfler(oturum.data?.kullanici.adSoyad) || meta.short}
           </span>
           <span className="min-w-0 flex-1 leading-tight">
-            <span className="block truncate text-[12.5px] font-bold text-[var(--fg)]">{meta.user}</span>
-            <span className="block truncate text-[11px] font-medium text-[var(--muted)]">Çevrimiçi</span>
+            {oturum.isPending ? (
+              <>
+                <span className="block h-3 w-28 animate-pulse rounded bg-[var(--soft-2)] motion-reduce:animate-none" />
+                <span className="mt-1.5 block h-2.5 w-16 animate-pulse rounded bg-[var(--soft-2)] motion-reduce:animate-none" />
+              </>
+            ) : (
+              <>
+                <span className="block truncate text-[12.5px] font-bold text-[var(--fg)]">{oturum.data?.kullanici.adSoyad || meta.user}</span>
+                <span className="block truncate text-[11px] font-medium text-[var(--muted)]">
+                  {oturum.isError ? "Oturum alınamadı" : `${etiket("yetki", oturum.data?.kullanici.yetki)} · Çevrimiçi`}
+                </span>
+              </>
+            )}
           </span>
           <button
             type="button"
@@ -212,9 +227,22 @@ export function Sidebar({ role, desktopOpen, mobileOpen, hidden, onClose, onLogo
   );
 }
 
+// "Ad Soyad" → "AS"
+const basHarfler = (ad) =>
+  (ad || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0].toLocaleUpperCase("tr-TR"))
+    .join("");
+
 export function UserMenu({ meta, isDark, onToggleTheme, onLogout }) {
   const [open, setOpen] = useState(false);
   useDismiss(open, () => setOpen(false));
+  const oturum = useOturum();
+  const sifirla = useDemoVerisiniSifirla();
+  const adSoyad = oturum.data?.kullanici.adSoyad || meta.user;
+  const firmaUnvan = oturum.data?.firma.unvan || meta.company;
   return (
     <div className="relative">
       <button
@@ -225,8 +253,8 @@ export function UserMenu({ meta, isDark, onToggleTheme, onLogout }) {
         aria-label="Kullanıcı menüsü"
         className={`flex h-8 items-center gap-1.5 rounded-full bg-[var(--soft)] pl-0.5 pr-2 transition-colors hover:bg-[var(--soft-2)] ${FOCUS}`}
       >
-        <span className="grid h-7 w-7 place-items-center rounded-full bg-[var(--brand)] text-[10px] font-extrabold text-white">{meta.short}</span>
-        <span className="hidden max-w-[150px] truncate text-[12.5px] font-semibold text-[var(--fg)] xl:block">{meta.user}</span>
+        <span className="grid h-7 w-7 place-items-center rounded-full bg-[var(--brand)] text-[10px] font-extrabold text-white">{basHarfler(adSoyad) || meta.short}</span>
+        <span className="hidden max-w-[150px] truncate text-[12.5px] font-semibold text-[var(--fg)] xl:block">{adSoyad}</span>
         <I name="chevronDown" size={13} className={`text-[var(--muted)] transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
@@ -237,8 +265,8 @@ export function UserMenu({ meta, isDark, onToggleTheme, onLogout }) {
             className="bn-pop absolute right-0 top-full z-40 mt-2 w-56 origin-top-right rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-1.5 [box-shadow:var(--pop-shadow)]"
           >
             <div className="px-2.5 pb-2 pt-1.5">
-              <p className="truncate text-[12.5px] font-bold text-[var(--fg)]">{meta.user}</p>
-              <p className="truncate text-[11.5px] text-[var(--muted)]">{meta.company}</p>
+              <p className="truncate text-[12.5px] font-bold text-[var(--fg)]">{adSoyad}</p>
+              <p className="truncate text-[11.5px] text-[var(--muted)]">{firmaUnvan}</p>
             </div>
             <div className="my-1 border-t border-[var(--border)]" />
             <button type="button" role="menuitem" className={MENU_ITEM} onClick={() => setOpen(false)}>
@@ -257,6 +285,22 @@ export function UserMenu({ meta, isDark, onToggleTheme, onLogout }) {
               <I name={isDark ? "sun" : "moon"} size={14} />
               {isDark ? "Açık moda geç" : "Koyu moda geç"}
             </button>
+            {SAHTE_BACKEND && (
+              <button
+                type="button"
+                role="menuitem"
+                className={MENU_ITEM}
+                disabled={sifirla.isPending}
+                onClick={() => {
+                  sifirla.mutate();
+                  setOpen(false);
+                }}
+                title="Sahte backend verisini başlangıç haline döndürür"
+              >
+                <I name="refund" size={14} />
+                {sifirla.isPending ? "Sıfırlanıyor…" : "Demo verisini sıfırla"}
+              </button>
+            )}
             <div className="my-1 border-t border-[var(--border)]" />
             <button
               type="button"
