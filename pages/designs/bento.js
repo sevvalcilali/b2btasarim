@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ROLES, ROLE_META, ROLE_ORDER } from "@/lib/roles";
 import { useRole } from "@/components/RoleContext";
-import { anaFirma, iptalIadeTalepleri } from "@/lib/mockData";
+import { anaFirma, iptalIadeTalepleri, faturaYuklemeleri } from "@/lib/mockData";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import CompanyLogo from "@/components/CompanyLogo";
@@ -11,6 +11,7 @@ import { Sidebar, UserMenu } from "@/components/bento/Kabuk";
 import { useAg, kapsamda } from "@/components/bento/ag";
 import { Dashboard } from "@/components/bento/ekranlar/AnaSayfa";
 import { BayiListesi, BayiTanimlama } from "@/components/bento/ekranlar/BayiTanim";
+import { FaturaYukleme, faturaGerekenler, faturaDurumu } from "@/components/bento/ekranlar/FaturaYukleme";
 import { onayimda, IptalIade } from "@/components/bento/ekranlar/IptalIade";
 import { IslemDetaylari } from "@/components/bento/ekranlar/IslemDetaylari";
 import { LinkOdeme } from "@/components/bento/ekranlar/LinkOdeme";
@@ -33,6 +34,9 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
   // iptal / iade talepleri panel düzeyinde: rol değiştirerek onay zinciri uçtan uca izlenebilir
   const [talepler, setTalepler] = useState(iptalIadeTalepleri);
   const bekleyenOnay = talepler.filter((t) => kapsamda(role, t.giren) && onayimda(role, t)).length;
+  // yüklenen faturalar da panel düzeyinde; rozet: rolün kendi işlemlerinden faturası beklenenler
+  const [faturalar, setFaturalar] = useState(faturaYuklemeleri);
+  const bekleyenFatura = faturaGerekenler(role).filter((t) => t.yapan === meta.company && faturaDurumu(faturalar, t.id).durum !== "Yüklendi").length;
 
   // açık ekran adres çubuğunda (?sayfa=) tutulur: yenileme ve geri tuşu çalışır
   const router = useRouter();
@@ -84,7 +88,7 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
         onLogout={onLogout}
         current={current}
         onNavigate={navigate}
-        rozetler={{ "/iptal-iade/onay": bekleyenOnay }}
+        rozetler={{ "/iptal-iade/onay": bekleyenOnay, "/raporlar/fatura-yukleme": bekleyenFatura }}
       />
 
       <div className="flex min-w-0 flex-1 flex-col px-3 lg:px-4">
@@ -187,6 +191,8 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
               vurgu={parametre("kaydedildi")}
               onNavigate={navigate}
             />
+          ) : current === "/raporlar/fatura-yukleme" ? (
+            <FaturaYukleme role={role} meta={meta} faturalar={faturalar} setFaturalar={setFaturalar} onNavigate={navigate} />
           ) : current === "/iptal-iade/onay" || current === "/iptal-iade/takip" ? (
             <IptalIade
               role={role}

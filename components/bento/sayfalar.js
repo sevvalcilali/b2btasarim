@@ -9,6 +9,7 @@ export const SAYFALAR = {
   "link-odeme": "/odeme/link",
   "iptal-iade-onay": "/iptal-iade/onay",
   "iptal-iade-takip": "/iptal-iade/takip",
+  "fatura-yukleme": "/raporlar/fatura-yukleme",
   "bayi-tanimlama": "/bayi-tanim/tanimlama",
   "bayi-liste": "/bayi-tanim/liste",
   "alt-bayi-liste": "/bayi-tanim/alt-bayi-liste",
