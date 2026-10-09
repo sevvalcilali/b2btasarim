@@ -29,6 +29,13 @@ Kullanıcı menüsündeki **Demo verisini sıfırla** sahte backend'i başlangı
 - **Rol değiştirici** (Ana Firma / Bayi / Alt Bayi): menü ve rakamlar role göre değişir.
 - **Açık / koyu mod**; tercih tarayıcıda hatırlanır.
 - **Giriş ekranı**: "Çıkış Yap" ile açılır, "Giriş Yap" panele döndürür.
+- **Komut paleti**: `⌘K` / `Ctrl+K` ya da `/` ile açılır. Ekran adı, işlem (no, unvan, cari, vergi no, kart son 4) ve
+  bayi araması; işlem seçilince İşlem Detayları o aramayla (`?ara=`), bayi seçilince Bayi Liste detay paneliyle (`?detay=`)
+  açılır, `Ctrl+Enter` bayiden ödeme alır. Tema, panel tipi ve çıkış da buradan.
+- **Telefonda kart görünümü**: 768px altında tablolar kart listesine dönüşür (`TABLE_CSS`, hücrelerde `data-label` /
+  `data-card`). Kalabalık filtreler (İşlem Detayları, Bayi Özet, Bayi Fatura Özet) alttan açılan çekmeceye taşınır.
+- **Ödeme sonucu**: animasyonlu onay işareti, sayarak gelen tutar, dekont kartı; dekont PNG olarak indirilir,
+  paylaşılır (cihazın paylaşım menüsü, yoksa panoya kopyalanır) ya da yazdırılır. Link ile ödemede WhatsApp / e-posta paylaşımı.
 - Bağlantıyla durum zorlama: `?theme=dark`, `?view=giris`, `?menu=closed`, `?role=ana|bayi|altbayi`.
 
 ## Yapı
@@ -45,7 +52,9 @@ components/
     theme.js            renk değişkenleri (açık / koyu), animasyonlar, ortak sınıflar
     routes.js           hazır ekranların adresleri (?sayfa=<anahtar> ↔ menü href)
     helpers.js          tutar / tarih biçimleri, sayaç, eğri, durum renkleri
-    shared.js           Breadcrumb, Modal, Notice, form alanları, müşteri seçici, kopyala
+    shared.js           Breadcrumb, Modal, Drawer, BottomSheet, Notice, form alanları, müşteri seçici, kopyala
+    CommandPalette.js   ⌘K komut paleti ve üst bardaki arama düğmesi
+    PaymentSuccess.js   ödeme sonucu: sonuç işareti, dekont kartı, dekont indirme / paylaşma
     payment.js          manuel ve link ile ödemenin ortak müşteri bölümü, ödeme koşulları
     Shell.js            logo, sol menü, kullanıcı menüsü
     Login.js            giriş ekranı

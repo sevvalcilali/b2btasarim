@@ -127,7 +127,7 @@ export function UserDefinition({ meta, onNavigate }) {
           <EmptyState title="Kullanıcı bulunamadı" description={q || status ? "Arama ya da durum filtresine uyan kullanıcı yok." : undefined} actions={(q || status) && [{ etiket: "Filtreleri temizle", onClick: () => { setSearch(""); setStatus(""); } }]} />
         ) : (
           <div className={`overflow-x-auto transition-opacity ${query.isFetching ? "opacity-60" : ""}`}>
-            <table className="min-w-full text-[12.5px]">
+            <table className="bn-rtable min-w-full text-[12.5px]">
               <thead>
                 <tr className="border-y border-[var(--border)] bg-[var(--soft)] text-left text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
                   <SortableHeader field="adSoyad" sorting={sorting} onSort={sort} className={th}>Kullanıcı</SortableHeader>
@@ -141,7 +141,7 @@ export function UserDefinition({ meta, onNavigate }) {
               <tbody>
                 {sorted.map((k, i) => (
                   <tr key={k.kullaniciId} className={`transition-colors hover:bg-[var(--soft)] ${i > 0 ? "border-t border-[var(--border)]" : ""}`}>
-                    <td className={td}>
+                    <td data-card="title" className={td}>
                       <span className="flex items-center gap-2.5">
                         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--brand-soft)] text-[11px] font-extrabold text-[var(--brand-text)]" aria-hidden="true">
                           {initials(k.adSoyad)}
@@ -155,16 +155,16 @@ export function UserDefinition({ meta, onNavigate }) {
                         </span>
                       </span>
                     </td>
-                    <td className={`${td} tabular-nums text-[var(--fg-2)]`}>{k.telefon || "—"}</td>
-                    <td className={td}>
+                    <td data-label="Telefon" className={`${td} tabular-nums text-[var(--fg-2)]`}>{k.telefon || "—"}</td>
+                    <td data-label="Yetki" className={td}>
                       <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${PERMISSION_TONE[k.yetki] || ""}`}>{labelOf("permission", k.yetki)}</span>
                     </td>
-                    <td className={`${td} tabular-nums text-[var(--fg-2)]`}>{k.sonGiris ? formatDateTime(k.sonGiris) : <span className="text-[var(--muted)]">Henüz girmedi</span>}</td>
-                    <td className={td}>
+                    <td data-label="Son Giriş" className={`${td} tabular-nums text-[var(--fg-2)]`}>{k.sonGiris ? formatDateTime(k.sonGiris) : <span className="text-[var(--muted)]">Henüz girmedi</span>}</td>
+                    <td data-card="aside" className={td}>
                       <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${statusTone(k.durum)}`}>{labelOf("recordStatus", k.durum)}</span>
                     </td>
                     {editable && (
-                      <td className={`${td} text-right`}>
+                      <td data-card="actions" className={`${td} text-right`}>
                         <button
                           type="button"
                           onClick={() => setEditingItem(k)}

@@ -110,6 +110,104 @@ export function Drawer({ title, subtitle, onClose, width = "max-w-xl", bottomBar
   );
 }
 
+// Alttan açılan çekmece (telefonda filtreler). Pencere ile aynı erişilebilirlik: odak, Esc, arka plan kilidi.
+export function BottomSheet({ title, onClose, bottomBar, children }) {
+  const closeRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const titleId = `bn-cekmece-${useId().replace(/:/g, "")}`;
+
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKey = (e) => e.key === "Escape" && onCloseRef.current();
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, []);
+
+  const root = typeof document !== "undefined" ? document.getElementById("bn-root") : null;
+  if (!root) return null;
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-end">
+      <div className="bn-fade absolute inset-0 bg-[rgba(15,18,40,0.45)] backdrop-blur-[1px]" onClick={onClose} aria-hidden="true" />
+      <div role="dialog" aria-modal="true" aria-labelledby={titleId} className="bn-sheet relative flex max-h-[85vh] w-full flex-col rounded-t-3xl border-t border-[var(--border)] bg-[var(--surface)] pb-[env(safe-area-inset-bottom)] [box-shadow:var(--pop-shadow)]">
+        <span className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-[var(--border-strong)]" aria-hidden="true" />
+        <div className="flex items-center justify-between gap-3 px-5 pb-2 pt-2">
+          <h2 id={titleId} className="text-base font-bold text-[var(--fg)]">
+            {title}
+          </h2>
+          <button ref={closeRef} type="button" onClick={onClose} aria-label="Kapat" className={`grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--soft)] text-[var(--fg-2)] ${FOCUS}`}>
+            <I name="x" size={16} />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 pb-4">{children}</div>
+        {bottomBar && <div className="flex gap-2 border-t border-[var(--border)] px-5 py-3">{bottomBar}</div>}
+      </div>
+    </div>,
+    root
+  );
+}
+
+// Filtre çekmecesini açan düğme: etkin filtre sayısı rozetle görünür; label verilirse (ör. seçili dönem) onu yazar
+export function FilterButton({ count = 0, label = "Filtrele", icon = "filter", onClick, className = "" }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-haspopup="dialog"
+      className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[12.5px] font-semibold transition active:scale-[0.97] ${
+        count > 0 ? "border-[var(--brand)] bg-[var(--brand-soft)] text-[var(--brand-text)]" : "border-[var(--border-strong)] bg-[var(--surface)] text-[var(--fg-2)]"
+      } ${FOCUS} ${className}`}
+    >
+      <I name={icon} size={14} />
+      <span className="truncate">{label}</span>
+      {count > 0 && <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[var(--brand)] px-1 text-[10.5px] font-bold text-white">{count}</span>}
+    </button>
+  );
+}
+
+// Çekmecedeki seçim grubu: başlık + yuvarlak seçenekler (tek seçim)
+export function ChipGroup({ label, options, value, onChange }) {
+  return (
+    <fieldset className="mt-4 first:mt-1">
+      <legend className="mb-2 text-[12px] font-bold text-[var(--fg-2)]">{label}</legend>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map(([v, name]) => (
+          <button
+            key={v || "tumu"}
+            type="button"
+            aria-pressed={value === v}
+            onClick={() => onChange(v)}
+            className={`inline-flex h-9 items-center rounded-full px-3.5 text-[12.5px] transition ${value === v ? "bg-[var(--brand)] font-bold text-white" : "bg-[var(--soft)] font-semibold text-[var(--fg-2)]"} ${FOCUS}`}
+          >
+            {name}
+          </button>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+// Çekmecenin alt düğmeleri: temizle + sonuçları göster
+export function SheetActions({ onClear, onClose, count }) {
+  return (
+    <>
+      {onClear && (
+        <button type="button" onClick={onClear} className={`inline-flex h-11 items-center justify-center rounded-full border border-[var(--border-strong)] px-5 text-[13px] font-semibold text-[var(--fg-2)] ${FOCUS}`}>
+          Temizle
+        </button>
+      )}
+      <button type="button" onClick={onClose} className={`inline-flex h-11 flex-1 items-center justify-center rounded-full bg-[var(--brand)] px-5 text-[13px] font-bold text-white ${FOCUS}`}>
+        {count == null ? "Uygula" : `${count} sonucu göster`}
+      </button>
+    </>
+  );
+}
+
 // Rapor dönemi seçici: hazır seçenekler + özel aralık. deger: { kod, baslangic, bitis } ya da null (tumu açıkken "Tümü")
 export function DateRange({ value, onChange, all = false }) {
   const [custom, setCustom] = useState(value?.kod === "ozel");

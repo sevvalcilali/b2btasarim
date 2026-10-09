@@ -10,6 +10,7 @@ import { useCreatePaymentLink, usePaymentLinks, useInstallmentOptions } from "@/
 import { EmptyState, ErrorBox, Loading } from "../states";
 import { LISTELI, CustomerSection, errorHandler, useCustomerSelection } from "../payment";
 import { Breadcrumb, inputCls, Field, FormSection, CopyButton } from "../shared";
+import { ResultMark, CountingAmount, ReceiptCard, LinkShareActions } from "../PaymentSuccess";
 import { ActiveAccountNote } from "./AccountSelection";
 import { HOME } from "../routes";
 import { CARD, FOCUS } from "../theme";
@@ -129,32 +130,28 @@ export function LinkPayment({ role, meta, onNavigate }) {
         </div>
       ) : created ? (
         <section className={`bn-pop mx-auto max-w-xl p-5 text-center sm:p-7 ${CARD} hover:!translate-y-0`} aria-live="polite">
-          <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-[var(--success-soft)] text-[var(--success-text)]">
-            <I name="link" size={24} strokeWidth={2.2} />
-          </span>
-          <h2 className="mt-3 text-lg font-extrabold text-[var(--fg)]">Ödeme linki oluşturuldu</h2>
+          <ResultMark tone="success" />
+          <h2 className="mt-4 text-lg font-extrabold text-[var(--fg)]">Ödeme linki oluşturuldu</h2>
           <p className="mt-1 text-[12.5px] text-[var(--muted)]">
             {created.kanal === "SMS" ? `SMS ile ${created.hedef} numarasına gönderildi.` : created.kanal === "EPOSTA" ? `E-posta ile ${created.hedef} adresine gönderildi.` : "Linki kopyalayıp müşterinize iletebilirsiniz."}
           </p>
+          <CountingAmount cents={created.tutarKurus} className="mt-2 text-[28px] font-extrabold tabular-nums tracking-tight text-[var(--fg)]" />
           <div className="mt-4 flex items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--soft)] p-1.5 pl-3">
+            <I name="link" size={15} className="shrink-0 text-[var(--muted)]" />
             <span className="min-w-0 flex-1 truncate text-left text-[12.5px] font-semibold tabular-nums text-[var(--fg)]">{created.url}</span>
             <CopyButton text={created.url} />
           </div>
-          <dl className="mt-4 divide-y divide-[var(--border)] rounded-2xl border border-[var(--border)] text-left text-[12.5px]">
-            {[
+          <LinkShareActions url={created.url} customer={created.musteriUnvan} amount={tl2(created.tutarKurus)} />
+          <ReceiptCard
+            rows={[
               ["Link No", created.linkNo],
               ["Müşteri", `${created.musteriUnvan} · ${labelOf("customerKind", created.musteriTuru)}`],
               ["Tutar", tl2(created.tutarKurus)],
               ["Taksit seçenekleri", installmentText(created.taksitler || [])],
               [m.accountLabel, created.tahsilatCarisi ? `${created.tahsilatCarisi.ad} — ${created.tahsilatCarisi.cariNo}` : "—"],
               ["Son geçerlilik", formatDateTime(created.sonGecerlilik)],
-            ].map(([k, v]) => (
-              <div key={k} className="flex justify-between gap-4 px-4 py-2.5">
-                <dt className="text-[var(--muted)]">{k}</dt>
-                <dd className="text-right font-semibold tabular-nums text-[var(--fg)]">{v}</dd>
-              </div>
-            ))}
-          </dl>
+            ]}
+          />
           <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
             <button type="button" onClick={newLink} className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-[var(--brand)] px-5 text-[13px] font-bold text-white transition hover:brightness-110 ${FOCUS}`}>
               <I name="plus" size={15} />
@@ -360,7 +357,7 @@ export function LinkPayment({ role, meta, onNavigate }) {
           <ErrorBox error={links.error} onRetry={() => links.refetch()} />
         ) : (
           <div className="relative overflow-x-auto">
-            <table className="min-w-full text-[12.5px]">
+            <table className="bn-rtable min-w-full text-[12.5px]">
               <thead>
                 <tr className="border-y border-[var(--border)] bg-[var(--soft)] text-left text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
                   <th scope="col" className={th}>Link No</th>
@@ -378,25 +375,25 @@ export function LinkPayment({ role, meta, onNavigate }) {
               <tbody>
                 {rows.map((l, i) => (
                   <tr key={l.linkNo} className={`transition-colors hover:bg-[var(--soft)] ${i > 0 ? "border-t border-[var(--border)]" : ""}`}>
-                    <td className={`${td} font-bold text-[var(--brand-text)]`}>
+                    <td data-label="Link No" data-card="sub" className={`${td} font-bold text-[var(--brand-text)]`}>
                       {l.linkNo}
                       {newItems.includes(l.linkNo) && <span className="ml-1.5 rounded-full bg-[var(--success-soft)] px-1.5 py-px text-[10px] font-bold text-[var(--success-text)]">Yeni</span>}
                     </td>
-                    <td className={`${td} tabular-nums`}>
+                    <td data-label="Oluşturma / Son Geçerlilik" className={`${td} tabular-nums`}>
                       <span className="block text-[var(--fg-2)]">{formatDateTime(l.olusturma)}</span>
                       <span className="block text-[11px] text-[var(--muted)]">son {formatDateTime(l.sonGecerlilik)}</span>
                     </td>
-                    {showCreatedBy && <td className={`${td} text-[var(--fg-2)]`}>{l.olusturan?.unvan}</td>}
-                    <td className={td}>
+                    {showCreatedBy && <td data-label="Oluşturan" className={`${td} text-[var(--fg-2)]`}>{l.olusturan?.unvan}</td>}
+                    <td data-card="title" className={td}>
                       <span className="block font-semibold text-[var(--fg)]">{l.musteriUnvan}</span>
                       <span className="block text-[11px] text-[var(--muted)]">{labelOf("customerKind", l.musteriTuru)}</span>
                     </td>
-                    <td className={`${td} text-right font-bold tabular-nums text-[var(--fg)]`}>{tl(l.tutarKurus)}</td>
-                    <td className={`${td} text-[var(--fg-2)]`}>{labelOf("channel", l.kanal)}</td>
-                    <td className={td}>
+                    <td data-card="aside" className={`${td} text-right font-bold tabular-nums text-[var(--fg)]`}>{tl(l.tutarKurus)}</td>
+                    <td data-label="Kanal" className={`${td} text-[var(--fg-2)]`}>{labelOf("channel", l.kanal)}</td>
+                    <td data-label="Durum" data-card="status" className={td}>
                       <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${l.durum === "BEKLIYOR" ? "bg-[var(--brand-soft)] text-[var(--brand-text)]" : statusTone(l.durum)}`}>{labelOf("linkStatus", l.durum)}</span>
                     </td>
-                    <td className={`${td} text-right`}>{l.durum === "BEKLIYOR" && <CopyButton small text={l.url} />}</td>
+                    <td data-card="actions" className={`${td} text-right`}>{l.durum === "BEKLIYOR" && <CopyButton small text={l.url} />}</td>
                   </tr>
                 ))}
               </tbody>

@@ -260,7 +260,7 @@ export function CancelRefund({ role, meta, mode, onNavigate }) {
           <ErrorBox error={query.error} onRetry={() => query.refetch()} />
         ) : (
           <div className={`relative overflow-x-auto transition-opacity ${query.isFetching ? "opacity-60" : ""}`}>
-            <table className="min-w-full text-[12.5px]">
+            <table className="bn-rtable min-w-full text-[12.5px]">
               <thead>
                 <tr className="border-y border-[var(--border)] bg-[var(--soft)] text-left text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
                   <th scope="col" className={th}>Talep</th>
@@ -280,29 +280,29 @@ export function CancelRefund({ role, meta, mode, onNavigate }) {
                   return (
                     <Fragment key={t.talepNo}>
                       <tr className={`transition-colors hover:bg-[var(--soft)] ${i > 0 ? "border-t border-[var(--border)]" : ""} ${t.onayimda ? "shadow-[inset_3px_0_0_var(--brand)]" : ""}`}>
-                        <td className={td}>
+                        <td data-label="Talep" data-card="sub" className={td}>
                           <span className="block font-bold text-[var(--brand-text)]">{t.talepNo}</span>
                           <span className="block text-[11px] tabular-nums text-[var(--muted)]">{formatDateTime(t.tarih)}</span>
                         </td>
                         {showEnteredBy && (
-                          <td className={td}>
+                          <td data-label="Giren" className={td}>
                             <span className="block font-semibold text-[var(--fg-2)]">{t.giren?.unvan}</span>
                             <span className="block text-[11px] text-[var(--muted)]">{labelOf("companyKind", t.giren?.tur)}</span>
                           </td>
                         )}
-                        <td className={td}>
+                        <td data-card="title" className={td}>
                           <span className="block font-semibold text-[var(--fg)]">{t.musteriUnvan}</span>
                           <span className="block text-[11px] tabular-nums text-[var(--muted)]">{t.islemNo}</span>
                         </td>
-                        <td className={`${td} font-semibold text-[var(--fg-2)]`}>{labelOf("requestKind", t.tur)}</td>
-                        <td className={`${td} text-right`}>
+                        <td data-label="Tür" className={`${td} font-semibold text-[var(--fg-2)]`}>{labelOf("requestKind", t.tur)}</td>
+                        <td data-card="aside" className={`${td} text-right`}>
                           <span className="block font-bold tabular-nums text-[var(--fg)]">{tl(t.tutarKurus)}</span>
                           <span className="block text-[11px] tabular-nums text-[var(--muted)]">işlem {tl(t.islemTutariKurus)}</span>
                         </td>
-                        <td className={td}>
+                        <td data-label="Durum" data-card="status" className={td}>
                           <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${statusTone(t.durum)}`}>{labelOf("requestStatus", t.durum)}</span>
                         </td>
-                        <td className={`${td} text-right`}>
+                        <td data-card="actions" className={`${td} text-right`}>
                           <div className="flex items-center justify-end gap-1.5">
                             {t.onayimda && (
                               <>
@@ -345,7 +345,7 @@ export function CancelRefund({ role, meta, mode, onNavigate }) {
                       </tr>
                       {detail && (
                         <tr id={`bn-detay-${t.talepNo}`} className="bg-[var(--soft)]">
-                          <td colSpan={column} className="px-4 py-3">
+                          <td data-card="full" colSpan={column} className="px-4 py-3">
                             <div className="grid gap-3 text-[12px] sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
                               <div>
                                 <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">Açıklama</p>

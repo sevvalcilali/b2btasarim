@@ -110,7 +110,7 @@ export function AnnouncementManagement({ meta, onNavigate }) {
           <EmptyState title="Henüz duyuru yok" description="Yayınladığınız duyuru bayi ve alt bayi ekranlarına pop-up olarak düşer." icon="megaphone" actions={editable && [{ etiket: "Yeni Duyuru", icon: "plus", primary: true, onClick: () => setEditingItem("yeni") }]} />
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full text-[12.5px]">
+            <table className="bn-rtable min-w-full text-[12.5px]">
               <thead>
                 <tr className="border-y border-[var(--border)] bg-[var(--soft)] text-left text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
                   <th scope="col" className={`${th} min-w-[280px]`}>Duyuru</th>
@@ -124,21 +124,21 @@ export function AnnouncementManagement({ meta, onNavigate }) {
               <tbody>
                 {visible.map((d, i) => (
                   <tr key={d.duyuruId} className={`transition-colors hover:bg-[var(--soft)] ${i > 0 ? "border-t border-[var(--border)]" : ""} ${d.durum === "ARSIV" ? "opacity-70" : ""}`}>
-                    <td className={td}>
+                    <td data-card="title" className={td}>
                       <span className="block font-semibold text-[var(--fg)]">{d.baslik}</span>
                       <span className="mt-0.5 block max-w-md text-[11.5px] leading-snug text-[var(--muted)]">{d.icerik}</span>
                       <AuditNote record={d} className="mt-1" />
                     </td>
-                    <td className={`${td} whitespace-nowrap`}><TargetBadges target={d.hedef} /></td>
-                    <td className={`${td} whitespace-nowrap tabular-nums text-[var(--fg-2)]`}>{formatDate(d.tarih)}</td>
-                    <td className={`${td} whitespace-nowrap tabular-nums text-[var(--fg-2)]`}>
+                    <td data-label="Hedef" className={`${td} whitespace-nowrap`}><TargetBadges target={d.hedef} /></td>
+                    <td data-label="Tarih" className={`${td} whitespace-nowrap tabular-nums text-[var(--fg-2)]`}>{formatDate(d.tarih)}</td>
+                    <td data-label="Okunma" className={`${td} whitespace-nowrap tabular-nums text-[var(--fg-2)]`}>
                       {formatNumber(d.okunma.okuyanAdet)} / {formatNumber(d.okunma.hedefAdet)} kullanıcı
                     </td>
-                    <td className={`${td} whitespace-nowrap`}>
+                    <td data-card="aside" className={`${td} whitespace-nowrap`}>
                       <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${statusTone(d.durum)}`}>{labelOf("announcementStatus", d.durum)}</span>
                     </td>
                     {editable && (
-                      <td className={`${td} whitespace-nowrap text-right`}>
+                      <td data-card="actions" className={`${td} whitespace-nowrap text-right`}>
                         <span className="inline-flex gap-1">
                           <button type="button" onClick={() => setEditingItem(d)} className={`inline-flex h-8 items-center gap-1 rounded-full border border-[var(--border-strong)] px-3 text-[12px] font-semibold text-[var(--fg-2)] transition hover:border-[var(--brand)] hover:text-[var(--brand-text)] ${FOCUS}`}>
                             <I name="edit" size={13} />

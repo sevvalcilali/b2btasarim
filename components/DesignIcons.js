@@ -235,6 +235,45 @@ export const ICONS = {
       <path d="M4 18h16" />
     </>
   ),
+  share: (
+    <>
+      <circle cx="18" cy="5" r="3" />
+      <circle cx="6" cy="12" r="3" />
+      <circle cx="18" cy="19" r="3" />
+      <path d="m8.59 13.51 6.83 3.98" />
+      <path d="m15.41 6.51-6.82 3.98" />
+    </>
+  ),
+  filter: (
+    <>
+      <path d="M3 6h18" />
+      <path d="M7 12h10" />
+      <path d="M10 18h4" />
+    </>
+  ),
+  enter: (
+    <>
+      <path d="M9 10 4 15l5 5" />
+      <path d="M20 4v7a4 4 0 0 1-4 4H4" />
+    </>
+  ),
+  arrowRight: (
+    <>
+      <path d="M5 12h14" />
+      <path d="m12 5 7 7-7 7" />
+    </>
+  ),
+  mail: (
+    <>
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+    </>
+  ),
+  message: (
+    <>
+      <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
+    </>
+  ),
 };
 
 export default function I({ name, size = 16, className = "", strokeWidth = 1.75 }) {

@@ -253,7 +253,7 @@ export function InvoiceUpload({ role, meta, onNavigate }) {
           <ErrorBox error={query.error} onRetry={() => query.refetch()} />
         ) : (
           <div className={`relative overflow-x-auto transition-opacity ${query.isFetching ? "opacity-60" : ""}`}>
-            <table className="min-w-full text-[12.5px]">
+            <table className="bn-rtable min-w-full text-[12.5px]">
               <thead>
                 <tr className="border-y border-[var(--border)] bg-[var(--soft)] text-left text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
                   <th scope="col" className={th}>İşlem</th>
@@ -272,22 +272,22 @@ export function InvoiceUpload({ role, meta, onNavigate }) {
                   const t = s.islem;
                   return (
                     <tr key={t.islemNo} className={`transition-colors hover:bg-[var(--soft)] ${i > 0 ? "border-t border-[var(--border)]" : ""}`}>
-                      <td className={td}>
+                      <td data-label="İşlem" data-card="sub" className={td}>
                         <span className="block font-bold text-[var(--brand-text)]">{t.islemNo}</span>
                         <span className="block text-[11px] tabular-nums text-[var(--muted)]">{formatDateTime(t.tarih)}</span>
                       </td>
                       {showActor && (
-                        <td className={td}>
+                        <td data-label="Çekim Yapan" className={td}>
                           <span className="block font-semibold text-[var(--fg-2)]">{t.cekimYapan?.unvan}</span>
                           <span className="block text-[11px] text-[var(--muted)]">{labelOf("companyKind", t.cekimYapan?.tur)}</span>
                         </td>
                       )}
-                      <td className={td}>
+                      <td data-card="title" className={td}>
                         <span className="block font-semibold text-[var(--fg)]">{t.musteri.unvan}</span>
                         <span className="block text-[11px] text-[var(--muted)]">{labelOf("customerKind", t.musteriTuru)}</span>
                       </td>
-                      <td className={`${td} text-right font-bold tabular-nums text-[var(--fg)]`}>{tl(t.tutarKurus)}</td>
-                      <td className={td}>
+                      <td data-card="aside" className={`${td} text-right font-bold tabular-nums text-[var(--fg)]`}>{tl(t.tutarKurus)}</td>
+                      <td data-label="Fatura" className={td}>
                         {!s.fatura ? (
                           <span className="text-[var(--muted)]">—</span>
                         ) : s.fatura.icerikGizli ? (
@@ -307,11 +307,11 @@ export function InvoiceUpload({ role, meta, onNavigate }) {
                           </>
                         )}
                       </td>
-                      <td className={td}>
+                      <td data-label="Durum" data-card="status" className={td}>
                         <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${statusTone(s.durum)}`}>{labelOf("invoiceStatus", s.durum)}</span>
                         {s.durum === "REDDEDILDI" && s.fatura?.redNedeni && <span className="mt-0.5 block max-w-[220px] whitespace-normal text-[11px] leading-snug text-[var(--danger-text)]">{s.fatura.redNedeni}</span>}
                       </td>
-                      <td className={`${td} text-right`}>
+                      <td data-card="actions" className={`${td} text-right`}>
                         {s.durum !== "YUKLENDI" &&
                           (s.kendi ? (
                             <div className="flex items-center justify-end gap-1.5">

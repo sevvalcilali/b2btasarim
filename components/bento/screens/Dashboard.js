@@ -489,7 +489,7 @@ function TransactionsCard({ onSeeAll, onPayment }) {
         <ErrorBox error={query.error} onRetry={() => query.refetch()} />
       ) : (
         <div className="overflow-x-auto">
-          <table className="min-w-full text-[12.5px]">
+          <table className="bn-rtable min-w-full text-[12.5px]">
             <thead>
               <tr className="border-y border-[var(--border)] bg-[var(--soft)] text-left text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
                 <th scope="col" className="whitespace-nowrap px-4 py-2">İşlem No</th>
@@ -503,15 +503,15 @@ function TransactionsCard({ onSeeAll, onPayment }) {
             <tbody>
               {rows.map((t, i) => (
                 <tr key={t.islemNo} className={`transition-colors hover:bg-[var(--soft)] ${i > 0 ? "border-t border-[var(--border)]" : ""}`}>
-                  <td className="whitespace-nowrap px-4 py-2.5 font-bold text-[var(--brand-text)]">{t.islemNo}</td>
-                  <td className="whitespace-nowrap px-4 py-2.5">
+                  <td data-label="İşlem No" data-card="sub" className="whitespace-nowrap px-4 py-2.5 font-bold text-[var(--brand-text)]">{t.islemNo}</td>
+                  <td data-card="title" className="whitespace-nowrap px-4 py-2.5">
                     <span className="block font-semibold text-[var(--fg)]">{t.musteri.unvan}</span>
                     <span className="block text-[11px] tabular-nums text-[var(--muted)]">{t.musteri.cariNo}</span>
                   </td>
-                  <td className="whitespace-nowrap px-4 py-2.5 tabular-nums text-[var(--muted)]">{formatDateTime(t.tarih)}</td>
-                  <td className="whitespace-nowrap px-4 py-2.5 text-[var(--fg-2)]">{t.taksit === 1 ? "Tek Çekim" : t.taksit}</td>
-                  <td className="whitespace-nowrap px-4 py-2.5 text-right font-bold tabular-nums text-[var(--fg)]">{tl(t.tutarKurus)}</td>
-                  <td className="whitespace-nowrap px-4 py-2.5">
+                  <td data-label="Tarih" className="whitespace-nowrap px-4 py-2.5 tabular-nums text-[var(--muted)]">{formatDateTime(t.tarih)}</td>
+                  <td data-label="Taksit" className="whitespace-nowrap px-4 py-2.5 text-[var(--fg-2)]">{t.taksit === 1 ? "Tek Çekim" : t.taksit}</td>
+                  <td data-card="aside" className="whitespace-nowrap px-4 py-2.5 text-right font-bold tabular-nums text-[var(--fg)]">{tl(t.tutarKurus)}</td>
+                  <td data-label="Durum" data-card="status" className="whitespace-nowrap px-4 py-2.5">
                     <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${statusTone(t.durum)}`}>{labelOf("transactionStatus", t.durum)}</span>
                   </td>
                 </tr>

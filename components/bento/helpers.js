@@ -25,7 +25,7 @@ export function curveThrough(pts) {
 }
 
 // Sayıyı 0'dan hedefe doğru sayarak getirir (hareket azaltma açıksa doğrudan hedef).
-function useCountUp(target) {
+export function useCountUp(target, stop = 900) {
   const [val, setVal] = useState(target);
   useEffect(() => {
     let rafId;
@@ -39,7 +39,6 @@ function useCountUp(target) {
       return undefined;
     }
     const start = performance.now();
-    const stop = 900;
     const tick = (now) => {
       const p = Math.min((now - start) / stop, 1);
       setVal(Math.round(target * (1 - Math.pow(1 - p, 3))));
@@ -53,7 +52,7 @@ function useCountUp(target) {
       cancelAnimationFrame(rafId);
       clearTimeout(done);
     };
-  }, [target]);
+  }, [target, stop]);
   return val;
 }
 
@@ -95,3 +94,21 @@ export function TrendArrow({ up }) {
 }
 
 export const figures = (x) => String(x ?? "").replace(/\D/g, "");
+
+/** Telefon genişliği (md altı, tablo kartlarıyla aynı eşik). Sunucuda ve ilk çizimde false döner. */
+export function useIsMobile(query = "(max-width: 767px)") {
+  const [mobile, setMobile] = useState(false);
+  useEffect(() => {
+    let mq;
+    try {
+      mq = window.matchMedia(query);
+    } catch (e) {
+      return undefined;
+    }
+    const sync = () => setMobile(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, [query]);
+  return mobile;
+}

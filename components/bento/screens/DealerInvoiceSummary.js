@@ -7,8 +7,9 @@ import { formatNumber, tl, formatPercent } from "@/lib/format";
 import { statusTone, labelOf } from "@/lib/labels";
 import { useDealerInvoiceSummary } from "@/lib/queries/reports";
 import { EmptyState, ErrorBox, Loading } from "../states";
-import { rangeQuery, periodRange } from "@/lib/period";
-import { Breadcrumb, DateRange, ChangeBadge, PrintButton } from "../shared";
+import { rangeQuery, periodRange, periodLabel } from "@/lib/period";
+import { Breadcrumb, DateRange, ChangeBadge, PrintButton, BottomSheet, FilterButton, SheetActions } from "../shared";
+import { useIsMobile } from "../helpers";
 import { HOME } from "../routes";
 import { SortableHeader, useSorting } from "../table";
 import { CARD, FOCUS } from "../theme";
@@ -25,6 +26,8 @@ const INVOICE_COLUMNS = {
 };
 
 export function DealerInvoiceSummary({ role, meta, onNavigate }) {
+  const mobile = useIsMobile();
+  const [sheetOpen, setSheetOpen] = useState(false);
   const isSub = role === ROLES.BAYI;
   const title = isSub ? "Alt Bayi Fatura Özet" : "Bayi Fatura Özet";
   const [range, setRange] = useState(() => periodRange("30g"));
@@ -80,8 +83,13 @@ export function DealerInvoiceSummary({ role, meta, onNavigate }) {
 
       <section style={{ "--i": 4 }} className={`bn-rise mt-3 overflow-hidden ${CARD} hover:!translate-y-0`} aria-label={title} aria-busy={query.isFetching}>
         <div className="p-3 sm:p-4">
-          <DateRange value={range} onChange={setRange} />
+          {mobile ? <FilterButton icon="calendar" label={periodLabel(range)} onClick={() => setSheetOpen(true)} /> : <DateRange value={range} onChange={setRange} />}
         </div>
+        {mobile && sheetOpen && (
+          <BottomSheet title="Dönem" onClose={() => setSheetOpen(false)} bottomBar={<SheetActions onClose={() => setSheetOpen(false)} />}>
+            <DateRange value={range} onChange={setRange} />
+          </BottomSheet>
+        )}
 
         {query.isPending ? (
           <Loading row={5} title={false} />
@@ -89,7 +97,7 @@ export function DealerInvoiceSummary({ role, meta, onNavigate }) {
           <ErrorBox error={query.error} onRetry={() => query.refetch()} />
         ) : (
           <div className={`relative overflow-x-auto transition-opacity ${query.isFetching ? "opacity-60" : ""}`}>
-            <table className="min-w-full text-[12.5px]">
+            <table className="bn-rtable min-w-full text-[12.5px]">
               <thead>
                 <tr className="border-y border-[var(--border)] bg-[var(--soft)] text-left text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
                   <SortableHeader field="firma" sorting={sorting} onSort={sort} className={th}>Firma</SortableHeader>
@@ -108,19 +116,19 @@ export function DealerInvoiceSummary({ role, meta, onNavigate }) {
                   const open = s.bekleyen + s.reddedilen > 0;
                   return (
                     <tr key={s.firma.firmaId} className={`transition-colors hover:bg-[var(--soft)] ${i > 0 ? "border-t border-[var(--border)]" : ""}`}>
-                      <td className={td}>
+                      <td data-card="title" className={td}>
                         <span className="block font-semibold text-[var(--fg)]">{s.firma.unvan}</span>
                         <span className="block text-[11px] text-[var(--muted)]">
                           {labelOf("companyKind", s.firma.tur)}
                           {s.bagli && s.bagli.tur !== "ANA_FIRMA" ? ` · ${s.bagli.unvan}` : ""}
                         </span>
                       </td>
-                      <td className={`${td} text-right tabular-nums text-[var(--fg-2)]`}>{formatNumber(s.gereken)}</td>
-                      <td className={`${td} text-right tabular-nums text-[var(--success-text)]`}>{formatNumber(s.yuklenen)}</td>
-                      <td className={`${td} text-right tabular-nums ${s.bekleyen ? "font-bold text-[var(--warning-text)]" : "text-[var(--muted)]"}`}>{formatNumber(s.bekleyen)}</td>
-                      <td className={`${td} text-right tabular-nums ${s.reddedilen ? "font-bold text-[var(--danger-text)]" : "text-[var(--muted)]"}`}>{formatNumber(s.reddedilen)}</td>
-                      <td className={`${td} text-right font-bold tabular-nums ${open ? "text-[var(--fg)]" : "text-[var(--muted)]"}`}>{open ? tl(s.bekleyenKurus) : "—"}</td>
-                      <td className={td}>
+                      <td data-label="Gereken" className={`${td} text-right tabular-nums text-[var(--fg-2)]`}>{formatNumber(s.gereken)}</td>
+                      <td data-label="Yüklenen" className={`${td} text-right tabular-nums text-[var(--success-text)]`}>{formatNumber(s.yuklenen)}</td>
+                      <td data-label="Bekleyen" className={`${td} text-right tabular-nums ${s.bekleyen ? "font-bold text-[var(--warning-text)]" : "text-[var(--muted)]"}`}>{formatNumber(s.bekleyen)}</td>
+                      <td data-label="Reddedilen" className={`${td} text-right tabular-nums ${s.reddedilen ? "font-bold text-[var(--danger-text)]" : "text-[var(--muted)]"}`}>{formatNumber(s.reddedilen)}</td>
+                      <td data-card="aside" className={`${td} text-right font-bold tabular-nums ${open ? "text-[var(--fg)]" : "text-[var(--muted)]"}`}>{open ? tl(s.bekleyenKurus) : "—"}</td>
+                      <td data-label="Tamamlanma" data-card="sub" className={td}>
                         <span className="flex items-center gap-2">
                           <span className="block h-1.5 w-28 overflow-hidden rounded-full bg-[var(--soft-2)]" role="progressbar" aria-valuenow={Math.round(rate ?? 0)} aria-valuemin={0} aria-valuemax={100} aria-label="Fatura tamamlanma oranı">
                             <span className={`bn-fill block h-full rounded-full ${rate === 100 ? "bg-[var(--success)]" : "bg-[var(--warning)]"}`} style={{ width: `${rate ?? 0}%` }} />
@@ -128,7 +136,7 @@ export function DealerInvoiceSummary({ role, meta, onNavigate }) {
                           <span className="text-[11px] font-semibold tabular-nums text-[var(--fg-2)]">{rate === null ? "—" : formatPercent(rate, 0)}</span>
                         </span>
                       </td>
-                      <td className={td}>
+                      <td data-label="Durum" data-card="status" className={td}>
                         <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${statusTone(s.durum)}`}>{labelOf("recordStatus", s.durum)}</span>
                       </td>
                     </tr>
@@ -138,14 +146,14 @@ export function DealerInvoiceSummary({ role, meta, onNavigate }) {
               {total && rows.length > 0 && (
                 <tfoot>
                   <tr className="border-t-2 border-[var(--border-strong)] bg-[var(--soft)] font-bold">
-                    <td className={`${td} text-[var(--fg)]`}>Toplam · {formatNumber(total.firmaAdet)} firma</td>
-                    <td className={`${td} text-right tabular-nums text-[var(--fg)]`}>{formatNumber(total.gereken)}</td>
-                    <td className={`${td} text-right tabular-nums text-[var(--success-text)]`}>{formatNumber(total.yuklenen)}</td>
-                    <td className={`${td} text-right tabular-nums text-[var(--warning-text)]`}>{formatNumber(total.bekleyen)}</td>
-                    <td className={`${td} text-right tabular-nums text-[var(--danger-text)]`}>{formatNumber(total.reddedilen)}</td>
-                    <td className={`${td} text-right tabular-nums text-[var(--fg)]`}>{tl(total.bekleyenKurus)}</td>
-                    <td className={`${td} tabular-nums text-[var(--fg-2)]`}>{total.gereken ? formatPercent(completion(total), 0) : "—"}</td>
-                    <td className={td} />
+                    <td data-card="title" className={`${td} text-[var(--fg)]`}>Toplam · {formatNumber(total.firmaAdet)} firma</td>
+                    <td data-label="Gereken" className={`${td} text-right tabular-nums text-[var(--fg)]`}>{formatNumber(total.gereken)}</td>
+                    <td data-label="Yüklenen" className={`${td} text-right tabular-nums text-[var(--success-text)]`}>{formatNumber(total.yuklenen)}</td>
+                    <td data-label="Bekleyen" className={`${td} text-right tabular-nums text-[var(--warning-text)]`}>{formatNumber(total.bekleyen)}</td>
+                    <td data-label="Reddedilen" className={`${td} text-right tabular-nums text-[var(--danger-text)]`}>{formatNumber(total.reddedilen)}</td>
+                    <td data-card="aside" className={`${td} text-right tabular-nums text-[var(--fg)]`}>{tl(total.bekleyenKurus)}</td>
+                    <td data-label="Tamamlanma" data-card="sub" className={`${td} tabular-nums text-[var(--fg-2)]`}>{total.gereken ? formatPercent(completion(total), 0) : "—"}</td>
+                    <td data-label="Durum" data-card="status" className={td} />
                   </tr>
                 </tfoot>
               )}

@@ -138,7 +138,7 @@ function BulkUpload({ meta, onNavigate, path, description, template, columns, ce
               <EmptyState title="Dosyada kayıt yok" />
             ) : (
               <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
-                <table className="min-w-full text-[12px]">
+                <table className="bn-rtable min-w-full text-[12px]">
                   <thead>
                     <tr className="border-b border-[var(--border)] bg-[var(--soft)] text-left text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
                       <th scope="col" className={th}>Satır</th>
@@ -153,13 +153,13 @@ function BulkUpload({ meta, onNavigate, path, description, template, columns, ce
                   <tbody>
                     {rows.map((s, i) => (
                       <tr key={s.sira} className={`${i > 0 ? "border-t border-[var(--border)]" : ""} ${s.gecerli ? "" : "bg-[var(--danger-soft)]/40"}`}>
-                        <td className={`${td} tabular-nums text-[var(--muted)]`}>{s.sira}</td>
+                        <td data-label="Satır" data-card="sub" className={`${td} tabular-nums text-[var(--muted)]`}>{s.sira}</td>
                         {cells(s).map((h, j) => (
-                          <td key={j} className={`${td} whitespace-nowrap ${j === 0 ? "font-semibold text-[var(--fg)]" : "text-[var(--fg-2)]"}`}>
+                          <td data-label={columns[j]} key={j} className={`${td} whitespace-nowrap ${j === 0 ? "font-semibold text-[var(--fg)]" : "text-[var(--fg-2)]"}`}>
                             {h ?? "—"}
                           </td>
                         ))}
-                        <td className={`${td} min-w-[220px]`}>
+                        <td data-label="Durum" data-card="full" className={`${td} min-w-[220px]`}>
                           {s.gecerli ? (
                             <span className="inline-flex rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[11px] font-bold text-[var(--success-text)]">{result ? (result.eklenen != null ? "Eklendi" : "Güncellendi") : "Geçerli"}</span>
                           ) : (

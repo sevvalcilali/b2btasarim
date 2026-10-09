@@ -47,7 +47,7 @@ const DEALER_COLUMNS = {
   durum: (b) => b.durum,
 };
 
-export function DealerList({ role, meta, allSubDealers, accent, recordName, onNavigate }) {
+export function DealerList({ role, meta, allSubDealers, accent, recordName, initialDetail, onNavigate }) {
   const subList = role === ROLES.BAYI || allSubDealers;
   const title = subList ? "Alt Bayi Listesi" : "Bayi Liste";
   const group = role === ROLES.BAYI ? "Alt Bayi Tanım" : "Bayi Tanım";
@@ -60,7 +60,7 @@ export function DealerList({ role, meta, allSubDealers, accent, recordName, onNa
   const rows = data?.kayitlar || [];
   const editable = data?.duzenlenebilir ?? !allSubDealers;
   const { sorted, sorting, sort } = useSorting(rows, DEALER_COLUMNS);
-  const [detail, setDetail] = useState(null); // sağ panelde açık bayi (cari no)
+  const [detail, setDetail] = useState(initialDetail || null); // sağ panelde açık bayi (cari no); komut paletinden ?detay= ile gelir
 
   // tanımlamadan dönüşte: kaydedilen satır vurgulanır, kısa bilgi gösterilir
   const [notice, setNotice] = useState(null); // { metin, eylem? }
@@ -160,7 +160,7 @@ export function DealerList({ role, meta, allSubDealers, accent, recordName, onNa
           <ErrorBox error={query.error} onRetry={() => query.refetch()} />
         ) : (
           <div className={`relative overflow-x-auto transition-opacity ${query.isFetching ? "opacity-60" : ""}`}>
-            <table className="min-w-full text-[12.5px]">
+            <table className="bn-rtable min-w-full text-[12.5px]">
               <thead>
                 <tr className="border-y border-[var(--border)] bg-[var(--soft)] text-left text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
                   <SortableHeader field="unvan" sorting={sorting} onSort={sort} className={th}>Unvan / Cari · Vergi No</SortableHeader>
@@ -182,7 +182,7 @@ export function DealerList({ role, meta, allSubDealers, accent, recordName, onNa
                     key={b.cariNo}
                     className={`transition-colors hover:bg-[var(--soft)] ${i > 0 ? "border-t border-[var(--border)]" : ""} ${accent === b.cariNo ? "bg-[var(--success-soft)]" : ""}`}
                   >
-                    <td className={td}>
+                    <td data-card="title" className={td}>
                       <button type="button" onClick={() => setDetail(b.cariNo)} title="Detayı aç" className={`bn-yazdir-koru block rounded text-left font-semibold text-[var(--fg)] hover:text-[var(--brand-text)] hover:underline ${FOCUS}`}>
                         {b.unvan}
                       </button>
@@ -190,24 +190,24 @@ export function DealerList({ role, meta, allSubDealers, accent, recordName, onNa
                         {b.cariNo} · VKN {b.vergiNo}
                       </span>
                     </td>
-                    <td className={td}>
+                    <td data-label="İletişim" className={td}>
                       <span className="block tabular-nums text-[var(--fg-2)]">{b.telefon}</span>
                       <span className="block text-[11px] text-[var(--muted)]">{b.email}</span>
                     </td>
-                    {allSubDealers && <td className={`${td} text-[var(--fg-2)]`}>{b.bagli?.unvan}</td>}
-                    <td className={`${td} tabular-nums text-[var(--fg-2)]`}>{profileName(b.vadeProfil)}</td>
-                    <td className={`${td} tabular-nums text-[var(--fg-2)]`}>{installmentSummary(b.taksitler)}</td>
-                    <td className={`${td} text-right font-semibold tabular-nums text-[var(--fg)]`}>{tl(b.islemLimitiKurus)}</td>
+                    {allSubDealers && <td data-label="Bağlı Bayi" className={`${td} text-[var(--fg-2)]`}>{b.bagli?.unvan}</td>}
+                    <td data-label="Vade Profili" className={`${td} tabular-nums text-[var(--fg-2)]`}>{profileName(b.vadeProfil)}</td>
+                    <td data-label="Taksitler" className={`${td} tabular-nums text-[var(--fg-2)]`}>{installmentSummary(b.taksitler)}</td>
+                    <td data-label="İşlem Limiti" className={`${td} text-right font-semibold tabular-nums text-[var(--fg)]`}>{tl(b.islemLimitiKurus)}</td>
                     {!subList && (
-                      <td className={td}>
+                      <td data-label="Alt Bayi" className={td}>
                         <span className="block font-semibold tabular-nums text-[var(--fg-2)]">{b.altBayiSayisi}</span>
                         <span className="block text-[11px] text-[var(--muted)]">{b.altBayiYetkisi ? "Tanımlayabilir" : "Yetkisi yok"}</span>
                       </td>
                     )}
-                    <td className={td}>
+                    <td data-card="aside" className={td}>
                       <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${statusTone(b.durum)}`}>{labelOf("recordStatus", b.durum)}</span>
                     </td>
-                    <td className={`${td} text-right`}>
+                    <td data-card="actions" className={`${td} text-right`}>
                       <ActionMenu
                         label={`${b.unvan} işlemleri`}
                         items={[

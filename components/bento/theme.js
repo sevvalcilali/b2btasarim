@@ -73,6 +73,10 @@ export const MOTION_CSS = `
 @keyframes bn-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
 @keyframes bn-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes bn-slide { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+@keyframes bn-ring { from { transform: scale(0.7); opacity: 0.55; } to { transform: scale(1.75); opacity: 0; } }
+@keyframes bn-burst { from { transform: translate(0, 0) scale(0.3); opacity: 1; } to { transform: translate(var(--x), var(--y)) scale(1); opacity: 0; } }
+@keyframes bn-shake { 0%, 100% { transform: none; } 20%, 60% { transform: translateX(-5px); } 40%, 80% { transform: translateX(5px); } }
+@keyframes bn-sheet { from { transform: translateY(100%); } to { transform: none; } }
 @keyframes bn-pop { from { opacity: 0; transform: translateY(-4px) scale(0.97); } to { opacity: 1; transform: none; } }
 .bn-rise { animation: bn-rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) backwards; animation-delay: calc(var(--i, 0) * 55ms); }
 .bn-grow { transform-origin: bottom; animation: bn-grow 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; animation-delay: calc(var(--i, 0) * 60ms + 180ms); }
@@ -82,8 +86,59 @@ export const MOTION_CSS = `
 .bn-fade { animation: bn-fade 0.18s ease-out backwards; }
 .bn-pop { animation: bn-pop 0.16s ease-out backwards; }
 .bn-slide { animation: bn-slide 0.22s cubic-bezier(0.2, 0.7, 0.2, 1) backwards; }
+.bn-sheet { animation: bn-sheet 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+.bn-mark-circle { stroke-dasharray: 1; animation: bn-draw 0.55s cubic-bezier(0.6, 0, 0.3, 1) backwards; }
+.bn-mark-check { stroke-dasharray: 1; animation: bn-draw 0.35s 0.45s ease-out backwards; }
+.bn-ring { opacity: 0; animation: bn-ring 0.9s 0.55s ease-out both; }
+.bn-burst { opacity: 0; animation: bn-burst 0.85s 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.bn-shake { animation: bn-shake 0.42s 0.3s ease-in-out both; }
 @media (prefers-reduced-motion: reduce) {
-  .bn-rise, .bn-grow, .bn-fill, .bn-draw, .bn-wipe, .bn-fade, .bn-pop, .bn-slide { animation: none; }
+  .bn-rise, .bn-grow, .bn-fill, .bn-draw, .bn-wipe, .bn-fade, .bn-pop, .bn-slide, .bn-sheet,
+  .bn-mark-circle, .bn-mark-check, .bn-ring, .bn-burst, .bn-shake { animation: none; }
+}
+`;
+
+// Telefon genişliğinde tablolar kart listesine dönüşür (yatay kaydırma yerine). Hücreler data-label ile etiketlenir;
+// data-card rolü kartın yerleşimini belirler: title (sol üst), aside (sağ üst: tutar), sub (sol alt), status (sağ alt),
+// actions (alt şerit), full (tam genişlik, etiketsiz). Etiketli diğer hücreler "Etiket ……… değer" satırı olur.
+// Yalnız ekranda uygulanır: yazdırmada tablo olarak kalır.
+export const TABLE_CSS = `
+@media screen and (max-width: 767px) {
+  .bn-rtable, .bn-rtable > tbody, .bn-rtable > tfoot { display: block; width: 100%; min-width: 0 !important; }
+  .bn-rtable > thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .bn-rtable > tbody, .bn-rtable > tfoot { display: flex; flex-direction: column; gap: 8px; padding: 10px; }
+  .bn-rtable > tfoot { padding-top: 0; }
+  .bn-rtable > tbody > tr, .bn-rtable > tfoot > tr {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; row-gap: 4px;
+    padding: 12px 14px; border: 1px solid var(--border) !important; border-radius: 16px;
+  }
+  .bn-rtable > tfoot > tr { background-color: var(--brand-soft) !important; border-color: transparent !important; }
+  .bn-rtable td {
+    grid-column: 1 / -1; display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+    min-width: 0; padding: 0 !important; white-space: normal !important; text-align: right !important; font-size: 12.5px;
+  }
+  .bn-rtable td[data-label]::before {
+    content: attr(data-label); flex-shrink: 0; text-align: left; font-size: 11.5px; font-weight: 600; color: var(--muted);
+  }
+  /* etiketli satır: solda etiket, sağda değer(ler) alt alta */
+  .bn-rtable td[data-label]:not([data-card]) {
+    position: relative; flex-direction: column; align-items: flex-end; justify-content: flex-start;
+    gap: 1px; min-height: 22px; padding: 6px 0 0 108px !important;
+  }
+  .bn-rtable td[data-label]:not([data-card])::before { position: absolute; left: 0; top: 6px; max-width: 100px; line-height: 1.35; }
+  .bn-rtable td[data-label]:not([data-card]) ~ td[data-label]:not([data-card]) { padding-top: 3px !important; }
+  .bn-rtable td[data-label]:not([data-card]) ~ td[data-label]:not([data-card])::before { top: 3px; }
+  .bn-rtable td[data-card="title"] { grid-column: 1; grid-row: 1; display: block; text-align: left !important; font-size: 13.5px; }
+  .bn-rtable td[data-card="aside"] { grid-column: 2; grid-row: 1; display: block; font-size: 14px; }
+  .bn-rtable td[data-card="sub"] { grid-column: 1; grid-row: 2; display: block; text-align: left !important; font-size: 11.5px; }
+  .bn-rtable td[data-card="status"] { grid-column: 2; grid-row: 2; display: block; }
+  .bn-rtable td[data-card="full"] { display: block; text-align: left !important; }
+  .bn-rtable td[data-card="actions"] {
+    justify-content: flex-end; margin-top: 6px; padding-top: 8px !important; border-top: 1px dashed var(--border-strong);
+  }
+  .bn-rtable td[data-card]::before { content: none; }
+  .bn-rtable td:empty { display: none; }
+  .bn-rtable td > span.block + span.block { margin-top: 1px; }
 }
 `;
 

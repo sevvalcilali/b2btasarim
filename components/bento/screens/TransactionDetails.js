@@ -8,10 +8,10 @@ import { useTransactions } from "@/lib/queries/transactions";
 import { EmptyState, ErrorBox, Loading } from "../states";
 import { downloadCsv, csvAmount } from "@/lib/export";
 import { SortableHeader, changeSorting } from "../table";
-import { rangeQuery } from "@/lib/period";
-import { Breadcrumb, DateRange, PrintButton } from "../shared";
+import { rangeQuery, periodLabel } from "@/lib/period";
+import { Breadcrumb, DateRange, PrintButton, BottomSheet, FilterButton, ChipGroup, SheetActions } from "../shared";
 import { CARD, FOCUS } from "../theme";
-import { useDebounced } from "../helpers";
+import { useDebounced, useIsMobile } from "../helpers";
 
 const STATUS_TABS = ["TUMU", "BASARILI", "BASARISIZ", "IPTAL", "IADE"];
 
@@ -28,8 +28,8 @@ function customerKindTone(kind) {
   return "bg-[var(--soft-2)] text-[var(--fg-2)]";
 }
 
-export function TransactionDetails({ role, meta, onHome }) {
-  const [search, setSearch] = useState("");
+export function TransactionDetails({ role, meta, onHome, initialSearch }) {
+  const [search, setSearch] = useState(initialSearch || "");
   const [status, setStatus] = useState("TUMU");
   const [paymentType, setPaymentType] = useState("");
   const [customerKind, setCustomerKind] = useState("");
@@ -53,6 +53,10 @@ export function TransactionDetails({ role, meta, onHome }) {
     setCustomerKind("");
     setRange(null);
   };
+  // telefonda müşteri türü, ödeme tipi ve dönem alttan açılan çekmecede
+  const mobile = useIsMobile();
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const sheetCount = (customerKind ? 1 : 0) + (paymentType ? 1 : 0) + (range ? 1 : 0);
   const selectCls = `h-9 rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-[12.5px] font-medium text-[var(--fg-2)] ${FOCUS}`;
   const th = "whitespace-nowrap px-4 py-2";
   const td = "whitespace-nowrap px-4 py-2.5";
@@ -125,8 +129,8 @@ export function TransactionDetails({ role, meta, onHome }) {
               </button>
             ))}
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-            <label className="relative block sm:w-60">
+          <div className={`flex gap-2 ${mobile ? "items-center" : "flex-col sm:flex-row sm:flex-wrap sm:items-center"}`}>
+            <label className="relative block min-w-0 flex-1 sm:w-60 sm:flex-none">
               <span className="sr-only">İşlem ara</span>
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]">
                 <I name="search" size={14} />
@@ -139,24 +143,52 @@ export function TransactionDetails({ role, meta, onHome }) {
                 className="h-9 w-full rounded-full border border-[var(--border-strong)] bg-[var(--surface)] pl-8 pr-3 text-[12.5px] text-[var(--fg)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--brand)]"
               />
             </label>
-            <select aria-label="Müşteri türü" value={customerKind} onChange={(e) => setCustomerKind(e.target.value)} className={selectCls}>
-              <option value="">Tüm müşteri türleri</option>
-              {(data?.musteriTurleri || []).map((m) => (
-                <option key={m} value={m}>
-                  {labelOf("customerKind", m)}
-                </option>
-              ))}
-            </select>
-            <select aria-label="Ödeme tipi" value={paymentType} onChange={(e) => setPaymentType(e.target.value)} className={selectCls}>
-              <option value="">Tüm ödeme tipleri</option>
-              <option value="MANUEL">Manuel ödeme</option>
-              <option value="LINK">Link ile ödeme</option>
-            </select>
+            {mobile ? (
+              <FilterButton count={sheetCount} label={range ? periodLabel(range) : "Filtrele"} onClick={() => setSheetOpen(true)} />
+            ) : (
+              <>
+                <select aria-label="Müşteri türü" value={customerKind} onChange={(e) => setCustomerKind(e.target.value)} className={selectCls}>
+                  <option value="">Tüm müşteri türleri</option>
+                  {(data?.musteriTurleri || []).map((m) => (
+                    <option key={m} value={m}>
+                      {labelOf("customerKind", m)}
+                    </option>
+                  ))}
+                </select>
+                <select aria-label="Ödeme tipi" value={paymentType} onChange={(e) => setPaymentType(e.target.value)} className={selectCls}>
+                  <option value="">Tüm ödeme tipleri</option>
+                  <option value="MANUEL">Manuel ödeme</option>
+                  <option value="LINK">Link ile ödeme</option>
+                </select>
+              </>
+            )}
           </div>
         </div>
-        <div className="border-t border-[var(--border)] px-3 py-2.5 sm:px-4">
-          <DateRange value={range} onChange={setRange} all />
-        </div>
+        {!mobile && (
+          <div className="border-t border-[var(--border)] px-3 py-2.5 sm:px-4">
+            <DateRange value={range} onChange={setRange} all />
+          </div>
+        )}
+        {mobile && sheetOpen && (
+          <BottomSheet
+            title="Filtreler"
+            onClose={() => setSheetOpen(false)}
+            bottomBar={
+              <SheetActions
+                onClear={sheetCount ? () => { setCustomerKind(""); setPaymentType(""); setRange(null); } : null}
+                onClose={() => setSheetOpen(false)}
+                count={data ? data.toplam : null}
+              />
+            }
+          >
+            <fieldset className="mt-1">
+              <legend className="mb-2 text-[12px] font-bold text-[var(--fg-2)]">Dönem</legend>
+              <DateRange value={range} onChange={setRange} all />
+            </fieldset>
+            <ChipGroup label="Müşteri türü" value={customerKind} onChange={setCustomerKind} options={[["", "Tümü"], ...(data?.musteriTurleri || []).map((m) => [m, labelOf("customerKind", m)])]} />
+            <ChipGroup label="Ödeme tipi" value={paymentType} onChange={setPaymentType} options={[["", "Tümü"], ["MANUEL", "Manuel ödeme"], ["LINK", "Link ile ödeme"]]} />
+          </BottomSheet>
+        )}
 
         {query.isPending ? (
           <Loading row={6} title={false} />
@@ -165,7 +197,7 @@ export function TransactionDetails({ role, meta, onHome }) {
         ) : (
           <>
             <div className={`overflow-x-auto transition-opacity ${query.isFetching ? "opacity-60" : ""}`}>
-              <table className="min-w-full text-[12.5px]">
+              <table className="bn-rtable min-w-full text-[12.5px]">
                 <thead>
                   <tr className="border-y border-[var(--border)] bg-[var(--soft)] text-left text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
                     <SortableHeader field="islemNo" sorting={sorting} onSort={sort} className={th}>İşlem No</SortableHeader>
@@ -182,23 +214,23 @@ export function TransactionDetails({ role, meta, onHome }) {
                 <tbody>
                   {rows.map((t, i) => (
                     <tr key={t.islemNo} className={`transition-colors hover:bg-[var(--soft)] ${i > 0 ? "border-t border-[var(--border)]" : ""}`}>
-                      <td className={`${td} font-bold text-[var(--brand-text)]`}>{t.islemNo}</td>
-                      <td className={`${td} tabular-nums text-[var(--muted)]`}>{formatDateTime(t.tarih)}</td>
+                      <td data-label="İşlem No" data-card="sub" className={`${td} font-bold text-[var(--brand-text)]`}>{t.islemNo}</td>
+                      <td data-label="Tarih" className={`${td} tabular-nums text-[var(--muted)]`}>{formatDateTime(t.tarih)}</td>
                       {showActor && (
-                        <td className={td}>
+                        <td data-label="Çekim Yapan" className={td}>
                           <span className="block font-semibold text-[var(--fg-2)]">{t.cekimYapan?.unvan}</span>
                           <span className="block text-[11px] text-[var(--muted)]">{labelOf("companyKind", t.cekimYapan?.tur)}</span>
                         </td>
                       )}
-                      <td className={td}>
+                      <td data-label="Müşteri Türü" className={td}>
                         <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${customerKindTone(t.musteriTuru)}`}>{labelOf("customerKind", t.musteriTuru)}</span>
                       </td>
-                      <td className={td}>
+                      <td data-card="title" className={td}>
                         <span className="block font-semibold text-[var(--fg)]">{t.musteri.unvan}</span>
                         <span className="block text-[11px] tabular-nums text-[var(--muted)]">{t.musteri.cariNo}</span>
                       </td>
-                      <td className={`${td} tabular-nums text-[var(--fg-2)]`}>{t.musteri.vergiNo}</td>
-                      <td className={td}>
+                      <td data-label="Vergi No" className={`${td} tabular-nums text-[var(--fg-2)]`}>{t.musteri.vergiNo}</td>
+                      <td data-label="Ödeme" className={td}>
                         <span className="flex items-center gap-1 tabular-nums text-[var(--fg-2)]">
                           <I name={t.odemeTipi === "LINK" ? "link" : "wallet"} size={13} className="text-[var(--muted)]" />
                           **** {t.kart.son4}
@@ -207,8 +239,8 @@ export function TransactionDetails({ role, meta, onHome }) {
                           {LABEL.paymentType[t.odemeTipi]} · {installmentText(t.taksit)}
                         </span>
                       </td>
-                      <td className={`${td} text-right font-bold tabular-nums text-[var(--fg)]`}>{tl(t.tutarKurus)}</td>
-                      <td className={td}>
+                      <td data-card="aside" className={`${td} text-right font-bold tabular-nums text-[var(--fg)]`}>{tl(t.tutarKurus)}</td>
+                      <td data-label="Durum" data-card="status" className={td}>
                         <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${statusTone(t.durum)}`}>{labelOf("transactionStatus", t.durum)}</span>
                       </td>
                     </tr>

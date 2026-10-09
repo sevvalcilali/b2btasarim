@@ -8,8 +8,9 @@ import { statusTone, labelOf } from "@/lib/labels";
 import { useDealerSummary } from "@/lib/queries/reports";
 import { EmptyState, ErrorBox, Loading } from "../states";
 import { downloadCsv, csvAmount } from "@/lib/export";
-import { rangeQuery, periodRange } from "@/lib/period";
-import { Breadcrumb, DateRange, ChangeBadge, PrintButton } from "../shared";
+import { rangeQuery, periodRange, periodLabel } from "@/lib/period";
+import { Breadcrumb, DateRange, ChangeBadge, PrintButton, BottomSheet, FilterButton, ChipGroup, SheetActions } from "../shared";
+import { useIsMobile } from "../helpers";
 import { HOME } from "../routes";
 import { SortableHeader, useSorting } from "../table";
 import { CARD, FOCUS } from "../theme";
@@ -28,6 +29,8 @@ const SUMMARY_COLUMNS = {
 
 export function DealerSummary({ role, meta, onNavigate }) {
   const isSub = role === ROLES.BAYI;
+  const mobile = useIsMobile();
+  const [sheetOpen, setSheetOpen] = useState(false);
   const title = isSub ? "Alt Bayi Özet" : "Bayi Özet";
   const [range, setRange] = useState(() => periodRange("30g"));
   const [customerKind, setCustomerKind] = useState("");
@@ -96,19 +99,25 @@ export function DealerSummary({ role, meta, onNavigate }) {
       </div>
 
       <section style={{ "--i": 4 }} className={`bn-rise mt-3 overflow-hidden ${CARD} hover:!translate-y-0`} aria-label={title} aria-busy={query.isFetching}>
-        <div className="flex flex-col gap-3 p-3 sm:p-4 lg:flex-row lg:items-center lg:justify-between">
-          <DateRange value={range} onChange={setRange} />
-          <div role="group" aria-label="Müşteri türü" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-0.5">
-            <button type="button" onClick={() => setCustomerKind("")} aria-pressed={customerKind === ""} className={selectionCls(customerKind === "")}>
-              Tüm müşteri türleri
-            </button>
-            {(data?.musteriTurleri || []).map((m) => (
-              <button key={m} type="button" onClick={() => setCustomerKind(m)} aria-pressed={customerKind === m} className={selectionCls(customerKind === m)}>
-                {labelOf("customerKind", m)}
-              </button>
-            ))}
-          </div>
-          <label className="relative block lg:w-56">
+        <div className={`flex gap-3 p-3 sm:p-4 ${mobile ? "items-center" : "flex-col lg:flex-row lg:items-center lg:justify-between"}`}>
+          {mobile ? (
+            <FilterButton count={customerKind ? 1 : 0} icon="calendar" label={periodLabel(range)} onClick={() => setSheetOpen(true)} />
+          ) : (
+            <>
+              <DateRange value={range} onChange={setRange} />
+              <div role="group" aria-label="Müşteri türü" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-0.5">
+                <button type="button" onClick={() => setCustomerKind("")} aria-pressed={customerKind === ""} className={selectionCls(customerKind === "")}>
+                  Tüm müşteri türleri
+                </button>
+                {(data?.musteriTurleri || []).map((m) => (
+                  <button key={m} type="button" onClick={() => setCustomerKind(m)} aria-pressed={customerKind === m} className={selectionCls(customerKind === m)}>
+                    {labelOf("customerKind", m)}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          <label className="relative block min-w-0 flex-1 lg:w-56 lg:flex-none">
             <span className="sr-only">Firma ara</span>
             <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]">
               <I name="search" size={14} />
@@ -117,13 +126,27 @@ export function DealerSummary({ role, meta, onNavigate }) {
           </label>
         </div>
 
+        {mobile && sheetOpen && (
+          <BottomSheet
+            title="Filtreler"
+            onClose={() => setSheetOpen(false)}
+            bottomBar={<SheetActions onClear={customerKind ? () => setCustomerKind("") : null} onClose={() => setSheetOpen(false)} count={data ? rows.length : null} />}
+          >
+            <fieldset className="mt-1">
+              <legend className="mb-2 text-[12px] font-bold text-[var(--fg-2)]">Dönem</legend>
+              <DateRange value={range} onChange={setRange} />
+            </fieldset>
+            <ChipGroup label="Müşteri türü" value={customerKind} onChange={setCustomerKind} options={[["", "Tümü"], ...(data?.musteriTurleri || []).map((m) => [m, labelOf("customerKind", m)])]} />
+          </BottomSheet>
+        )}
+
         {query.isPending ? (
           <Loading row={5} title={false} />
         ) : query.isError ? (
           <ErrorBox error={query.error} onRetry={() => query.refetch()} />
         ) : (
           <div className={`relative overflow-x-auto transition-opacity ${query.isFetching ? "opacity-60" : ""}`}>
-            <table className="min-w-full text-[12.5px]">
+            <table className="bn-rtable min-w-full text-[12.5px]">
               <thead>
                 <tr className="border-y border-[var(--border)] bg-[var(--soft)] text-left text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
                   <SortableHeader field="firma" sorting={sorting} onSort={sort} className={th}>Firma</SortableHeader>
@@ -138,7 +161,7 @@ export function DealerSummary({ role, meta, onNavigate }) {
               <tbody>
                 {visible.map((s, i) => (
                   <tr key={s.firma.firmaId} className={`transition-colors hover:bg-[var(--soft)] ${i > 0 ? "border-t border-[var(--border)]" : ""}`}>
-                    <td className={td}>
+                    <td data-card="title" className={td}>
                       <span className="block font-semibold text-[var(--fg)]">{s.firma.unvan}</span>
                       <span className="block text-[11px] text-[var(--muted)]">
                         {labelOf("companyKind", s.firma.tur)}
@@ -146,23 +169,23 @@ export function DealerSummary({ role, meta, onNavigate }) {
                         {s.vadeProfil ? ` · ${s.vadeProfil}` : ""}
                       </span>
                     </td>
-                    <td className={td}>
+                    <td data-label="İşlem" data-card="sub" className={td}>
                       <span className="block font-semibold tabular-nums text-[var(--fg)]">{formatNumber(s.islemAdet)}</span>
                       <span className="block text-[11px] tabular-nums text-[var(--muted)]">
                         {formatNumber(s.basariliAdet)} başarılı · {formatPercent(successRate(s), 0)}
                       </span>
                     </td>
-                    <td className={td}>
+                    <td data-label="Ciro (başarılı)" className={td}>
                       <span className="block font-bold tabular-nums text-[var(--fg)]">{tl(s.ciroKurus)}</span>
                       {/* ciro payı: en yüksek ciroya göre */}
                       <span className="mt-1.5 block h-1 w-full max-w-[180px] overflow-hidden rounded-full bg-[var(--soft-2)]" aria-hidden="true">
                         <span className="bn-fill block h-full rounded-full bg-[linear-gradient(90deg,var(--chart-from),var(--chart-to))]" style={{ width: `${Math.max(2, (s.ciroKurus / highest) * 100)}%` }} />
                       </span>
                     </td>
-                    <td className={`${td} text-right tabular-nums text-[var(--fg-2)]`}>{tl(s.vadeFarkiKurus)}</td>
-                    <td className={`${td} text-right tabular-nums ${s.iptalIadeKurus ? "text-[var(--danger-text)]" : "text-[var(--muted)]"}`}>{s.iptalIadeKurus ? `− ${tl(s.iptalIadeKurus)}` : "—"}</td>
-                    <td className={`${td} text-right font-bold tabular-nums text-[var(--fg)]`}>{tl(s.hesabaGececekKurus)}</td>
-                    <td className={td}>
+                    <td data-label="Vade Farkı" className={`${td} text-right tabular-nums text-[var(--fg-2)]`}>{tl(s.vadeFarkiKurus)}</td>
+                    <td data-label="İptal / İade" className={`${td} text-right tabular-nums ${s.iptalIadeKurus ? "text-[var(--danger-text)]" : "text-[var(--muted)]"}`}>{s.iptalIadeKurus ? `− ${tl(s.iptalIadeKurus)}` : "—"}</td>
+                    <td data-card="aside" className={`${td} text-right font-bold tabular-nums text-[var(--fg)]`}>{tl(s.hesabaGececekKurus)}</td>
+                    <td data-label="Durum" data-card="status" className={td}>
                       <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${statusTone(s.durum)}`}>{labelOf("recordStatus", s.durum)}</span>
                     </td>
                   </tr>
@@ -171,13 +194,13 @@ export function DealerSummary({ role, meta, onNavigate }) {
               {total && rows.length > 0 && (
                 <tfoot>
                   <tr className="border-t-2 border-[var(--border-strong)] bg-[var(--soft)] font-bold">
-                    <td className={`${td} text-[var(--fg)]`}>Toplam · {formatNumber(total.firmaAdet)} firma</td>
-                    <td className={`${td} tabular-nums text-[var(--fg)]`}>{formatNumber(total.islemAdet)}</td>
-                    <td className={`${td} tabular-nums text-[var(--fg)]`}>{tl(total.ciroKurus)}</td>
-                    <td className={`${td} text-right tabular-nums text-[var(--fg)]`}>{tl(total.vadeFarkiKurus)}</td>
-                    <td className={`${td} text-right tabular-nums ${total.iptalIadeKurus ? "text-[var(--danger-text)]" : "text-[var(--muted)]"}`}>{total.iptalIadeKurus ? `− ${tl(total.iptalIadeKurus)}` : "—"}</td>
-                    <td className={`${td} text-right tabular-nums text-[var(--brand-text)]`}>{tl(total.hesabaGececekKurus)}</td>
-                    <td className={td} />
+                    <td data-card="title" className={`${td} text-[var(--fg)]`}>Toplam · {formatNumber(total.firmaAdet)} firma</td>
+                    <td data-label="İşlem" data-card="sub" className={`${td} tabular-nums text-[var(--fg)]`}>{formatNumber(total.islemAdet)}</td>
+                    <td data-label="Ciro (başarılı)" className={`${td} tabular-nums text-[var(--fg)]`}>{tl(total.ciroKurus)}</td>
+                    <td data-label="Vade Farkı" className={`${td} text-right tabular-nums text-[var(--fg)]`}>{tl(total.vadeFarkiKurus)}</td>
+                    <td data-label="İptal / İade" className={`${td} text-right tabular-nums ${total.iptalIadeKurus ? "text-[var(--danger-text)]" : "text-[var(--muted)]"}`}>{total.iptalIadeKurus ? `− ${tl(total.iptalIadeKurus)}` : "—"}</td>
+                    <td data-card="aside" className={`${td} text-right tabular-nums text-[var(--brand-text)]`}>{tl(total.hesabaGececekKurus)}</td>
+                    <td data-label="Durum" data-card="status" className={td} />
                   </tr>
                 </tfoot>
               )}

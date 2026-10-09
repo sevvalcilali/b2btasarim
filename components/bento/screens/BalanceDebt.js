@@ -82,7 +82,7 @@ export function BalanceDebt({ role, meta, onNavigate }) {
               <EmptyState title="Bu dönemde hareket yok" icon="check" tone="success" actions={[range.kod !== "90g" && { etiket: "Son 90 günü göster", onClick: () => setRange(periodRange("90g")) }]} />
             ) : (
               <div className={`overflow-x-auto transition-opacity ${query.isFetching ? "opacity-60" : ""}`}>
-                <table className="min-w-full text-[12.5px]">
+                <table className="bn-rtable min-w-full text-[12.5px]">
                   <thead>
                     <tr className="border-y border-[var(--border)] bg-[var(--soft)] text-left text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
                       <th scope="col" className={th}>Tarih</th>
@@ -94,15 +94,15 @@ export function BalanceDebt({ role, meta, onNavigate }) {
                   <tbody>
                     {entries.map((h, i) => (
                       <tr key={h.hareketId} className={`transition-colors hover:bg-[var(--soft)] ${i > 0 ? "border-t border-[var(--border)]" : ""}`}>
-                        <td className={`${td} tabular-nums text-[var(--fg-2)]`}>{formatDateTime(h.tarih)}</td>
-                        <td className={`${td} !whitespace-normal`}>
+                        <td data-label="Tarih" data-card="sub" className={`${td} tabular-nums text-[var(--fg-2)]`}>{formatDateTime(h.tarih)}</td>
+                        <td data-card="title" className={`${td} !whitespace-normal`}>
                           <span className="block font-semibold text-[var(--fg)]">{h.aciklama}</span>
                           {h.islemNo && <span className="block text-[11px] tabular-nums text-[var(--muted)]">{h.islemNo}</span>}
                         </td>
-                        <td className={td}>
+                        <td data-label="Tür" data-card="status" className={td}>
                           <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${ENTRY_TONE[h.tur] || ""}`}>{labelOf("entryKind", h.tur)}</span>
                         </td>
-                        <td className={`${td} text-right font-bold tabular-nums ${h.tutarKurus < 0 ? "text-[var(--success-text)]" : "text-[var(--fg)]"}`}>
+                        <td data-card="aside" className={`${td} text-right font-bold tabular-nums ${h.tutarKurus < 0 ? "text-[var(--success-text)]" : "text-[var(--fg)]"}`}>
                           {h.tutarKurus < 0 ? "−" : "+"}
                           {tl(Math.abs(h.tutarKurus))}
                         </td>
@@ -111,10 +111,10 @@ export function BalanceDebt({ role, meta, onNavigate }) {
                   </tbody>
                   <tfoot>
                     <tr className="border-t-2 border-[var(--border-strong)] bg-[var(--soft)] text-[12px] font-bold">
-                      <td className={`${td} text-[var(--fg)]`} colSpan={3}>
+                      <td data-card="title" className={`${td} text-[var(--fg)]`} colSpan={3}>
                         Dönem toplamı
                       </td>
-                      <td className={`${td} text-right tabular-nums`}>
+                      <td data-card="aside" className={`${td} text-right tabular-nums`}>
                         <span className="block text-[var(--warning-text)]">+{tl(data.donemToplami.borcKurus)} borç</span>
                         <span className="block text-[var(--success-text)]">−{tl(data.donemToplami.odemeKurus)} ödeme</span>
                         {data.donemToplami.iadeIptalKurus > 0 && <span className="block text-[var(--danger-text)]">+{tl(data.donemToplami.iadeIptalKurus)} iade / iptal</span>}

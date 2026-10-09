@@ -8,6 +8,7 @@ import CompanyLogo from "@/components/CompanyLogo";
 import I from "@/components/DesignIcons";
 import { LoginView } from "@/components/bento/Login";
 import { Sidebar, UserMenu } from "@/components/bento/Shell";
+import { CommandPalette, PaletteTrigger, usePaletteShortcut } from "@/components/bento/CommandPalette";
 import { Dashboard } from "@/components/bento/screens/Dashboard";
 import { DealerList, DealerDefinition } from "@/components/bento/screens/DealerDefinition";
 import { InvoiceUpload } from "@/components/bento/screens/InvoiceUpload";
@@ -27,9 +28,9 @@ import { LinkPayment } from "@/components/bento/screens/LinkPayment";
 import { ManualPayment } from "@/components/bento/screens/ManualPayment";
 import { HOME, ROUTES, PERSISTENT_PARAMS } from "@/components/bento/routes";
 import { usePendingItems } from "@/lib/queries/panel";
-import { light, dark, MOTION_CSS, FOCUS, GHOST } from "@/components/bento/theme";
+import { light, dark, MOTION_CSS, TABLE_CSS, FOCUS, GHOST } from "@/components/bento/theme";
 
-// N Kolay Bayim paneli — seçilen tasarım: Bento (Tasarım 03). Diğer tasarımlar arsiv/ klasöründe.
+// N Kolay Bayim paneli — seçilen tasarım: Bento (Tasarım 03). Diğer tasarımlar archive/ klasöründe.
 // Lavanta zemin üzerinde yüzen yuvarlak paneller, renkli KPI blokları.
 // Açılır kapanır sol menü, ince yüzen üst bar, giriş animasyonları, açık / koyu mod.
 
@@ -38,6 +39,8 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(true);
   const [announcementsOpen, setAnnouncementsOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  usePaletteShortcut(setPaletteOpen);
   // rolün demo meta verisi; firma unvanı GET /oturum'dan gelir (ekranlar meta.company ile başlık yazar)
   const session = useSession();
   const meta = { ...ROLE_META[role], company: session.data?.firma.unvan || ROLE_META[role].company };
@@ -120,7 +123,7 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
 
             {/* menü kapalıyken marka üst barda görünür */}
             <div
-              className={`ml-1 block max-w-[220px] shrink-0 overflow-hidden transition-[max-width,opacity,margin] duration-300 motion-reduce:transition-none ${
+              className={`ml-1 hidden max-w-[220px] shrink-0 overflow-hidden sm:block transition-[max-width,opacity,margin] duration-300 motion-reduce:transition-none ${
                 desktopOpen ? "lg:ml-0 lg:max-w-0 lg:opacity-0" : "lg:ml-1.5 lg:max-w-[220px] lg:opacity-100"
               }`}
               aria-hidden={desktopOpen && isDesktop ? "true" : undefined}
@@ -134,17 +137,7 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
               </div>
             </div>
 
-            <label className="relative ml-1.5 hidden w-full max-w-[260px] md:block">
-              <span className="sr-only">Ara</span>
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]">
-                <I name="search" size={14} />
-              </span>
-              <input
-                type="search"
-                placeholder="İşlem, cari veya müşteri ara"
-                className="h-8 w-full rounded-full border border-transparent bg-[var(--soft)] pl-8 pr-3 text-[12.5px] text-[var(--fg)] outline-none transition placeholder:text-[var(--muted)] hover:border-[var(--border-strong)] focus:border-[var(--brand)] focus:bg-[var(--surface)]"
-              />
-            </label>
+            <PaletteTrigger onOpen={() => setPaletteOpen(true)} />
 
             <div className="ml-auto flex items-center gap-1 sm:gap-1.5">
               {/* rol değiştirici — menü ve veriler role göre değişir */}
@@ -155,7 +148,7 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
                     type="button"
                     onClick={() => setRole(r)}
                     aria-pressed={role === r}
-                    className={`h-7 rounded-full px-2.5 text-[11.5px] transition-all duration-200 active:scale-95 sm:px-3 ${
+                    className={`h-7 whitespace-nowrap rounded-full px-2.5 text-[11.5px] transition-all duration-200 active:scale-95 sm:px-3 ${
                       role === r ? "bg-[var(--brand)] font-bold text-white shadow-sm" : "font-semibold text-[var(--muted)] hover:text-[var(--fg)]"
                     } ${FOCUS}`}
                   >
@@ -194,6 +187,17 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
         </div>
 
         {announcementsOpen && <AnnouncementModal role={role} onClose={() => setAnnouncementsOpen(false)} />}
+        {paletteOpen && (
+          <CommandPalette
+            role={role}
+            isDark={isDark}
+            onClose={() => setPaletteOpen(false)}
+            onNavigate={navigate}
+            onRole={setRole}
+            onToggleTheme={onToggleTheme}
+            onLogout={onLogout}
+          />
+        )}
 
         {/* key: rol ya da ekran değişince giriş animasyonları yeniden oynar */}
         <main key={`${role}-${current}`} className="mx-auto w-full max-w-[1280px] flex-1 py-4">
@@ -202,7 +206,7 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
             {meta.company} · N Kolay Bayim · yazdırma: {new Date().toLocaleString("tr-TR")}
           </p>
           {current === "/raporlar/islem-detaylari" ? (
-            <TransactionDetails role={role} meta={meta} onHome={() => navigate(HOME)} />
+            <TransactionDetails key={param("ara")} role={role} meta={meta} initialSearch={param("ara")} onHome={() => navigate(HOME)} />
           ) : current === "/odeme/manuel" ? (
             <ManualPayment key={param("musteri")} role={role} meta={meta} onNavigate={navigate} suggestedAccount={param("musteri")} />
           ) : current === "/odeme/link" ? (
@@ -211,11 +215,13 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
             <DealerDefinition key={param("duzenle")} role={role} meta={meta} editingAccountNo={param("duzenle")} onNavigate={navigate} />
           ) : (current === "/bayi-tanim/liste" || current === "/bayi-tanim/alt-bayi-liste") && role !== ROLES.ALT_BAYI ? (
             <DealerList
+              key={param("detay")}
               role={role}
               meta={meta}
               allSubDealers={current === "/bayi-tanim/alt-bayi-liste"}
               accent={param("kaydedildi")}
               recordName={param("ad")}
+              initialDetail={param("detay")}
               onNavigate={navigate}
             />
           ) : current === "/bayi-tanim/excel-ekleme" && role !== ROLES.ALT_BAYI ? (
@@ -289,7 +295,7 @@ export default function BentoDesign() {
         <title>N Kolay Bayim</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
-      <style dangerouslySetInnerHTML={{ __html: MOTION_CSS }} />
+      <style dangerouslySetInnerHTML={{ __html: MOTION_CSS + TABLE_CSS }} />
       <div
         id="bn-root"
         style={{ ...(isDark ? dark : light), fontFamily: "'Plus Jakarta Sans', sans-serif" }}

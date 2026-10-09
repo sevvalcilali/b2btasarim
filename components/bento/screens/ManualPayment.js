@@ -5,13 +5,14 @@ import { useState } from "react";
 import I from "@/components/DesignIcons";
 import { ApiError } from "@/lib/api/error";
 import { tokenizeCard } from "@/lib/api/payments";
-import { parseCents, installmentText, tl, tl2, formatPercent, formatMoneyText } from "@/lib/format";
+import { parseCents, installmentText, tl, tl2, formatPercent, formatMoneyText, formatDateTime } from "@/lib/format";
 import { labelOf } from "@/lib/labels";
 import { useMakePayment, useInstallmentOptions } from "@/lib/queries/payment";
 import { ErrorBox } from "../states";
 import { LISTELI, CustomerSection, errorHandler, useCustomerSelection } from "../payment";
 import { Breadcrumb, inputCls, Field, FormSection } from "../shared";
 import { ActiveAccountNote } from "./AccountSelection";
+import { ResultMark, CountingAmount, ReceiptCard, ReceiptActions } from "../PaymentSuccess";
 import { HOME } from "../routes";
 import { CARD, FOCUS } from "../theme";
 import { figures, useDebounced } from "../helpers";
@@ -131,6 +132,7 @@ export function ManualPayment({ role, meta, onNavigate, suggestedAccount }) {
     const successful = result.durum === "BASARILI";
     const rows = [
       ["İşlem No", result.islemNo],
+      ["Tarih", formatDateTime(result.tarih)],
       ["Müşteri", `${result.musteri.unvan} · ${labelOf("customerKind", result.musteriTuru)}`],
       [m.accountLabel, result.tahsilatCarisi ? `${result.tahsilatCarisi.ad} — ${result.tahsilatCarisi.cariNo}` : "—"],
       ["Kart", `**** ${result.kart.son4} · ${result.kart.isim}`],
@@ -142,37 +144,34 @@ export function ManualPayment({ role, meta, onNavigate, suggestedAccount }) {
       <>
         {title}
         <section className={`bn-pop mx-auto max-w-xl p-5 text-center sm:p-7 ${CARD} hover:!translate-y-0`} aria-live="polite">
-          <span className={`mx-auto grid h-14 w-14 place-items-center rounded-full ${successful ? "bg-[var(--success-soft)] text-[var(--success-text)]" : "bg-[var(--danger-soft)] text-[var(--danger-text)]"}`}>
-            <I name={successful ? "check" : "x"} size={26} strokeWidth={2.4} />
-          </span>
-          <h2 className="mt-3 text-lg font-extrabold text-[var(--fg)]">{successful ? "Ödeme alındı" : "Ödeme alınamadı"}</h2>
+          <ResultMark tone={successful ? "success" : "danger"} />
+          <h2 className="mt-4 text-lg font-extrabold text-[var(--fg)]">{successful ? "Ödeme alındı" : "Ödeme alınamadı"}</h2>
           <p className="mt-1 text-[12.5px] text-[var(--muted)]">{successful ? "Karttan çekilen toplam" : result.redNedeni || "Banka işlemi onaylamadı."}</p>
-          {successful && <p className="mt-1 text-[28px] font-extrabold tabular-nums tracking-tight text-[var(--fg)]">{tl2(result.toplamKurus)}</p>}
-          <dl className="mt-4 divide-y divide-[var(--border)] rounded-2xl border border-[var(--border)] text-left text-[12.5px]">
-            {rows.map(([k, v]) => (
-              <div key={k} className="flex justify-between gap-4 px-4 py-2.5">
-                <dt className="text-[var(--muted)]">{k}</dt>
-                <dd className="text-right font-semibold tabular-nums text-[var(--fg)]">{v}</dd>
-              </div>
-            ))}
-          </dl>
+          {successful && <CountingAmount cents={result.toplamKurus} className="mt-1 text-[32px] font-extrabold tabular-nums tracking-tight text-[var(--fg)]" />}
+          <ReceiptCard rows={rows} />
           {result.faturaGerekli && (
             <p className="mt-3 flex items-start gap-2 rounded-xl bg-[var(--warning-soft)] px-3 py-2 text-left text-[12px] font-medium text-[var(--warning-text)]">
               <I name="info" size={15} className="mt-px shrink-0" />
               Bu işlemin faturasını Raporlar › Fatura Yükleme Detay ekranından yüklemeyi unutmayın.
             </p>
           )}
-          <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
-            <button type="button" onClick={newPayment} className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-[var(--brand)] px-5 text-[13px] font-bold text-white transition hover:brightness-110 ${FOCUS}`}>
+          {successful && (
+            <ReceiptActions
+              receipt={{ fileName: `dekont-${result.islemNo}`, title: "Ödeme alındı", company: meta.company, amount: tl2(result.toplamKurus), rows, ok: true }}
+            />
+          )}
+          <div className="mt-3 flex flex-col justify-center gap-2 sm:flex-row">
+            <button type="button" onClick={newPayment} className={`inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full bg-[var(--brand)] px-5 text-[13px] font-bold text-white transition [box-shadow:0_10px_22px_-12px_rgba(12,52,231,0.9)] hover:brightness-110 ${FOCUS}`}>
               <I name="plus" size={15} />
               {successful ? "Yeni Ödeme" : "Yeniden Dene"}
             </button>
             <button
               type="button"
-              onClick={() => onNavigate("/raporlar/islem-detaylari")}
-              className={`inline-flex h-10 items-center justify-center rounded-full border border-[var(--border-strong)] px-5 text-[13px] font-semibold text-[var(--fg-2)] transition hover:border-[var(--brand)] hover:text-[var(--brand-text)] ${FOCUS}`}
+              onClick={() => onNavigate("/raporlar/islem-detaylari", { ara: result.islemNo })}
+              className={`inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full border border-[var(--border-strong)] px-5 text-[13px] font-semibold text-[var(--fg-2)] transition hover:border-[var(--brand)] hover:text-[var(--brand-text)] ${FOCUS}`}
             >
-              İşlem Detayları
+              İşlemi görüntüle
+              <I name="arrowRight" size={14} />
             </button>
           </div>
         </section>
