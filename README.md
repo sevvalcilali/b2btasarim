@@ -4,6 +4,7 @@ pay'n kolay **N Kolay Bayim** B2B ödeme paneli. Seçilen tasarım: **Bento (Tas
 Next.js (Pages Router) + Tailwind CSS + React Query. Ekranlar veriyi `/api/v1` uç noktalarından
 HTTP ile alır; şimdilik bu istekleri tarayıcıdaki **sahte backend** (MSW, `mocks/`) örnek veriyle cevaplar.
 Sözleşme: [`docs/api/openapi.yaml`](docs/api/openapi.yaml) · özet: [`docs/api/README.md`](docs/api/README.md).
+Sonra bakılacak tasarım fikirleri: [`docs/backlog.md`](docs/backlog.md).
 
 ## Çalıştırma
 
@@ -72,6 +73,7 @@ mocks/
   rules.js              sunucu kuralları: oturum, rol kapsamı, sayfalama
   handlers/             uç nokta cevapları (lib/api ile aynı dosya adları)
 docs/api/               openapi.yaml (sözleşme) · README.md (özet, uç nokta durumu)
+docs/backlog.md         yapılabilirler listesi (sonra bakılacak tasarım fikirleri)
 public/mockServiceWorker.js   MSW servis çalışanı (üretilmiş dosya, elle değiştirilmez)
 styles/globals.css      Tailwind + yazı tipi
 archive/                seçilmeyen tasarımlar ve galeri — yorum satırında, derlemeye dahil değil
