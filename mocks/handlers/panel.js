@@ -1,9 +1,9 @@
 // GET /panel/ozet · /panel/haftalik-hacim · /panel/bakiye
 import { http, HttpResponse } from "msw";
-import { depo } from "../db/depo";
-import { faturaDurumu, faturaGerekli, kapsamda, onayimda } from "../kurallar";
-import { okunmamisDuyurular } from "./duyurular";
-import { gecikme, uc, yetkili } from "./yardimci";
+import { depo } from "../db/store";
+import { faturaDurumu, faturaGerekli, kapsamda, onayimda } from "../rules";
+import { okunmamisDuyurular } from "./announcements";
+import { gecikme, uc, yetkili } from "./helpers";
 
 const KALEMLER = ["TOPLAM", "BASARILI", "BASARISIZ", "IPTAL", "IADE"];
 

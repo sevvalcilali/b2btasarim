@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ROLES } from "@/lib/roles";
-import { kimlikAyarla } from "@/lib/api/istemci";
+import { kimlikAyarla } from "@/lib/api/client";
 
 const RoleContext = createContext(null);
 

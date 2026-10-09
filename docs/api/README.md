@@ -6,16 +6,16 @@ dosyasıdır (OpenAPI 3.1; [Swagger Editor](https://editor.swagger.io) ile açı
 ## Katmanlar
 
 ```
-Ekran (components/bento/ekranlar)  →  lib/sorgular (React Query kancaları)  →  lib/api (uç fonksiyonları, fetch)
+Ekran (components/bento/screens)  →  lib/queries (React Query kancaları)  →  lib/api (uç fonksiyonları, fetch)
                                                                                       ↓
                                                         ŞİMDİ: mocks/ (MSW, tarayıcıda, örnek veri)
                                                         SONRA: gerçek backend — NEXT_PUBLIC_API_URL
 ```
 
-- `lib/api/istemci.js` tek fetch noktasıdır: adres, kimlik başlığı, zaman aşımı, hata dönüştürme.
-- `mocks/kurallar.js` sunucu tarafı iş kurallarını (rol kapsamı, limitler, onay zinciri) çalışan kod olarak taşır;
+- `lib/api/client.js` tek fetch noktasıdır: adres, kimlik başlığı, zaman aşımı, hata dönüştürme.
+- `mocks/rules.js` sunucu tarafı iş kurallarını (rol kapsamı, limitler, onay zinciri) çalışan kod olarak taşır;
   backend aynı kuralları uygulamalıdır.
-- Örnek veri yalnızca `mocks/db/tohum.js` içindedir; ekranlar ona hiç erişmez.
+- Örnek veri yalnızca `mocks/db/seed.js` içindedir; ekranlar ona hiç erişmez.
 
 ## Genel kurallar
 
@@ -23,7 +23,7 @@ Ekran (components/bento/ekranlar)  →  lib/sorgular (React Query kancaları)  �
 | --- | --- |
 | Adres | `/api/v1/…`, kebab-case |
 | Alan adları | camelCase |
-| Durum / tür | Kod: `BASARILI`, `ALT_BAYI`, `ANA_FIRMA_ONAYINDA` — etiketler `lib/etiketler.js` |
+| Durum / tür | Kod: `BASARILI`, `ALT_BAYI`, `ANA_FIRMA_ONAYINDA` — etiketler `lib/labels.js` |
 | Para | Kuruş, tam sayı: `tutarKurus: 1240000` |
 | Tarih | ISO 8601 saat dilimli; yalnız gün `YYYY-AA-GG` |
 | Liste | `{ kayitlar, toplam, sayfa, boyut, sayaclar? }` — filtre ve arama sorgu parametresi, sunucuda |
@@ -69,12 +69,12 @@ Ekran (components/bento/ekranlar)  →  lib/sorgular (React Query kancaları)  �
 | `demo-ALT_BAYI` | Kemal Er (Yönetici) | Çankaya Oto Servis `540.02.011` |
 
 Tüm hazır ekranlar bu uç noktalarla çalışır; ekran kodu örnek veriye erişmez. Yeni ekranlar aynı sırayla eklenir:
-sözleşmeye uç nokta → `lib/api` fonksiyonu → `lib/sorgular` kancası → `mocks/handlers` cevabı → ekran.
+sözleşmeye uç nokta → `lib/api` fonksiyonu → `lib/queries` kancası → `mocks/handlers` cevabı → ekran.
 
 ## Backend ekibine teslim
 
 - **Sözleşme:** `docs/api/openapi.yaml` — Swagger Editor'da açılır; her uç noktanın istek / cevap örneği var.
-- **İş kuralları:** `mocks/kurallar.js` (rol kapsamı, bayi tanım sınırları, ödeme koşulları, onay zinciri, fatura kontrolü)
+- **İş kuralları:** `mocks/rules.js` (rol kapsamı, bayi tanım sınırları, ödeme koşulları, onay zinciri, fatura kontrolü)
   ve `mocks/handlers/*.js` — backend'in uygulaması gereken kurallar, çalışan kod olarak.
 - **Canlı örnek:** uygulamayı açıp Network sekmesinde her ekranın hangi isteği attığı ve ne beklediği görülür.
 - **Geçiş:** `NEXT_PUBLIC_API_MOCK=false` ve `NEXT_PUBLIC_API_URL=<backend>/api/v1`; servisler tek tek de bağlanabilir
@@ -84,15 +84,15 @@ sözleşmeye uç nokta → `lib/api` fonksiyonu → `lib/sorgular` kancası → 
 
 Sahte backend'de etkisi olmayan, gerçek serviste önem kazanan noktalar (code review, 8 Ekim 2026):
 
-1. **Idempotency-Key** ödeme denemesi başlarken üretilip kesin cevap gelene kadar aynı kalmalı (`lib/api/odemeler.js`);
+1. **Idempotency-Key** ödeme denemesi başlarken üretilip kesin cevap gelene kadar aynı kalmalı (`lib/api/payments.js`);
    bugün her çağrıda yeni anahtar üretiliyor, zaman aşımı sonrası "Yeniden Dene" ikinci çekim yaratabilir.
 2. **Açılışta rol:** kayıtlı rol mount sonrası uygulanıyor; ilk istekler varsayılan kimlikle gidip sonra tekrarlanıyor
    (`components/RoleContext.js`). Gerçek kimlik akışı gelince rol / token senkron okunmalı.
 3. **Zaman aşımı uyumluluğu:** `AbortSignal.any` / `AbortSignal.timeout` olmayan tarayıcılar için manuel
-   `AbortController` yedeği (`lib/api/istemci.js`).
+   `AbortController` yedeği (`lib/api/client.js`).
 4. **Safari pano:** fatura yükleme linki kopyalama, sunucu cevabı beklendiği için Safari'de reddedilebilir
    (`FaturaYukleme.js` → `LinkKopyala`); linki önce gösterip `KopyalaDugmesi` ile kopyalatmak yeterli.
-5. **Tekrar:** `BayiTanim`, `IptalIade` ve `FaturaYukleme` kendi hata bağlayıcısını yazıyor; `odeme.js`'teki
+5. **Tekrar:** `BayiTanim`, `IptalIade` ve `FaturaYukleme` kendi hata bağlayıcısını yazıyor; `payment.js`'teki
    `hataBaglayici` ortak kullanılmalı.
 
 ## Backend ekibinin netleştireceği noktalar
