@@ -1,97 +1,97 @@
 // GET /odeme/taksit-secenekleri · POST /odemeler · GET /tahsilat-carileri — şartname s.4, s.5, s.6, s.9
 import { http, HttpResponse } from "msw";
-import { depo } from "../db/store";
-import { firmaOzeti, musteriCoz, odemeKosullari, simdi, tahsilatCarileri, taksitHesabi } from "../rules";
-import { islemCevabi } from "./transactions";
-import { gecikme, hata, kuralHatasi, uc, yetkili } from "./helpers";
+import { store } from "../db/store";
+import { companySummary, resolveCustomer, paymentTerms, now, collectionAccounts, installmentCalc } from "../rules";
+import { transactionResponse } from "./transactions";
+import { latency, error, ruleError, uc, authorized } from "./helpers";
 
 // Aynı Idempotency-Key ile gelen ikinci istek ilk cevabı alır (çift çekim olmaz)
-const islenmis = new Map();
+const processed = new Map();
 
-export const odemelerHandlers = [
+export const paymentsHandlers = [
   http.get(uc("/tahsilat-carileri"), async ({ request }) => {
-    await gecikme();
-    const { kim, cevap } = yetkili(request);
-    if (cevap) return cevap;
-    return HttpResponse.json(tahsilatCarileri(kim));
+    await latency();
+    const { kim: caller, cevap: response } = authorized(request);
+    if (response) return response;
+    return HttpResponse.json(collectionAccounts(caller));
   }),
 
   http.get(uc("/odeme/taksit-secenekleri"), async ({ request }) => {
-    await gecikme();
-    const { kim, cevap } = yetkili(request);
-    if (cevap) return cevap;
+    await latency();
+    const { kim: caller, cevap: response } = authorized(request);
+    if (response) return response;
     const s = new URL(request.url).searchParams;
-    const tutarKurus = Number(s.get("tutarKurus")) || 0;
-    const { taksitler, limitKurus, profil } = odemeKosullari(kim, s.get("musteriTuru"), s.get("musteriCariNo"));
+    const amountCents = Number(s.get("tutarKurus")) || 0;
+    const { taksitler: installments, limitKurus: limitCents, profil: profile } = paymentTerms(caller, s.get("musteriTuru"), s.get("musteriCariNo"));
     return HttpResponse.json({
-      vadeProfil: profil,
-      limitKurus,
-      taksitler,
-      secenekler: taksitler.map((n) => taksitHesabi(tutarKurus, n, profil.oranYuzde)),
+      vadeProfil: profile,
+      limitKurus: limitCents,
+      taksitler: installments,
+      secenekler: installments.map((n) => installmentCalc(amountCents, n, profile.oranYuzde)),
     });
   }),
 
   http.post(uc("/odemeler"), async ({ request }) => {
-    await gecikme();
-    const { kim, cevap } = yetkili(request);
-    if (cevap) return cevap;
-    const anahtar = request.headers.get("idempotency-key");
-    if (anahtar && islenmis.has(anahtar)) return HttpResponse.json(islenmis.get(anahtar), { status: 201 });
+    await latency();
+    const { kim: caller, cevap: response } = authorized(request);
+    if (response) return response;
+    const key = request.headers.get("idempotency-key");
+    if (key && processed.has(key)) return HttpResponse.json(processed.get(key), { status: 201 });
     const g = await request.json().catch(() => null);
-    if (!g) return hata(400, "GECERSIZ_GOVDE", "İstek gövdesi okunamadı.");
+    if (!g) return error(400, "GECERSIZ_GOVDE", "İstek gövdesi okunamadı.");
 
-    const alanlar = {};
-    const { musteri, hata: musteriHatasi } = musteriCoz(kim, g);
-    Object.assign(alanlar, musteriHatasi || {});
-    const cariler = tahsilatCarileri(kim).kayitlar;
-    const cari = cariler.find((c) => c.cariNo === g.tahsilatCariNo);
-    if (!cari) alanlar.tahsilatCariNo = "Tahsilat carisi seçin.";
-    const { taksitler, limitKurus, profil } = odemeKosullari(kim, g.musteriTuru, g.musteri?.cariNo);
-    if (!(Number.isInteger(g.tutarKurus) && g.tutarKurus > 0)) alanlar.tutarKurus = "Tutar girin.";
-    else if (limitKurus && g.tutarKurus > limitKurus) alanlar.tutarKurus = `İşlem bazlı ödeme limiti ₺ ${(limitKurus / 100).toLocaleString("tr-TR")}.`;
-    if (!taksitler.includes(g.taksit)) alanlar.taksit = "Bu taksit seçeneği size açık değil.";
-    if (!g.kart?.token) alanlar.kartNo = "Kart bilgisi alınamadı.";
-    if (!String(g.kart?.isim || "").trim()) alanlar.kartIsmi = "Kart üzerindeki ismi girin.";
-    const kendiKarti = g.musteriTuru === "KENDI_KARTI";
-    if (!kendiKarti && g.faturaBeyani !== true) alanlar.faturaBeyani = "Müşteri kartıyla ödemede beyanı onaylayın.";
-    if (Object.keys(alanlar).length) return kuralHatasi("DOGRULAMA", "Bazı alanlar hatalı.", alanlar);
+    const fields = {};
+    const { musteri: customer, hata: customerError } = resolveCustomer(caller, g);
+    Object.assign(fields, customerError || {});
+    const accounts = collectionAccounts(caller).kayitlar;
+    const account = accounts.find((c) => c.cariNo === g.tahsilatCariNo);
+    if (!account) fields.tahsilatCariNo = "Tahsilat carisi seçin.";
+    const { taksitler: installments, limitKurus: limitCents, profil: profile } = paymentTerms(caller, g.musteriTuru, g.musteri?.cariNo);
+    if (!(Number.isInteger(g.tutarKurus) && g.tutarKurus > 0)) fields.tutarKurus = "Tutar girin.";
+    else if (limitCents && g.tutarKurus > limitCents) fields.tutarKurus = `İşlem bazlı ödeme limiti ₺ ${(limitCents / 100).toLocaleString("tr-TR")}.`;
+    if (!installments.includes(g.taksit)) fields.taksit = "Bu taksit seçeneği size açık değil.";
+    if (!g.kart?.token) fields.kartNo = "Kart bilgisi alınamadı.";
+    if (!String(g.kart?.isim || "").trim()) fields.kartIsmi = "Kart üzerindeki ismi girin.";
+    const ownCard = g.musteriTuru === "KENDI_KARTI";
+    if (!ownCard && g.faturaBeyani !== true) fields.faturaBeyani = "Müşteri kartıyla ödemede beyanı onaylayın.";
+    if (Object.keys(fields).length) return ruleError("DOGRULAMA", "Bazı alanlar hatalı.", fields);
 
     // DEMO: son 4 hanesi 0002 olan kart banka tarafından reddedilir (başarısız akışı denemek için)
-    const basarisiz = g.kart.son4 === "0002";
-    const hesap = taksitHesabi(g.tutarKurus, g.taksit, profil.oranYuzde);
-    const sira = Math.max(...depo.tablo("islemler").map((t) => Number(t.islemNo.replace(/\D/g, "")))) + 1;
-    const islem = {
-      islemNo: `TRX-${sira}`,
-      tarih: simdi(),
-      cekimYapanId: kim.firmaId,
+    const failed = g.kart.son4 === "0002";
+    const calc = installmentCalc(g.tutarKurus, g.taksit, profile.oranYuzde);
+    const order = Math.max(...store.table("transactions").map((t) => Number(t.islemNo.replace(/\D/g, "")))) + 1;
+    const transaction = {
+      islemNo: `TRX-${order}`,
+      tarih: now(),
+      cekimYapanId: caller.firmaId,
       musteriTuru: g.musteriTuru,
-      musteri: { unvan: musteri.unvan, cariNo: musteri.cariNo || "—", vergiNo: musteri.vergiNo || "—" },
+      musteri: { unvan: customer.unvan, cariNo: customer.cariNo || "—", vergiNo: customer.vergiNo || "—" },
       kartSon4: g.kart.son4,
       odemeTipi: "MANUEL",
       taksit: g.taksit,
       tutarKurus: g.tutarKurus,
-      durum: basarisiz ? "BASARISIZ" : "BASARILI",
+      durum: failed ? "BASARISIZ" : "BASARILI",
       aciklama: g.aciklama || null,
-      tahsilatCariNo: cari.cariNo,
-      uyeIsyeriCariNo: kim.aktifUyeIsyeri || null, // oturumda seçili cari (şartname s.1)
+      tahsilatCariNo: account.cariNo,
+      uyeIsyeriCariNo: caller.aktifUyeIsyeri || null, // oturumda seçili cari (şartname s.1)
       kartIsmi: g.kart.isim,
     };
-    depo.ekle("islemler", islem);
-    const sonuc = {
-      ...islemCevabi(islem),
+    store.insert("transactions", transaction);
+    const result = {
+      ...transactionResponse(transaction),
       kart: { son4: g.kart.son4, isim: g.kart.isim },
-      tahsilatCarisi: cari,
-      vadeFarkiKurus: hesap.vadeFarkiKurus,
-      toplamKurus: hesap.toplamKurus,
-      aylikKurus: hesap.aylikKurus,
-      vadeProfil: profil,
+      tahsilatCarisi: account,
+      vadeFarkiKurus: calc.vadeFarkiKurus,
+      toplamKurus: calc.toplamKurus,
+      aylikKurus: calc.aylikKurus,
+      vadeProfil: profile,
       // s.9: kendi kartı olmayan bayi / alt bayi işlemlerinde fatura yüklenmeli
-      faturaGerekli: !basarisiz && !kendiKarti && kim.rol !== "ANA_FIRMA",
-      redNedeni: basarisiz ? "Banka onay vermedi (demo: 0002 ile biten kart)." : null,
+      faturaGerekli: !failed && !ownCard && caller.rol !== "ANA_FIRMA",
+      redNedeni: failed ? "Banka onay vermedi (demo: 0002 ile biten kart)." : null,
     };
-    if (anahtar) islenmis.set(anahtar, sonuc);
-    return HttpResponse.json(sonuc, { status: 201 });
+    if (key) processed.set(key, result);
+    return HttpResponse.json(result, { status: 201 });
   }),
 ];
 
-export { firmaOzeti };
+export { companySummary };

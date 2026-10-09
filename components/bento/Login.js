@@ -1,6 +1,6 @@
 // Giriş ekranı.
 
-import { useOturum } from "@/lib/queries/session";
+import { useSession } from "@/lib/queries/session";
 import CompanyLogo from "@/components/CompanyLogo";
 import I from "@/components/DesignIcons";
 import { Logo } from "./Shell";
@@ -8,7 +8,7 @@ import { inputCls } from "./shared";
 import { FOCUS, GHOST } from "./theme";
 
 export function LoginView({ isDark, onToggleTheme, onLogin }) {
-  const anaFirma = useOturum().data?.anaFirma;
+  const mainCompany = useSession().data?.anaFirma;
   const inputCls =
     "h-10 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--soft)] px-3 text-[13px] text-[var(--fg)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--brand)] focus:bg-[var(--surface)]";
   return (
@@ -33,10 +33,10 @@ export function LoginView({ isDark, onToggleTheme, onLogin }) {
           </div>
           <div className="relative py-10">
             <div className="mb-6 flex items-center gap-3.5">
-              <CompanyLogo name={anaFirma?.unvan || "N Kolay Bayim"} size={64} tone="light" className="shrink-0 shadow-[0_16px_32px_-14px_rgba(0,0,0,0.5)]" />
+              <CompanyLogo name={mainCompany?.unvan || "N Kolay Bayim"} size={64} tone="light" className="shrink-0 shadow-[0_16px_32px_-14px_rgba(0,0,0,0.5)]" />
               <div className="leading-tight">
-                <p className="text-[21px] font-extrabold tracking-tight">{anaFirma?.unvan || "N Kolay Bayim"}</p>
-                <p className="mt-1 text-[12.5px] text-white/80">{anaFirma?.aciklama || "B2B Bayi Paneli"}</p>
+                <p className="text-[21px] font-extrabold tracking-tight">{mainCompany?.unvan || "N Kolay Bayim"}</p>
+                <p className="mt-1 text-[12.5px] text-white/80">{mainCompany?.aciklama || "B2B Bayi Paneli"}</p>
               </div>
             </div>
             <span className="inline-block rounded-full bg-white/15 px-2.5 py-1 text-[10.5px] font-bold tracking-wide">B2B ÖDEME PANELİ</span>

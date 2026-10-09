@@ -5,9 +5,9 @@ import { ROLES, ROLE_META } from "@/lib/roles";
 import { getNav } from "@/lib/nav";
 import CompanyLogo from "@/components/CompanyLogo";
 import I from "@/components/DesignIcons";
-import { SAHTE_BACKEND } from "@/lib/api/client";
-import { etiket } from "@/lib/labels";
-import { useDemoVerisiniSifirla, useOturum } from "@/lib/queries/session";
+import { MOCK_BACKEND } from "@/lib/api/client";
+import { labelOf } from "@/lib/labels";
+import { useResetDemoData, useSession } from "@/lib/queries/session";
 import { isReady } from "./routes";
 import { FOCUS, GHOST, MENU_ITEM } from "./theme";
 import { useDismiss } from "./helpers";
@@ -31,11 +31,11 @@ export function Logo({ onBrand, compact }) {
 }
 
 // ---- sol menü ----------------------------------------------------------------------------
-function NavGroup({ entry, open, onToggle, current, onNavigate, rozetler = {} }) {
+function NavGroup({ entry, open, onToggle, current, onNavigate, badges = {} }) {
   const id = `bn-grp-${entry.icon}`;
   const hasActive = entry.items.some((i) => i.href === current);
   // bekleyen iş sayısı (ör. onay bekleyen iptal / iade); grup kapalıyken başlıkta toplamı görünür
-  const rozet = entry.items.reduce((a, i) => a + (rozetler[i.href] || 0), 0);
+  const badge = entry.items.reduce((a, i) => a + (badges[i.href] || 0), 0);
   return (
     <div>
       <button
@@ -49,9 +49,9 @@ function NavGroup({ entry, open, onToggle, current, onNavigate, rozetler = {} })
       >
         <I name={entry.icon} size={16} className={`transition-colors ${open || hasActive ? "" : "text-[var(--muted)] group-hover:text-[var(--brand-text)]"}`} />
         <span className="flex-1 text-left">{entry.label}</span>
-        {rozet > 0 && !open && (
-          <span className="rounded-full bg-[var(--danger)] px-1.5 text-[10.5px] font-bold tabular-nums text-white" aria-label={`${rozet} bekleyen`}>
-            {rozet}
+        {badge > 0 && !open && (
+          <span className="rounded-full bg-[var(--danger)] px-1.5 text-[10.5px] font-bold tabular-nums text-white" aria-label={`${badge} bekleyen`}>
+            {badge}
           </span>
         )}
         <I
@@ -80,9 +80,9 @@ function NavGroup({ entry, open, onToggle, current, onNavigate, rozetler = {} })
                   } ${FOCUS}`}
                 >
                   <span className="flex-1">{i.label}</span>
-                  {rozetler[i.href] > 0 && (
-                    <span className="rounded-full bg-[var(--danger)] px-1.5 text-[10.5px] font-bold tabular-nums text-white" aria-label={`${rozetler[i.href]} bekleyen`}>
-                      {rozetler[i.href]}
+                  {badges[i.href] > 0 && (
+                    <span className="rounded-full bg-[var(--danger)] px-1.5 text-[10.5px] font-bold tabular-nums text-white" aria-label={`${badges[i.href]} bekleyen`}>
+                      {badges[i.href]}
                     </span>
                   )}
                 </button>
@@ -95,7 +95,7 @@ function NavGroup({ entry, open, onToggle, current, onNavigate, rozetler = {} })
   );
 }
 
-function NavSection({ label, entries, openGroup, setOpenGroup, current, onNavigate, rozetler }) {
+function NavSection({ label, entries, openGroup, setOpenGroup, current, onNavigate, badges }) {
   if (entries.length === 0) return null;
   return (
     <div>
@@ -110,7 +110,7 @@ function NavSection({ label, entries, openGroup, setOpenGroup, current, onNaviga
               onToggle={() => setOpenGroup((g) => (g === entry.label ? null : entry.label))}
               current={current}
               onNavigate={onNavigate}
-              rozetler={rozetler}
+              badges={badges}
             />
           ) : (
             <button
@@ -138,15 +138,15 @@ function NavSection({ label, entries, openGroup, setOpenGroup, current, onNaviga
   );
 }
 
-export function Sidebar({ role, desktopOpen, mobileOpen, hidden, onClose, onLogout, current, onNavigate, rozetler }) {
+export function Sidebar({ role, desktopOpen, mobileOpen, hidden, onClose, onLogout, current, onNavigate, badges }) {
   const nav = getNav(role);
   const meta = ROLE_META[role];
   const main = nav.filter((e) => !MANAGE_ICONS.has(e.icon));
   const manage = nav.filter((e) => MANAGE_ICONS.has(e.icon));
   // tüm gruplar kapalı başlar; aynı anda tek grup açık kalır. Açık ekranın grubu kapalıyken de başlığı vurgulanır.
   const [openGroup, setOpenGroup] = useState(null);
-  const oturum = useOturum();
-  const anaFirma = oturum.data?.anaFirma;
+  const session = useSession();
+  const mainCompany = session.data?.anaFirma;
 
   return (
     <>
@@ -169,9 +169,9 @@ export function Sidebar({ role, desktopOpen, mobileOpen, hidden, onClose, onLogo
         {/* ana firma — her rolde göz önünde: mavi kart, büyük logo */}
         <div className="relative mx-3 mt-1 flex shrink-0 items-center gap-3 overflow-hidden rounded-2xl bg-[#0C34E7] p-3 text-white [box-shadow:0_12px_26px_-14px_rgba(12,52,231,0.8)]">
           <div className="pointer-events-none absolute -right-8 -top-10 h-24 w-24 rounded-full bg-[#D4D1FC] opacity-30 blur-2xl" aria-hidden="true" />
-          <CompanyLogo name={anaFirma?.unvan || "N Kolay Bayim"} size={48} tone="light" className="relative shrink-0" />
+          <CompanyLogo name={mainCompany?.unvan || "N Kolay Bayim"} size={48} tone="light" className="relative shrink-0" />
           <div className="relative min-w-0 leading-tight">
-            <p className="truncate text-[15px] font-extrabold">{anaFirma?.unvan || "…"}</p>
+            <p className="truncate text-[15px] font-extrabold">{mainCompany?.unvan || "…"}</p>
             <p className="mt-0.5 truncate text-[11px] font-medium text-white/75">Ana Firma · B2B Bayi Ağı</p>
           </div>
         </div>
@@ -189,26 +189,26 @@ export function Sidebar({ role, desktopOpen, mobileOpen, hidden, onClose, onLogo
         )}
 
         <nav className="flex-1 overflow-y-auto overscroll-contain px-3 pb-3 [scrollbar-color:transparent_transparent] [scrollbar-width:thin] hover:[scrollbar-color:var(--border-strong)_transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[var(--border-strong)] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:w-1.5">
-          <NavSection label="İşlemler" entries={main} openGroup={openGroup} setOpenGroup={setOpenGroup} current={current} onNavigate={onNavigate} rozetler={rozetler} />
-          <NavSection label="Yönetim" entries={manage} openGroup={openGroup} setOpenGroup={setOpenGroup} current={current} onNavigate={onNavigate} rozetler={rozetler} />
+          <NavSection label="İşlemler" entries={main} openGroup={openGroup} setOpenGroup={setOpenGroup} current={current} onNavigate={onNavigate} badges={badges} />
+          <NavSection label="Yönetim" entries={manage} openGroup={openGroup} setOpenGroup={setOpenGroup} current={current} onNavigate={onNavigate} badges={badges} />
         </nav>
 
         {/* kullanıcı — GET /oturum */}
         <div className="m-3 mt-0 flex shrink-0 items-center gap-2.5 rounded-xl border border-[var(--border)] p-2">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--brand)] text-[10px] font-extrabold text-white">
-            {basHarfler(oturum.data?.kullanici.adSoyad) || meta.short}
+            {initials(session.data?.kullanici.adSoyad) || meta.short}
           </span>
           <span className="min-w-0 flex-1 leading-tight">
-            {oturum.isPending ? (
+            {session.isPending ? (
               <>
                 <span className="block h-3 w-28 animate-pulse rounded bg-[var(--soft-2)] motion-reduce:animate-none" />
                 <span className="mt-1.5 block h-2.5 w-16 animate-pulse rounded bg-[var(--soft-2)] motion-reduce:animate-none" />
               </>
             ) : (
               <>
-                <span className="block truncate text-[12.5px] font-bold text-[var(--fg)]">{oturum.data?.kullanici.adSoyad || meta.user}</span>
+                <span className="block truncate text-[12.5px] font-bold text-[var(--fg)]">{session.data?.kullanici.adSoyad || meta.user}</span>
                 <span className="block truncate text-[11px] font-medium text-[var(--muted)]">
-                  {oturum.isError ? "Oturum alınamadı" : `${etiket("yetki", oturum.data?.kullanici.yetki)} · Çevrimiçi`}
+                  {session.isError ? "Oturum alınamadı" : `${labelOf("permission", session.data?.kullanici.yetki)} · Çevrimiçi`}
                 </span>
               </>
             )}
@@ -229,21 +229,21 @@ export function Sidebar({ role, desktopOpen, mobileOpen, hidden, onClose, onLogo
 }
 
 // "Ad Soyad" → "AS"
-const basHarfler = (ad) =>
-  (ad || "")
+const initials = (name) =>
+  (name || "")
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
     .map((p) => p[0].toLocaleUpperCase("tr-TR"))
     .join("");
 
-export function UserMenu({ meta, isDark, onToggleTheme, onLogout, onFirmaBilgileri }) {
+export function UserMenu({ meta, isDark, onToggleTheme, onLogout, onCompanyInfo }) {
   const [open, setOpen] = useState(false);
   useDismiss(open, () => setOpen(false));
-  const oturum = useOturum();
-  const sifirla = useDemoVerisiniSifirla();
-  const adSoyad = oturum.data?.kullanici.adSoyad || meta.user;
-  const firmaUnvan = oturum.data?.firma.unvan || meta.company;
+  const session = useSession();
+  const reset = useResetDemoData();
+  const fullName = session.data?.kullanici.adSoyad || meta.user;
+  const companyName = session.data?.firma.unvan || meta.company;
   return (
     <div className="relative">
       <button
@@ -254,8 +254,8 @@ export function UserMenu({ meta, isDark, onToggleTheme, onLogout, onFirmaBilgile
         aria-label="Kullanıcı menüsü"
         className={`flex h-8 items-center gap-1.5 rounded-full bg-[var(--soft)] pl-0.5 pr-2 transition-colors hover:bg-[var(--soft-2)] ${FOCUS}`}
       >
-        <span className="grid h-7 w-7 place-items-center rounded-full bg-[var(--brand)] text-[10px] font-extrabold text-white">{basHarfler(adSoyad) || meta.short}</span>
-        <span className="hidden max-w-[150px] truncate text-[12.5px] font-semibold text-[var(--fg)] xl:block">{adSoyad}</span>
+        <span className="grid h-7 w-7 place-items-center rounded-full bg-[var(--brand)] text-[10px] font-extrabold text-white">{initials(fullName) || meta.short}</span>
+        <span className="hidden max-w-[150px] truncate text-[12.5px] font-semibold text-[var(--fg)] xl:block">{fullName}</span>
         <I name="chevronDown" size={13} className={`text-[var(--muted)] transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
@@ -266,17 +266,17 @@ export function UserMenu({ meta, isDark, onToggleTheme, onLogout, onFirmaBilgile
             className="bn-pop absolute right-0 top-full z-40 mt-2 w-56 origin-top-right rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-1.5 [box-shadow:var(--pop-shadow)]"
           >
             <div className="px-2.5 pb-2 pt-1.5">
-              <p className="truncate text-[12.5px] font-bold text-[var(--fg)]">{adSoyad}</p>
-              <p className="truncate text-[11.5px] text-[var(--muted)]">{firmaUnvan}</p>
+              <p className="truncate text-[12.5px] font-bold text-[var(--fg)]">{fullName}</p>
+              <p className="truncate text-[11.5px] text-[var(--muted)]">{companyName}</p>
             </div>
             <div className="my-1 border-t border-[var(--border)]" />
-            {onFirmaBilgileri && (
+            {onCompanyInfo && (
               <button
                 type="button"
                 role="menuitem"
                 className={MENU_ITEM}
                 onClick={() => {
-                  onFirmaBilgileri();
+                  onCompanyInfo();
                   setOpen(false);
                 }}
               >
@@ -296,20 +296,20 @@ export function UserMenu({ meta, isDark, onToggleTheme, onLogout, onFirmaBilgile
               <I name={isDark ? "sun" : "moon"} size={14} />
               {isDark ? "Açık moda geç" : "Koyu moda geç"}
             </button>
-            {SAHTE_BACKEND && (
+            {MOCK_BACKEND && (
               <button
                 type="button"
                 role="menuitem"
                 className={MENU_ITEM}
-                disabled={sifirla.isPending}
+                disabled={reset.isPending}
                 onClick={() => {
-                  sifirla.mutate();
+                  reset.mutate();
                   setOpen(false);
                 }}
                 title="Sahte backend verisini başlangıç haline döndürür"
               >
                 <I name="refund" size={14} />
-                {sifirla.isPending ? "Sıfırlanıyor…" : "Demo verisini sıfırla"}
+                {reset.isPending ? "Sıfırlanıyor…" : "Demo verisini sıfırla"}
               </button>
             )}
             <div className="my-1 border-t border-[var(--border)]" />

@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ROLES } from "@/lib/roles";
-import { kimlikAyarla } from "@/lib/api/client";
+import { setAuth } from "@/lib/api/client";
 
 const RoleContext = createContext(null);
 
@@ -15,10 +15,10 @@ export function RoleProvider({ children }) {
   const queryClient = useQueryClient();
 
   // Kimlik, çocuk bileşenlerin ilk isteğinden önce hazır olsun diye render sırasında ayarlanır (idempotent).
-  const sonRol = useRef(null);
-  if (sonRol.current !== role) {
-    sonRol.current = role;
-    kimlikAyarla(demoToken(role));
+  const lastRole = useRef(null);
+  if (lastRole.current !== role) {
+    lastRole.current = role;
+    setAuth(demoToken(role));
   }
 
   // Persist the selected role so the mockup keeps it across navigation.
@@ -38,10 +38,10 @@ export function RoleProvider({ children }) {
   }, []);
 
   // Rol değişince önbellek boşalır: her ekran veriyi yeni kimlikle yeniden ister.
-  const ilk = useRef(true);
+  const initial = useRef(true);
   useEffect(() => {
-    if (ilk.current) {
-      ilk.current = false;
+    if (initial.current) {
+      initial.current = false;
       return;
     }
     queryClient.resetQueries();

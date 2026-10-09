@@ -1,9 +1,9 @@
 // Sahte backend'in başlangıç verisi — HAM biçimde: tutarlar kuruş (tam sayı), tarihler ISO 8601, durum ve türler kod.
-// Ekranlar bu dosyayı hiç görmez; veri yalnızca /api/v1 cevaplarıyla ekrana ulaşır. Etiketler: lib/etiketler.js.
+// Ekranlar bu dosyayı hiç görmez; veri yalnızca /api/v1 cevaplarıyla ekrana ulaşır. Etiketler: lib/labels.js.
 // Firma kimliği (firmaId) = cari no. Ana firma 100.00.001; alt bayiler Ankara Lastik Bayi'ye (320.01.001) bağlıdır.
 // Üretildi: scratchpad/tohum-uret.mjs ile eski lib/mockData.js'ten; elle düzenlenebilir.
 
-export const firmalar = [
+export const companies = [
   {
     firmaId: "100.00.001",
     tur: "ANA_FIRMA",
@@ -253,7 +253,7 @@ export const firmalar = [
   }
 ];
 
-export const uyeIsyerleri = [
+export const merchants = [
   {
     cariNo: "320.00.001",
     ad: "Brisa İş Makinası Lastik",
@@ -266,7 +266,7 @@ export const uyeIsyerleri = [
   }
 ];
 
-export const vadeFarkiProfilleri = [
+export const maturityProfiles = [
   {
     id: 1,
     ad: "Vade Farkı Profil 1",
@@ -305,7 +305,7 @@ export const vadeFarkiProfilleri = [
   }
 ];
 
-export const musteriler = [
+export const customers = [
   {
     musteriId: "M-001",
     sahipFirmaId: "100.00.001",
@@ -368,7 +368,7 @@ export const musteriler = [
   }
 ];
 
-export const islemler = [
+export const transactions = [
   {
     islemNo: "TRX-90241",
     tarih: "2026-09-30T14:22:00+03:00",
@@ -796,7 +796,7 @@ export const islemler = [
   {"islemNo": "TRX-89371", "tarih": "2026-09-25T10:05:00+03:00", "cekimYapanId": "320.01.003", "musteriTuru": "DUZENLI_MUSTERI", "musteri": {"unvan": "Çelik Ltd.", "cariNo": "120.02.044", "vergiNo": "1180654432"}, "kartSon4": "7952", "odemeTipi": "MANUEL", "taksit": 2, "tutarKurus": 1310000, "durum": "BASARILI"}
 ];
 
-export const odemeLinkleri = [
+export const paymentLinks = [
   {
     linkNo: "LNK-7Q2M4X",
     olusturma: "2026-09-30T15:10:00+03:00",
@@ -876,7 +876,7 @@ export const odemeLinkleri = [
   }
 ];
 
-export const iptalIadeTalepleri = [
+export const cancelRefundRequests = [
   {
     talepNo: "TLP-4418",
     tarih: "2026-10-01T09:40:00+03:00",
@@ -1153,7 +1153,7 @@ export const iptalIadeTalepleri = [
   }
 ];
 
-export const faturalar = [
+export const invoices = [
   {
     islemNo: "TRX-90241",
     faturaNo: "ANK2026000000412",
@@ -1240,7 +1240,7 @@ export const faturalar = [
   {"islemNo": "TRX-89371", "faturaNo": "BRS2026871303373", "faturaTarihi": "2026-09-25", "tutarKurus": 1310000, "dosyaAdi": "fatura_89371.pdf", "yukleme": "2026-09-25T13:05:00+03:00", "durum": "YUKLENDI"}
 ];
 
-export const panelOzetleri = {
+export const panelSummaries = {
   "100.00.001": {
     bugun: {
       TOPLAM: {
@@ -1342,7 +1342,7 @@ export const panelOzetleri = {
   }
 };
 
-export const bakiyeler = {
+export const balances = {
   "100.00.001": {
     bakiyeKurus: 124050000,
     borcKurus: 32080000,
@@ -1364,7 +1364,7 @@ export const bakiyeler = {
 };
 
 // Üst cariye borç yüklemeleri (sevkiyat / fatura); ödemeler islemler tablosundan türetilir (bakiye ekstresi)
-export const borcHareketleri = [
+export const debtEntries = [
   { hareketId: "BH-101", firmaId: "320.01.001", tarih: "2026-10-01T09:00:00+03:00", aciklama: "Eylül sevkiyatı — fatura BRS-2026-0912", tutarKurus: 6800000 },
   { hareketId: "BH-102", firmaId: "320.01.001", tarih: "2026-09-16T09:00:00+03:00", aciklama: "Kampanya stoğu — fatura BRS-2026-0871", tutarKurus: 4250000 },
   { hareketId: "BH-103", firmaId: "320.01.001", tarih: "2026-08-28T09:00:00+03:00", aciklama: "Ağustos sevkiyatı — fatura BRS-2026-0790", tutarKurus: 5120000 },
@@ -1373,7 +1373,7 @@ export const borcHareketleri = [
   { hareketId: "BH-203", firmaId: "540.02.011", tarih: "2026-08-22T10:30:00+03:00", aciklama: "Ağustos sevkiyatı — fatura ANK-2026-0198", tutarKurus: 1120000 }
 ];
 
-export const haftalikHacim = [
+export const weeklyVolume = [
   {
     gun: "2026-09-28",
     tutarKurus: 51200000
@@ -1404,7 +1404,7 @@ export const haftalikHacim = [
   }
 ];
 
-export const kurlar = [
+export const rates = [
   {
     kod: "USD",
     ad: "Amerikan Doları",
@@ -1428,7 +1428,7 @@ export const kurlar = [
   }
 ];
 
-export const kullanicilar = [
+export const users = [
   { kullaniciId: "K-001", firmaId: "100.00.001", adSoyad: "Mehmet Yılmaz", email: "mehmet.yilmaz@brisa.com", telefon: "0532 411 20 01", yetki: "YONETICI", durum: "AKTIF", sonGiris: "2026-10-08T08:42:00+03:00", olusturma: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-02-10T09:00:00+03:00" }, sonDegisiklik: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-08-21T11:30:00+03:00" } },
   { kullaniciId: "K-002", firmaId: "100.00.001", adSoyad: "Ayşe Demir", email: "ayse.demir@brisa.com", telefon: "0533 204 18 77", yetki: "ODEME", durum: "AKTIF", sonGiris: "2026-10-07T17:05:00+03:00", olusturma: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-02-10T09:00:00+03:00" }, sonDegisiklik: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-08-21T11:30:00+03:00" } },
   { kullaniciId: "K-003", firmaId: "100.00.001", adSoyad: "Can Kaya", email: "can.kaya@brisa.com", telefon: "0542 318 40 12", yetki: "RAPORLAMA", durum: "AKTIF", sonGiris: "2026-10-02T09:30:00+03:00", olusturma: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-02-10T09:00:00+03:00" }, sonDegisiklik: { kullaniciId: "K-001", adSoyad: "Mehmet Yılmaz", tarih: "2026-08-21T11:30:00+03:00" } },
@@ -1440,7 +1440,7 @@ export const kullanicilar = [
   { kullaniciId: "K-202", firmaId: "540.02.011", adSoyad: "Derya Ak", email: "derya@cankayaotoservis.com", telefon: "0535 118 62 34", yetki: "ODEME", durum: "AKTIF", sonGiris: "2026-10-05T10:02:00+03:00", olusturma: { kullaniciId: "K-201", adSoyad: "Kemal Er", tarih: "2026-02-10T09:00:00+03:00" }, sonDegisiklik: { kullaniciId: "K-201", adSoyad: "Kemal Er", tarih: "2026-08-21T11:30:00+03:00" } }
 ];
 
-export const duyurular = [
+export const announcements = [
   {
     duyuruId: "D-001",
     baslik: "+3 Taksit Kampanyası",
@@ -1482,13 +1482,13 @@ export const duyurular = [
 ];
 
 // Duyuruyu okuyan kullanıcılar (pop-up "Okudum")
-export const duyuruOkumalari = [
+export const announcementReads = [
   { duyuruId: "D-002", kullaniciId: "K-101" },
   { duyuruId: "D-002", kullaniciId: "K-102" },
   { duyuruId: "D-001", kullaniciId: "K-102" }
 ];
 
-export const oturumlar = {
+export const sessions = {
   "demo-ANA_FIRMA": {
     kullaniciId: "K-001",
     adSoyad: "Mehmet Yılmaz",

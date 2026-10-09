@@ -1,31 +1,31 @@
 // GET/POST /bayiler · GET/PUT /bayiler/{cariNo} · POST /bayiler/toplu(/onizleme) — şartname s.5 (bayi tanım yönetimi),
 // s.2 / s.10 Excel ile toplu ekleme
 import { http, HttpResponse } from "msw";
-import { depo } from "../db/store";
-import { altBayileri, anaFirma, denetim, firma, firmaCevabi, icerir, kimlikHatalari, kosulHatalari, sayaclar } from "../rules";
-import { gecikme, hata, kuralHatasi, uc, yetkiGerekli, yetkili } from "./helpers";
-import { dosyadanCsv, tlCoz } from "../csv";
+import { store } from "../db/store";
+import { subDealersOf, mainCompany, audit, company, companyResponse, includes, authErrors, conditionErrors, counters } from "../rules";
+import { latency, error, ruleError, uc, requirePermission, authorized } from "./helpers";
+import { csvFromFile, parseTl } from "../csv";
 
 /** Rolün tanımlayıp düzenleyebildiği kayıtlar: ana firma → bayiler; bayi → kendi alt bayileri */
-export function yonetilenler(kim) {
-  const hepsi = depo.tablo("firmalar");
-  if (kim.rol === "ANA_FIRMA") return hepsi.filter((f) => f.tur === "BAYI");
-  if (kim.rol === "BAYI") return altBayileri(kim.firmaId);
+export function managed(caller) {
+  const all = store.table("companies");
+  if (caller.rol === "ANA_FIRMA") return all.filter((f) => f.tur === "BAYI");
+  if (caller.rol === "BAYI") return subDealersOf(caller.firmaId);
   return [];
 }
 
 /** Yeni kayıt için yetki ve tür kontrolü. Dönüş: hata cevabı ya da null */
-function yetkiKontrolu(kim, tur) {
-  const yetkiHatasi = yetkiGerekli(kim, "BAYI_TANIM");
-  if (yetkiHatasi) return yetkiHatasi;
-  if (kim.rol === "ANA_FIRMA" && tur === "BAYI") return null;
-  if (kim.rol === "BAYI" && tur === "ALT_BAYI") {
-    return firma(kim.firmaId)?.altBayiYetkisi ? null : hata(403, "ALT_BAYI_YETKISI_YOK", "Alt bayi tanımlama yetkiniz bulunmuyor. Bu yetki ana firmanın bayi tanımından açılır.");
+function permissionCheck(caller, kind) {
+  const permissionError = requirePermission(caller, "BAYI_TANIM");
+  if (permissionError) return permissionError;
+  if (caller.rol === "ANA_FIRMA" && kind === "BAYI") return null;
+  if (caller.rol === "BAYI" && kind === "ALT_BAYI") {
+    return company(caller.firmaId)?.altBayiYetkisi ? null : error(403, "ALT_BAYI_YETKISI_YOK", "Alt bayi tanımlama yetkiniz bulunmuyor. Bu yetki ana firmanın bayi tanımından açılır.");
   }
-  return hata(403, "YETKI_YOK", "Bu türde kayıt tanımlama yetkiniz yok.");
+  return error(403, "YETKI_YOK", "Bu türde kayıt tanımlama yetkiniz yok.");
 }
 
-const temizle = (g) => ({
+const clear = (g) => ({
   unvan: String(g.unvan || "").trim(),
   cariNo: String(g.cariNo || "").trim(),
   vergiNo: String(g.vergiNo || "").replace(/\D/g, ""),
@@ -35,66 +35,66 @@ const temizle = (g) => ({
 });
 
 /** Toplu dosyanın bir satırı → BayiGirdisi; boş koşullar tanımlayanın kendi sınırlarıyla dolar */
-function satirdanGirdi(s, kim, ust) {
-  const taksitler = String(s.taksitler || "").trim()
+function rowToInput(s, caller, parent) {
+  const installments = String(s.taksitler || "").trim()
     ? String(s.taksitler).split(/[,\s]+/).filter(Boolean).map(Number)
-    : ust ? ust.taksitler : [1, 2, 3, 6, 9, 12];
-  const limitKurus = tlCoz(s.islemlimititl ?? s.islemlimiti);
+    : parent ? parent.taksitler : [1, 2, 3, 6, 9, 12];
+  const limitCents = parseTl(s.islemlimititl ?? s.islemlimiti);
   return {
-    tur: kim.rol === "ANA_FIRMA" ? "BAYI" : "ALT_BAYI",
-    ...temizle({ unvan: s.unvan, cariNo: s.carino, vergiNo: s.vergino, telefon: s.telefon, email: s.email ?? s.eposta, adres: s.adres }),
-    vadeProfilId: s.vadeprofilid ? Number(s.vadeprofilid) : ust?.vadeProfilId ?? 1,
-    taksitler,
-    islemLimitiKurus: limitKurus === null ? ust?.islemLimitiKurus ?? 15000000 : limitKurus,
-    uyeIsyerleri: ust ? ust.uyeIsyerleri : depo.tablo("uyeIsyerleri").map((u) => u.cariNo),
-    altBayiYetkisi: kim.rol === "ANA_FIRMA" ? /^(evet|e|1|true)$/i.test(String(s.altbayiyetkisi || "")) : undefined,
+    tur: caller.rol === "ANA_FIRMA" ? "BAYI" : "ALT_BAYI",
+    ...clear({ unvan: s.unvan, cariNo: s.carino, vergiNo: s.vergino, telefon: s.telefon, email: s.email ?? s.eposta, adres: s.adres }),
+    vadeProfilId: s.vadeprofilid ? Number(s.vadeprofilid) : parent?.vadeProfilId ?? 1,
+    taksitler: installments,
+    islemLimitiKurus: limitCents === null ? parent?.islemLimitiKurus ?? 15000000 : limitCents,
+    uyeIsyerleri: parent ? parent.uyeIsyerleri : store.table("merchants").map((u) => u.cariNo),
+    altBayiYetkisi: caller.rol === "ANA_FIRMA" ? /^(evet|e|1|true)$/i.test(String(s.altbayiyetkisi || "")) : undefined,
     durum: /^pasif$/i.test(String(s.durum || "").trim()) ? "PASIF" : "AKTIF", // ASCII karşılaştırma: tr-TR büyütme i→İ yapar
   };
 }
 
 /** Dosyayı okuyup her satırı doğrular; { cevap } (hata) ya da { satirlar } */
-async function topluCoz(request, kim) {
-  const yetkiHatasi = yetkiKontrolu(kim, kim.rol === "ANA_FIRMA" ? "BAYI" : "ALT_BAYI");
-  if (yetkiHatasi) return { cevap: yetkiHatasi };
+async function parseBulk(request, caller) {
+  const permissionError = permissionCheck(caller, caller.rol === "ANA_FIRMA" ? "BAYI" : "ALT_BAYI");
+  if (permissionError) return { cevap: permissionError };
   const fd = await request.formData().catch(() => null);
-  if (!fd) return { cevap: hata(400, "GECERSIZ_GOVDE", "Form verisi okunamadı.") };
-  const okunan = await dosyadanCsv(fd);
-  if (okunan.hata) return { cevap: kuralHatasi("DOSYA", okunan.hata, { dosya: okunan.hata }) };
-  const zorunlu = ["unvan", "carino", "vergino", "telefon", "email", "adres"];
-  const eksik = zorunlu.filter((b) => !okunan.basliklar.includes(b));
-  if (eksik.length) return { cevap: kuralHatasi("BASLIK", `Eksik sütun: ${eksik.join(", ")}. Şablonu kullanın.`, { dosya: `Eksik sütun: ${eksik.join(", ")}` }) };
-  const ust = kim.rol === "BAYI" ? firma(kim.firmaId) : null;
-  const gorulen = new Set();
-  const satirlar = okunan.satirlar.map((s, i) => {
-    const girdi = satirdanGirdi(s, kim, ust);
-    const hatalar = { ...kimlikHatalari(girdi), ...kosulHatalari(girdi, ust) };
-    if (!hatalar.cariNo && gorulen.has(girdi.cariNo)) hatalar.cariNo = "Dosyada aynı cari no birden çok kez var.";
-    gorulen.add(girdi.cariNo);
-    return { sira: i + 2, girdi, hatalar, gecerli: Object.keys(hatalar).length === 0 };
+  if (!fd) return { cevap: error(400, "GECERSIZ_GOVDE", "Form verisi okunamadı.") };
+  const readItem = await csvFromFile(fd);
+  if (readItem.hata) return { cevap: ruleError("DOSYA", readItem.hata, { dosya: readItem.hata }) };
+  const required = ["unvan", "carino", "vergino", "telefon", "email", "adres"];
+  const missing = required.filter((b) => !readItem.basliklar.includes(b));
+  if (missing.length) return { cevap: ruleError("BASLIK", `Eksik sütun: ${missing.join(", ")}. Şablonu kullanın.`, { dosya: `Eksik sütun: ${missing.join(", ")}` }) };
+  const parent = caller.rol === "BAYI" ? company(caller.firmaId) : null;
+  const seen = new Set();
+  const rows = readItem.satirlar.map((s, i) => {
+    const input = rowToInput(s, caller, parent);
+    const errors = { ...authErrors(input), ...conditionErrors(input, parent) };
+    if (!errors.cariNo && seen.has(input.cariNo)) errors.cariNo = "Dosyada aynı cari no birden çok kez var.";
+    seen.add(input.cariNo);
+    return { sira: i + 2, girdi: input, hatalar: errors, gecerli: Object.keys(errors).length === 0 };
   });
-  return { satirlar };
+  return { satirlar: rows };
 }
 
-const topluOzet = (satirlar) => ({ toplam: satirlar.length, gecerli: satirlar.filter((s) => s.gecerli).length, hatali: satirlar.filter((s) => !s.gecerli).length, satirlar });
+const bulkSummary = (rows) => ({ toplam: rows.length, gecerli: rows.filter((s) => s.gecerli).length, hatali: rows.filter((s) => !s.gecerli).length, satirlar: rows });
 
-export const bayilerHandlers = [
+export const dealersHandlers = [
   // Toplu ekleme önizlemesi: dosya doğrulanır, hiçbir kayıt yazılmaz
   http.post(uc("/bayiler/toplu/onizleme"), async ({ request }) => {
-    await gecikme();
-    const { kim, cevap } = yetkili(request);
-    if (cevap) return cevap;
-    const { satirlar, cevap: hataCevabi } = await topluCoz(request, kim);
-    return hataCevabi || HttpResponse.json(topluOzet(satirlar));
+    await latency();
+    const { kim: caller, cevap: response } = authorized(request);
+    if (response) return response;
+    const { satirlar: rows, cevap: errorResponse } = await parseBulk(request, caller);
+    return errorResponse || HttpResponse.json(bulkSummary(rows));
   }),
 
   // Toplu ekleme: geçerli satırlar kaydedilir, hatalılar atlanır (önizlemede görülmüş olur)
   http.post(uc("/bayiler/toplu"), async ({ request }) => {
-    await gecikme();
-    const { kim, cevap } = yetkili(request);
-    if (cevap) return cevap;
-    const { satirlar, cevap: hataCevabi } = await topluCoz(request, kim);
-    if (hataCevabi) return hataCevabi;
-    const yeniler = satirlar
+    await latency();
+    const { kim: caller, cevap: response } = authorized(request);
+    if (response) return response;
+    const { satirlar: rows, cevap: errorResponse } = await parseBulk(request, caller);
+    if (errorResponse) return errorResponse;
+    const newItems = rows
       .filter((s) => s.gecerli)
       .map(({ girdi: g }) => ({
         firmaId: g.cariNo,
@@ -109,100 +109,100 @@ export const bayilerHandlers = [
         taksitler: [...g.taksitler].sort((a, b) => a - b),
         islemLimitiKurus: g.islemLimitiKurus,
         ortaklar: [],
-        bagliFirmaId: kim.rol === "ANA_FIRMA" ? anaFirma().firmaId : kim.firmaId,
+        bagliFirmaId: caller.rol === "ANA_FIRMA" ? mainCompany().firmaId : caller.firmaId,
         uyeIsyerleri: g.uyeIsyerleri,
         ...(g.tur === "BAYI" ? { altBayiYetkisi: !!g.altBayiYetkisi } : {}),
         durum: g.durum,
-        olusturma: denetim(kim),
-        sonDegisiklik: denetim(kim),
+        olusturma: audit(caller),
+        sonDegisiklik: audit(caller),
       }));
-    if (yeniler.length) depo.guncelle("firmalar", (l) => [...l, ...yeniler]);
-    return HttpResponse.json({ ...topluOzet(satirlar), eklenen: yeniler.length, atlanan: satirlar.length - yeniler.length, kayitlar: yeniler.map(firmaCevabi) }, { status: 201 });
+    if (newItems.length) store.update("companies", (l) => [...l, ...newItems]);
+    return HttpResponse.json({ ...bulkSummary(rows), eklenen: newItems.length, atlanan: rows.length - newItems.length, kayitlar: newItems.map(companyResponse) }, { status: 201 });
   }),
 
   http.get(uc("/bayiler"), async ({ request }) => {
-    await gecikme();
-    const { kim, cevap } = yetkili(request);
-    if (cevap) return cevap;
+    await latency();
+    const { kim: caller, cevap: response } = authorized(request);
+    if (response) return response;
     const s = new URL(request.url).searchParams;
-    const tur = s.get("tur") || (kim.rol === "BAYI" ? "ALT_BAYI" : "BAYI");
-    const durum = s.get("durum");
+    const kind = s.get("tur") || (caller.rol === "BAYI" ? "ALT_BAYI" : "BAYI");
+    const status = s.get("durum");
     const q = (s.get("q") || "").trim();
-    if (kim.rol === "ALT_BAYI") return hata(403, "YETKI_YOK", "Alt bayinin bayi tanımı yoktur.");
-    if (kim.rol === "BAYI" && tur !== "ALT_BAYI") return hata(403, "YETKI_YOK", "Bayi yalnızca kendi alt bayilerini görür.");
-    const kaynak = tur === "ALT_BAYI" && kim.rol === "ANA_FIRMA" ? depo.tablo("firmalar").filter((f) => f.tur === "ALT_BAYI") : yonetilenler(kim);
-    const adaylar = kaynak.filter((f) => !q || [f.unvan, f.cariNo, f.vergiNo].some((x) => icerir(x, q)));
-    const liste = adaylar.filter((f) => !durum || f.durum === durum);
+    if (caller.rol === "ALT_BAYI") return error(403, "YETKI_YOK", "Alt bayinin bayi tanımı yoktur.");
+    if (caller.rol === "BAYI" && kind !== "ALT_BAYI") return error(403, "YETKI_YOK", "Bayi yalnızca kendi alt bayilerini görür.");
+    const source = kind === "ALT_BAYI" && caller.rol === "ANA_FIRMA" ? store.table("companies").filter((f) => f.tur === "ALT_BAYI") : managed(caller);
+    const candidates = source.filter((f) => !q || [f.unvan, f.cariNo, f.vergiNo].some((x) => includes(x, q)));
+    const list = candidates.filter((f) => !status || f.durum === status);
     return HttpResponse.json({
-      kayitlar: liste.map(firmaCevabi),
-      toplam: liste.length,
+      kayitlar: list.map(companyResponse),
+      toplam: list.length,
       sayfa: 1,
-      boyut: Math.max(liste.length, 1),
-      sayaclar: sayaclar(adaylar, "durum", ["AKTIF", "PASIF"]),
+      boyut: Math.max(list.length, 1),
+      sayaclar: counters(candidates, "durum", ["AKTIF", "PASIF"]),
       // ana firma ağdaki alt bayileri yalnızca görüntüler; tanımı bağlı bayi yapar
-      duzenlenebilir: !(tur === "ALT_BAYI" && kim.rol === "ANA_FIRMA"),
+      duzenlenebilir: !(kind === "ALT_BAYI" && caller.rol === "ANA_FIRMA"),
     });
   }),
 
   http.get(uc("/bayiler/:cariNo"), async ({ request, params }) => {
-    await gecikme();
-    const { kim, cevap } = yetkili(request);
-    if (cevap) return cevap;
-    const f = yonetilenler(kim).find((x) => x.cariNo === decodeURIComponent(params.cariNo));
-    return f ? HttpResponse.json(firmaCevabi(f)) : hata(404, "BAYI_YOK", "Bayi bulunamadı ya da kapsamınızda değil.");
+    await latency();
+    const { kim: caller, cevap: response } = authorized(request);
+    if (response) return response;
+    const f = managed(caller).find((x) => x.cariNo === decodeURIComponent(params.cariNo));
+    return f ? HttpResponse.json(companyResponse(f)) : error(404, "BAYI_YOK", "Bayi bulunamadı ya da kapsamınızda değil.");
   }),
 
   http.post(uc("/bayiler"), async ({ request }) => {
-    await gecikme();
-    const { kim, cevap } = yetkili(request);
-    if (cevap) return cevap;
+    await latency();
+    const { kim: caller, cevap: response } = authorized(request);
+    if (response) return response;
     const g = await request.json().catch(() => null);
-    if (!g) return hata(400, "GECERSIZ_GOVDE", "İstek gövdesi okunamadı.");
-    const yetkiHatasi = yetkiKontrolu(kim, g.tur);
-    if (yetkiHatasi) return yetkiHatasi;
-    const kimlik = temizle(g);
-    const ust = kim.rol === "BAYI" ? firma(kim.firmaId) : null;
-    const alanlar = { ...kimlikHatalari(kimlik), ...kosulHatalari(g, ust) };
-    if (alanlar.cariNo?.includes("başka bir kayıtta")) return hata(409, "CARI_CAKISMASI", alanlar.cariNo, { cariNo: alanlar.cariNo });
-    if (Object.keys(alanlar).length) return kuralHatasi("DOGRULAMA", "Bazı alanlar hatalı.", alanlar);
-    const yeni = {
-      firmaId: kimlik.cariNo,
+    if (!g) return error(400, "GECERSIZ_GOVDE", "İstek gövdesi okunamadı.");
+    const permissionError = permissionCheck(caller, g.tur);
+    if (permissionError) return permissionError;
+    const auth = clear(g);
+    const parent = caller.rol === "BAYI" ? company(caller.firmaId) : null;
+    const fields = { ...authErrors(auth), ...conditionErrors(g, parent) };
+    if (fields.cariNo?.includes("başka bir kayıtta")) return error(409, "CARI_CAKISMASI", fields.cariNo, { cariNo: fields.cariNo });
+    if (Object.keys(fields).length) return ruleError("DOGRULAMA", "Bazı alanlar hatalı.", fields);
+    const draft = {
+      firmaId: auth.cariNo,
       tur: g.tur,
-      ...kimlik,
+      ...auth,
       vadeProfilId: g.vadeProfilId,
       taksitler: [...g.taksitler].sort((a, b) => a - b),
       islemLimitiKurus: g.islemLimitiKurus,
       ortaklar: [],
-      bagliFirmaId: kim.rol === "ANA_FIRMA" ? anaFirma().firmaId : kim.firmaId,
+      bagliFirmaId: caller.rol === "ANA_FIRMA" ? mainCompany().firmaId : caller.firmaId,
       uyeIsyerleri: g.uyeIsyerleri,
       ...(g.tur === "BAYI" ? { altBayiYetkisi: !!g.altBayiYetkisi } : {}),
       durum: g.durum,
-      olusturma: denetim(kim),
-      sonDegisiklik: denetim(kim),
+      olusturma: audit(caller),
+      sonDegisiklik: audit(caller),
     };
-    depo.guncelle("firmalar", (l) => [...l, yeni]);
-    return HttpResponse.json(firmaCevabi(yeni), { status: 201 });
+    store.update("companies", (l) => [...l, draft]);
+    return HttpResponse.json(companyResponse(draft), { status: 201 });
   }),
 
   http.put(uc("/bayiler/:cariNo"), async ({ request, params }) => {
-    await gecikme();
-    const { kim, cevap } = yetkili(request);
-    if (cevap) return cevap;
-    const yetkiHatasi = yetkiGerekli(kim, "BAYI_TANIM", ["ANA_FIRMA", "BAYI"]);
-    if (yetkiHatasi) return yetkiHatasi;
-    const cariNo = decodeURIComponent(params.cariNo);
-    const mevcut = yonetilenler(kim).find((x) => x.cariNo === cariNo);
-    if (!mevcut) return hata(404, "BAYI_YOK", "Bayi bulunamadı ya da kapsamınızda değil.");
+    await latency();
+    const { kim: caller, cevap: response } = authorized(request);
+    if (response) return response;
+    const permissionError = requirePermission(caller, "BAYI_TANIM", ["ANA_FIRMA", "BAYI"]);
+    if (permissionError) return permissionError;
+    const accountNo = decodeURIComponent(params.cariNo);
+    const existing = managed(caller).find((x) => x.cariNo === accountNo);
+    if (!existing) return error(404, "BAYI_YOK", "Bayi bulunamadı ya da kapsamınızda değil.");
     const g = await request.json().catch(() => null);
-    if (!g) return hata(400, "GECERSIZ_GOVDE", "İstek gövdesi okunamadı.");
-    const kimlik = { ...temizle(g), cariNo }; // cari no değiştirilemez
-    const ust = kim.rol === "BAYI" ? firma(kim.firmaId) : null;
-    const alanlar = { ...kimlikHatalari(kimlik, { mevcutCariNo: cariNo }), ...kosulHatalari(g, ust, { mevcutProfilId: mevcut.vadeProfilId }) };
-    if (Object.keys(alanlar).length) return kuralHatasi("DOGRULAMA", "Bazı alanlar hatalı.", alanlar);
-    const guncel = depo.degistir("firmalar", "cariNo", cariNo, (f) => ({
+    if (!g) return error(400, "GECERSIZ_GOVDE", "İstek gövdesi okunamadı.");
+    const auth = { ...clear(g), cariNo: accountNo }; // cari no değiştirilemez
+    const parent = caller.rol === "BAYI" ? company(caller.firmaId) : null;
+    const fields = { ...authErrors(auth, { mevcutCariNo: accountNo }), ...conditionErrors(g, parent, { mevcutProfilId: existing.vadeProfilId }) };
+    if (Object.keys(fields).length) return ruleError("DOGRULAMA", "Bazı alanlar hatalı.", fields);
+    const current = store.replace("companies", "cariNo", accountNo, (f) => ({
       ...f,
-      ...kimlik,
-      sonDegisiklik: denetim(kim),
+      ...auth,
+      sonDegisiklik: audit(caller),
       vadeProfilId: g.vadeProfilId,
       taksitler: [...g.taksitler].sort((a, b) => a - b),
       islemLimitiKurus: g.islemLimitiKurus,
@@ -210,6 +210,6 @@ export const bayilerHandlers = [
       ...(f.tur === "BAYI" ? { altBayiYetkisi: !!g.altBayiYetkisi } : {}),
       durum: g.durum,
     }));
-    return HttpResponse.json(firmaCevabi(guncel));
+    return HttpResponse.json(companyResponse(current));
   }),
 ];

@@ -4,26 +4,26 @@
 import { useState } from "react";
 import { ROLES } from "@/lib/roles";
 import I from "@/components/DesignIcons";
-import { ApiHatasi } from "@/lib/api/error";
-import { sayi, tl } from "@/lib/format";
-import { csvIndir } from "@/lib/export";
-import { etiket } from "@/lib/labels";
-import { useBakiyeTopluOnizle, useBakiyeTopluYukle } from "@/lib/queries/balance";
-import { useBayiTopluEkle, useBayiTopluOnizle } from "@/lib/queries/dealers";
-import { BosDurum } from "../states";
-import { Konum } from "../shared";
+import { ApiError } from "@/lib/api/error";
+import { formatNumber, tl } from "@/lib/format";
+import { downloadCsv } from "@/lib/export";
+import { labelOf } from "@/lib/labels";
+import { usePreviewBalanceBulk, useUploadBalanceBulk } from "@/lib/queries/balance";
+import { useAddDealerBulk, usePreviewDealerBulk } from "@/lib/queries/dealers";
+import { EmptyState } from "../states";
+import { Breadcrumb } from "../shared";
 import { HOME } from "../routes";
 import { CARD, FOCUS } from "../theme";
 
-const Adim = ({ no, baslik, aciklama, children, i }) => (
+const Step = ({ no, title, description, children, i }) => (
   <section style={{ "--i": i }} className={`bn-rise p-4 sm:p-5 ${CARD} hover:!translate-y-0`} aria-labelledby={`bn-toplu-${no}`}>
     <div className="mb-3 flex items-start gap-3">
       <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--brand)] text-[12px] font-extrabold text-white">{no}</span>
       <div>
         <h2 id={`bn-toplu-${no}`} className="text-sm font-bold text-[var(--fg)]">
-          {baslik}
+          {title}
         </h2>
-        {aciklama && <p className="mt-0.5 text-[12px] text-[var(--muted)]">{aciklama}</p>}
+        {description && <p className="mt-0.5 text-[12px] text-[var(--muted)]">{description}</p>}
       </div>
     </div>
     {children}
@@ -41,47 +41,47 @@ const Adim = ({ no, baslik, aciklama, children, i }) => (
  * @param {(sonuc) => string} p.sonucMetni
  * @param {{ label, href }} [p.sonrakiAdim]
  */
-function TopluYukleme({ meta, onNavigate, yol, aciklama, sablon, sutunlar, hucreler, onizle, kaydet, kaydetEtiketi, sonucMetni, sonrakiAdim, notlar }) {
-  const [dosya, setDosya] = useState(null);
-  const [onizleme, setOnizleme] = useState(null); // sunucu doğrulaması
-  const [sonuc, setSonuc] = useState(null); // kaydet cevabı
-  const [hata, setHata] = useState(null);
-  const baslik = yol[yol.length - 1];
-  const mesgul = onizle.isPending || kaydet.isPending;
+function BulkUpload({ meta, onNavigate, path, description, template, columns, cells, preview, save, saveLabel, resultText, nextStep, notes }) {
+  const [file, setFile] = useState(null);
+  const [previewResult, setPreview] = useState(null); // sunucu doğrulaması
+  const [result, setResult] = useState(null); // kaydet cevabı
+  const [error, setError] = useState(null);
+  const title = path[path.length - 1];
+  const busy = preview.isPending || save.isPending;
 
-  const dosyaSec = (f) => {
-    setDosya(f);
-    setOnizleme(null);
-    setSonuc(null);
-    setHata(null);
+  const selectFile = (f) => {
+    setFile(f);
+    setPreview(null);
+    setResult(null);
+    setError(null);
   };
-  const calistir = async (mutasyon, sonra) => {
-    setHata(null);
+  const run = async (mutation, after) => {
+    setError(null);
     try {
-      sonra(await mutasyon.mutateAsync(dosya));
+      after(await mutation.mutateAsync(file));
     } catch (err) {
-      setHata(err instanceof ApiHatasi && err.alanlar.dosya ? err.alanlar.dosya : err?.message || "İşlem yapılamadı.");
+      setError(err instanceof ApiError && err.alanlar.dosya ? err.alanlar.dosya : err?.message || "İşlem yapılamadı.");
     }
   };
   const th = "whitespace-nowrap px-3 py-2";
   const td = "px-3 py-2 align-top";
-  const satirlar = (sonuc || onizleme)?.satirlar || [];
+  const rows = (result || previewResult)?.satirlar || [];
 
   return (
     <>
       <div className="bn-rise mb-4 px-1">
-        <Konum onHome={() => onNavigate(HOME)} yol={yol} />
-        <h1 className="text-xl font-extrabold tracking-tight text-[var(--fg)]">{baslik}</h1>
+        <Breadcrumb onHome={() => onNavigate(HOME)} path={path} />
+        <h1 className="text-xl font-extrabold tracking-tight text-[var(--fg)]">{title}</h1>
         <p className="mt-0.5 text-[12.5px] text-[var(--muted)]">
-          {meta.company} · {aciklama}
+          {meta.company} · {description}
         </p>
       </div>
 
       <div className="flex max-w-5xl flex-col gap-3">
-        <Adim no={1} i={0} baslik="Şablonu indirin" aciklama="Sütun adlarını değiştirmeden doldurun; Excel'de açıp CSV (noktalı virgül) olarak kaydedin.">
+        <Step no={1} i={0} title="Şablonu indirin" description="Sütun adlarını değiştirmeden doldurun; Excel'de açıp CSV (noktalı virgül) olarak kaydedin.">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <ul className="flex flex-wrap gap-1" aria-label="Sütunlar">
-              {sablon.basliklar.map((b) => (
+              {template.basliklar.map((b) => (
                 <li key={b} className="rounded-full bg-[var(--soft)] px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[var(--fg-2)]">
                   {b}
                 </li>
@@ -89,60 +89,60 @@ function TopluYukleme({ meta, onNavigate, yol, aciklama, sablon, sutunlar, hucre
             </ul>
             <button
               type="button"
-              onClick={() => csvIndir(sablon.dosyaAdi, sablon.basliklar, sablon.ornekler)}
+              onClick={() => downloadCsv(template.dosyaAdi, template.basliklar, template.samples)}
               className={`inline-flex h-9 shrink-0 items-center gap-1.5 self-start rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 text-[12.5px] font-semibold text-[var(--fg-2)] transition hover:border-[var(--brand)] hover:text-[var(--brand-text)] ${FOCUS}`}
             >
               <I name="download" size={14} />
               Şablonu İndir
             </button>
           </div>
-          {notlar && (
+          {notes && (
             <ul className="mt-3 list-disc space-y-0.5 pl-5 text-[11.5px] text-[var(--muted)]">
-              {notlar.map((n) => (
+              {notes.map((n) => (
                 <li key={n}>{n}</li>
               ))}
             </ul>
           )}
-        </Adim>
+        </Step>
 
-        <Adim no={2} i={1} baslik="Dosyayı seçin ve önizleyin" aciklama="Önizleme her satırı sunucuda doğrular; bu adımda hiçbir kayıt yazılmaz.">
-          <label htmlFor="bn-toplu-dosya" className={`flex cursor-pointer flex-col items-center gap-1.5 rounded-2xl border-2 border-dashed px-4 py-6 text-center transition focus-within:border-[var(--brand)] focus-within:ring-2 focus-within:ring-[var(--ring)] hover:border-[var(--brand)] hover:bg-[var(--soft)] ${hata ? "border-[var(--danger)]" : "border-[var(--border-strong)]"}`}>
+        <Step no={2} i={1} title="Dosyayı seçin ve önizleyin" description="Önizleme her satırı sunucuda doğrular; bu adımda hiçbir kayıt yazılmaz.">
+          <label htmlFor="bn-toplu-dosya" className={`flex cursor-pointer flex-col items-center gap-1.5 rounded-2xl border-2 border-dashed px-4 py-6 text-center transition focus-within:border-[var(--brand)] focus-within:ring-2 focus-within:ring-[var(--ring)] hover:border-[var(--brand)] hover:bg-[var(--soft)] ${error ? "border-[var(--danger)]" : "border-[var(--border-strong)]"}`}>
             <span className="grid h-10 w-10 place-items-center rounded-full bg-[var(--brand-soft)] text-[var(--brand-text)]">
-              <I name={dosya ? "check" : "download"} size={18} />
+              <I name={file ? "check" : "download"} size={18} />
             </span>
-            <span className="text-[13px] font-bold text-[var(--fg)]">{dosya ? dosya.name : "Excel ya da CSV dosyasını seçin"}</span>
-            <span className="text-[11.5px] text-[var(--muted)]">{dosya ? `${Math.max(1, Math.round(dosya.size / 1024)).toLocaleString("tr-TR")} KB · değiştirmek için tıklayın` : ".xlsx ya da .csv · en fazla 2 MB"}</span>
-            <input id="bn-toplu-dosya" type="file" accept=".csv,.xlsx,.xls" onChange={(e) => dosyaSec(e.target.files?.[0] || null)} aria-invalid={hata ? true : undefined} aria-describedby={hata ? "bn-toplu-hata" : undefined} className="sr-only" />
+            <span className="text-[13px] font-bold text-[var(--fg)]">{file ? file.name : "Excel ya da CSV dosyasını seçin"}</span>
+            <span className="text-[11.5px] text-[var(--muted)]">{file ? `${Math.max(1, Math.round(file.size / 1024)).toLocaleString("tr-TR")} KB · değiştirmek için tıklayın` : ".xlsx ya da .csv · en fazla 2 MB"}</span>
+            <input id="bn-toplu-dosya" type="file" accept=".csv,.xlsx,.xls" onChange={(e) => selectFile(e.target.files?.[0] || null)} aria-invalid={error ? true : undefined} aria-describedby={error ? "bn-toplu-hata" : undefined} className="sr-only" />
           </label>
-          {hata && (
+          {error && (
             <p id="bn-toplu-hata" role="alert" className="mt-2 rounded-xl bg-[var(--danger-soft)] px-4 py-2.5 text-[12.5px] font-semibold text-[var(--danger-text)]">
-              {hata}
+              {error}
             </p>
           )}
           <div className="mt-3 flex justify-end">
             <button
               type="button"
-              disabled={!dosya || mesgul}
-              onClick={() => calistir(onizle, (o) => { setOnizleme(o); setSonuc(null); })}
+              disabled={!file || busy}
+              onClick={() => run(preview, (o) => { setPreview(o); setResult(null); })}
               className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-[var(--brand)] px-6 text-[13px] font-bold text-white hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`}
             >
               <I name="search" size={15} strokeWidth={2.2} />
-              {onizle.isPending ? "Doğrulanıyor…" : "Önizle"}
+              {preview.isPending ? "Doğrulanıyor…" : "Önizle"}
             </button>
           </div>
-        </Adim>
+        </Step>
 
-        {(onizleme || sonuc) && (
-          <Adim no={3} i={2} baslik={sonuc ? "Sonuç" : "Önizleme"} aciklama={sonuc ? sonucMetni(sonuc) : `${sayi(onizleme.gecerli)} geçerli · ${sayi(onizleme.hatali)} hatalı satır. Hatalı satırlar atlanır; düzeltip dosyayı yeniden seçebilirsiniz.`}>
-            {satirlar.length === 0 ? (
-              <BosDurum baslik="Dosyada kayıt yok" />
+        {(previewResult || result) && (
+          <Step no={3} i={2} title={result ? "Sonuç" : "Önizleme"} description={result ? resultText(result) : `${formatNumber(previewResult.gecerli)} geçerli · ${formatNumber(previewResult.hatali)} hatalı satır. Hatalı satırlar atlanır; düzeltip dosyayı yeniden seçebilirsiniz.`}>
+            {rows.length === 0 ? (
+              <EmptyState title="Dosyada kayıt yok" />
             ) : (
               <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
                 <table className="min-w-full text-[12px]">
                   <thead>
                     <tr className="border-b border-[var(--border)] bg-[var(--soft)] text-left text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
                       <th scope="col" className={th}>Satır</th>
-                      {sutunlar.map((s) => (
+                      {columns.map((s) => (
                         <th key={s} scope="col" className={th}>
                           {s}
                         </th>
@@ -151,17 +151,17 @@ function TopluYukleme({ meta, onNavigate, yol, aciklama, sablon, sutunlar, hucre
                     </tr>
                   </thead>
                   <tbody>
-                    {satirlar.map((s, i) => (
+                    {rows.map((s, i) => (
                       <tr key={s.sira} className={`${i > 0 ? "border-t border-[var(--border)]" : ""} ${s.gecerli ? "" : "bg-[var(--danger-soft)]/40"}`}>
                         <td className={`${td} tabular-nums text-[var(--muted)]`}>{s.sira}</td>
-                        {hucreler(s).map((h, j) => (
+                        {cells(s).map((h, j) => (
                           <td key={j} className={`${td} whitespace-nowrap ${j === 0 ? "font-semibold text-[var(--fg)]" : "text-[var(--fg-2)]"}`}>
                             {h ?? "—"}
                           </td>
                         ))}
                         <td className={`${td} min-w-[220px]`}>
                           {s.gecerli ? (
-                            <span className="inline-flex rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[11px] font-bold text-[var(--success-text)]">{sonuc ? (sonuc.eklenen != null ? "Eklendi" : "Güncellendi") : "Geçerli"}</span>
+                            <span className="inline-flex rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[11px] font-bold text-[var(--success-text)]">{result ? (result.eklenen != null ? "Eklendi" : "Güncellendi") : "Geçerli"}</span>
                           ) : (
                             <ul className="space-y-0.5 text-[11.5px] font-semibold text-[var(--danger-text)]">
                               {Object.entries(s.hatalar).map(([k, m]) => (
@@ -177,26 +177,26 @@ function TopluYukleme({ meta, onNavigate, yol, aciklama, sablon, sutunlar, hucre
               </div>
             )}
             <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              {sonuc ? (
-                sonrakiAdim && (
-                  <button type="button" onClick={() => onNavigate(sonrakiAdim.href)} className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-[var(--brand)] px-6 text-[13px] font-bold text-white hover:brightness-110 ${FOCUS}`}>
-                    {sonrakiAdim.label}
+              {result ? (
+                nextStep && (
+                  <button type="button" onClick={() => onNavigate(nextStep.href)} className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-[var(--brand)] px-6 text-[13px] font-bold text-white hover:brightness-110 ${FOCUS}`}>
+                    {nextStep.label}
                     <I name="chevronRight" size={14} />
                   </button>
                 )
               ) : (
                 <button
                   type="button"
-                  disabled={onizleme.gecerli === 0 || mesgul}
-                  onClick={() => calistir(kaydet, setSonuc)}
+                  disabled={previewResult.gecerli === 0 || busy}
+                  onClick={() => run(save, setResult)}
                   className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-[var(--brand)] px-6 text-[13px] font-bold text-white hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`}
                 >
                   <I name="check" size={15} strokeWidth={2.2} />
-                  {kaydet.isPending ? "Kaydediliyor…" : kaydetEtiketi(onizleme.gecerli)}
+                  {save.isPending ? "Kaydediliyor…" : saveLabel(previewResult.gecerli)}
                 </button>
               )}
             </div>
-          </Adim>
+          </Step>
         )}
       </div>
     </>
@@ -204,79 +204,79 @@ function TopluYukleme({ meta, onNavigate, yol, aciklama, sablon, sutunlar, hucre
 }
 
 // ───────────────────────── Excel ile Toplu Bayi / Alt Bayi Ekleme ─────────────────────────
-export function TopluBayiEkleme({ role, meta, onNavigate }) {
-  const altMi = role === ROLES.BAYI;
-  const ad = altMi ? "alt bayi" : "bayi";
-  const basliklar = ["unvan", "cariNo", "vergiNo", "telefon", "email", "adres", "vadeProfilId", "taksitler", "islemLimitiTL", ...(altMi ? [] : ["altBayiYetkisi"]), "durum"];
-  const ornek = (unvan, cari, vkn, tel, mail, adres) => [unvan, cari, vkn, tel, mail, adres, "", "", "", ...(altMi ? [] : ["Hayır"]), "AKTIF"];
-  const ornekler = altMi
-    ? [ornek("Etimesgut Lastik", "540.02.021", "5566778899", "0312 244 10 20", "info@etimesgutlastik.com", "Etimesgut / Ankara")]
-    : [ornek("Adana Lastik Merkezi", "320.01.021", "5566778899", "0322 455 10 20", "info@adanalastik.com", "Seyhan / Adana"), ornek("Trabzon Oto Lastik", "320.01.022", "6677889900", "0462 321 44 55", "info@trabzonoto.com", "Ortahisar / Trabzon")];
+export function BulkDealerAdd({ role, meta, onNavigate }) {
+  const isSub = role === ROLES.BAYI;
+  const name = isSub ? "alt bayi" : "bayi";
+  const headers = ["unvan", "cariNo", "vergiNo", "telefon", "email", "adres", "vadeProfilId", "taksitler", "islemLimitiTL", ...(isSub ? [] : ["altBayiYetkisi"]), "durum"];
+  const sample = (legalName, account, taxId, tel, mail, address) => [legalName, account, taxId, tel, mail, address, "", "", "", ...(isSub ? [] : ["Hayır"]), "AKTIF"];
+  const samples = isSub
+    ? [sample("Etimesgut Lastik", "540.02.021", "5566778899", "0312 244 10 20", "info@etimesgutlastik.com", "Etimesgut / Ankara")]
+    : [sample("Adana Lastik Merkezi", "320.01.021", "5566778899", "0322 455 10 20", "info@adanalastik.com", "Seyhan / Adana"), sample("Trabzon Oto Lastik", "320.01.022", "6677889900", "0462 321 44 55", "info@trabzonoto.com", "Ortahisar / Trabzon")];
   return (
-    <TopluYukleme
+    <BulkUpload
       meta={meta}
       onNavigate={onNavigate}
-      yol={[altMi ? "Alt Bayi Tanım" : "Bayi Tanım", `Excel ile Toplu ${altMi ? "Alt Bayi" : "Bayi"} Ekleme`]}
-      aciklama={`Birden çok ${ad}yi tek dosyayla tanımlayın; kurallar tekil tanımla aynıdır`}
-      sablon={{ dosyaAdi: altMi ? "alt-bayi-sablonu" : "bayi-sablonu", basliklar, ornekler }}
-      notlar={[
+      path={[isSub ? "Alt Bayi Tanım" : "Bayi Tanım", `Excel ile Toplu ${isSub ? "Alt Bayi" : "Bayi"} Ekleme`]}
+      description={`Birden çok ${name}yi tek dosyayla tanımlayın; kurallar tekil tanımla aynıdır`}
+      template={{ dosyaAdi: isSub ? "alt-bayi-sablonu" : "bayi-sablonu", basliklar: headers, samples }}
+      notes={[
         "vadeProfilId, taksitler (örn. 1,2,3,6) ve islemLimitiTL boş bırakılırsa kendi tanımınızdaki sınırlar uygulanır; üye işyerleri size açık olanların tümüdür.",
         "cariNo 000.00.000 biçiminde ve ağda tek olmalı; vergiNo 10 hane.",
         "Hatalı satırlar kaydedilmez; önizlemede nedenini görüp dosyayı düzeltebilirsiniz.",
       ]}
-      sutunlar={["Unvan", "Cari No", "Vergi No", "Telefon", "E-posta", "Vade profili", "Taksitler", "Limit"]}
-      hucreler={(s) => [s.girdi.unvan, s.girdi.cariNo, s.girdi.vergiNo, s.girdi.telefon, s.girdi.email, s.girdi.vadeProfilId ? `Profil ${s.girdi.vadeProfilId}` : null, s.girdi.taksitler?.join(", "), s.girdi.islemLimitiKurus ? tl(s.girdi.islemLimitiKurus) : null]}
-      onizle={useBayiTopluOnizle()}
-      kaydet={useBayiTopluEkle()}
-      kaydetEtiketi={(n) => `${sayi(n)} ${ad} ekle`}
-      sonucMetni={(r) => `${sayi(r.eklenen)} ${ad} eklendi${r.atlanan ? `, ${sayi(r.atlanan)} hatalı satır atlandı` : ""}.`}
-      sonrakiAdim={{ label: altMi ? "Alt Bayi Listesine git" : "Bayi Listesine git", href: "/bayi-tanim/liste" }}
+      columns={["Unvan", "Cari No", "Vergi No", "Telefon", "E-posta", "Vade profili", "Taksitler", "Limit"]}
+      cells={(s) => [s.girdi.unvan, s.girdi.cariNo, s.girdi.vergiNo, s.girdi.telefon, s.girdi.email, s.girdi.vadeProfilId ? `Profil ${s.girdi.vadeProfilId}` : null, s.girdi.taksitler?.join(", "), s.girdi.islemLimitiKurus ? tl(s.girdi.islemLimitiKurus) : null]}
+      preview={usePreviewDealerBulk()}
+      save={useAddDealerBulk()}
+      saveLabel={(n) => `${formatNumber(n)} ${name} ekle`}
+      resultText={(r) => `${formatNumber(r.eklenen)} ${name} eklendi${r.atlanan ? `, ${formatNumber(r.atlanan)} hatalı satır atlandı` : ""}.`}
+      nextStep={{ label: isSub ? "Alt Bayi Listesine git" : "Bayi Listesine git", href: "/bayi-tanim/liste" }}
     />
   );
 }
 
 // ───────────────────────── Toplu Bakiye ve Borç Yükleme ─────────────────────────
-export function TopluBakiyeYukleme({ role, meta, onNavigate }) {
-  const altMi = role === ROLES.BAYI;
-  const ad = altMi ? "alt bayi" : "bayi";
+export function BulkBalanceUpload({ role, meta, onNavigate }) {
+  const isSub = role === ROLES.BAYI;
+  const name = isSub ? "alt bayi" : "bayi";
   return (
-    <TopluYukleme
+    <BulkUpload
       meta={meta}
       onNavigate={onNavigate}
-      yol={[altMi ? "Alt Bayi Tanım" : "Bayi Tanım", "Toplu Bakiye ve Borç Yükleme"]}
-      aciklama={`${altMi ? "Alt bayilerinizin" : "Bayilerinizin"} bakiye, borç ve limitini tek dosyayla güncelleyin; borç artışı ekstreye hareket olarak düşer`}
-      sablon={{
+      path={[isSub ? "Alt Bayi Tanım" : "Bayi Tanım", "Toplu Bakiye ve Borç Yükleme"]}
+      description={`${isSub ? "Alt bayilerinizin" : "Bayilerinizin"} bakiye, borç ve limitini tek dosyayla güncelleyin; borç artışı ekstreye hareket olarak düşer`}
+      template={{
         dosyaAdi: "bakiye-borc-sablonu",
         basliklar: ["cariNo", "bakiyeTL", "borcTL", "limitTL", "aciklama"],
-        ornekler: altMi ? [["540.02.011", "38.900,00", "15.100,00", "100.000,00", "Ekim sevkiyatı"]] : [["320.01.001", "184.200,00", "52.300,00", "400.000,00", "Ekim sevkiyatı — fatura BRS-2026-1003"], ["320.01.002", "", "61.000,00", "", "Ekim sevkiyatı"]],
+        samples: isSub ? [["540.02.011", "38.900,00", "15.100,00", "100.000,00", "Ekim sevkiyatı"]] : [["320.01.001", "184.200,00", "52.300,00", "400.000,00", "Ekim sevkiyatı — fatura BRS-2026-1003"], ["320.01.002", "", "61.000,00", "", "Ekim sevkiyatı"]],
       }}
-      notlar={["Boş bırakılan tutar değişmez; tutarlar TL, ondalık virgülle (12.500,00).", `cariNo yönettiğiniz bir ${ad}ye ait olmalı; borç limiti aşamaz.`]}
-      sutunlar={["Firma", "Cari No", "Bakiye", "Borç", "Limit", "Açıklama"]}
-      hucreler={(s) => {
-        const fark = (yeni, eski) => (s.eski && yeni !== eski ? <span className="block text-[10.5px] text-[var(--muted)]">önce {tl(eski)}</span> : null);
+      notes={["Boş bırakılan tutar değişmez; tutarlar TL, ondalık virgülle (12.500,00).", `cariNo yönettiğiniz bir ${name}ye ait olmalı; borç limiti aşamaz.`]}
+      columns={["Firma", "Cari No", "Bakiye", "Borç", "Limit", "Açıklama"]}
+      cells={(s) => {
+        const difference = (draft, old) => (s.eski && draft !== old ? <span className="block text-[10.5px] text-[var(--muted)]">önce {tl(old)}</span> : null);
         return [
           s.girdi.unvan,
           s.girdi.cariNo,
           <>
             {Number.isInteger(s.girdi.bakiyeKurus) ? tl(s.girdi.bakiyeKurus) : "—"}
-            {fark(s.girdi.bakiyeKurus, s.eski?.bakiyeKurus)}
+            {difference(s.girdi.bakiyeKurus, s.eski?.bakiyeKurus)}
           </>,
           <>
             {Number.isInteger(s.girdi.borcKurus) ? tl(s.girdi.borcKurus) : "—"}
-            {fark(s.girdi.borcKurus, s.eski?.borcKurus)}
+            {difference(s.girdi.borcKurus, s.eski?.borcKurus)}
           </>,
           <>
             {Number.isInteger(s.girdi.limitKurus) ? tl(s.girdi.limitKurus) : "—"}
-            {fark(s.girdi.limitKurus, s.eski?.limitKurus)}
+            {difference(s.girdi.limitKurus, s.eski?.limitKurus)}
           </>,
           s.girdi.aciklama || null,
         ];
       }}
-      onizle={useBakiyeTopluOnizle()}
-      kaydet={useBakiyeTopluYukle()}
-      kaydetEtiketi={(n) => `${sayi(n)} ${ad} için yükle`}
-      sonucMetni={(r) => `${sayi(r.guncellenen)} ${ad} güncellendi${r.atlanan ? `, ${sayi(r.atlanan)} hatalı satır atlandı` : ""}.`}
-      sonrakiAdim={{ label: altMi ? "Alt Bayi Listesine git" : "Bayi Listesine git", href: "/bayi-tanim/liste" }}
+      preview={usePreviewBalanceBulk()}
+      save={useUploadBalanceBulk()}
+      saveLabel={(n) => `${formatNumber(n)} ${name} için yükle`}
+      resultText={(r) => `${formatNumber(r.guncellenen)} ${name} güncellendi${r.atlanan ? `, ${formatNumber(r.atlanan)} hatalı satır atlandı` : ""}.`}
+      nextStep={{ label: isSub ? "Alt Bayi Listesine git" : "Bayi Listesine git", href: "/bayi-tanim/liste" }}
     />
   );
 }

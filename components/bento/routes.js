@@ -4,7 +4,7 @@
 // Burada olmayan menü öğeleri henüz bir ekrana gitmez.
 export const HOME = "/dashboard";
 
-export const SAYFALAR = {
+export const ROUTES = {
   "manuel-odeme": "/odeme/manuel",
   "link-odeme": "/odeme/link",
   "iptal-iade-onay": "/iptal-iade/onay",
@@ -28,6 +28,6 @@ export const SAYFALAR = {
   "bayi-bakiye": "/odeme/bayi-bakiye",
 };
 
-export const KALICI_PARAMETRELER = ["role", "theme", "menu"];
+export const PERSISTENT_PARAMS = ["role", "theme", "menu"];
 
-export const isReady = (href) => href === HOME || Object.values(SAYFALAR).includes(href);
+export const isReady = (href) => href === HOME || Object.values(ROUTES).includes(href);

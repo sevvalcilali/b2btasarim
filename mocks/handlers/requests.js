@@ -1,19 +1,19 @@
 // /iptal-iade-talepleri — şartname s.8 (onay zinciri) ve s.7 (takip raporu)
 import { http, HttpResponse } from "msw";
-import { depo } from "../db/store";
-import { altBayileri, kapsamda, onayimda, simdi, talepCevabi } from "../rules";
-import { gecikme, hata, kuralHatasi, uc, yetkili } from "./helpers";
+import { store } from "../db/store";
+import { subDealersOf, inScope, awaitingMyApproval, now, requestResponse } from "../rules";
+import { latency, error, ruleError, uc, authorized } from "./helpers";
 
-const kapsamdakiTalepler = (kim) =>
-  depo
-    .tablo("iptalIadeTalepleri")
-    .filter((t) => kapsamda(kim, t.girenId))
+const scopedRequests = (caller) =>
+  store
+    .table("cancelRefundRequests")
+    .filter((t) => inScope(caller, t.girenId))
     .sort((a, b) => (a.tarih < b.tarih ? 1 : -1));
 
 // Görünüm süzgeçleri — rolün sekmeleri bunlardan oluşur
-const GORUNUMLER = {
+const VIEWS = {
   TUMU: () => true,
-  ONAYIMDA: (t, kim) => onayimda(kim, t),
+  ONAYIMDA: (t, caller) => awaitingMyApproval(caller, t),
   UST_ONAYA_ILETILEN: (t) => t.durum === "ANA_FIRMA_ONAYINDA",
   ONAY_BEKLEYEN: (t) => t.durum === "BAYI_ONAYINDA" || t.durum === "ANA_FIRMA_ONAYINDA",
   ONAYLANDI: (t) => t.durum === "ONAYLANDI",
@@ -21,109 +21,109 @@ const GORUNUMLER = {
 };
 
 /** Talep girilebilecek işlemler: kendi başarılı çekimleri, açık / onaylı talebi olmayanlar */
-export const uygunIslemler = (kim) => {
-  const talepler = depo.tablo("iptalIadeTalepleri");
-  return depo
-    .tablo("islemler")
-    .filter((t) => t.cekimYapanId === kim.firmaId && t.durum === "BASARILI" && !talepler.some((x) => x.islemNo === t.islemNo && x.durum !== "REDDEDILDI"))
+export const eligibleTransactions = (caller) => {
+  const requests = store.table("cancelRefundRequests");
+  return store
+    .table("transactions")
+    .filter((t) => t.cekimYapanId === caller.firmaId && t.durum === "BASARILI" && !requests.some((x) => x.islemNo === t.islemNo && x.durum !== "REDDEDILDI"))
     .sort((a, b) => (a.tarih < b.tarih ? 1 : -1));
 };
 
-export const taleplerHandlers = [
+export const requestsHandlers = [
   http.get(uc("/iptal-iade-talepleri"), async ({ request }) => {
-    await gecikme();
-    const { kim, cevap } = yetkili(request);
-    if (cevap) return cevap;
-    const gorunum = new URL(request.url).searchParams.get("gorunum") || "TUMU";
-    const kaynak = kapsamdakiTalepler(kim);
-    const suzgec = GORUNUMLER[gorunum] || GORUNUMLER.TUMU;
-    const liste = kaynak.filter((t) => suzgec(t, kim));
+    await latency();
+    const { kim: caller, cevap: response } = authorized(request);
+    if (response) return response;
+    const view = new URL(request.url).searchParams.get("gorunum") || "TUMU";
+    const source = scopedRequests(caller);
+    const filter = VIEWS[view] || VIEWS.TUMU;
+    const list = source.filter((t) => filter(t, caller));
     return HttpResponse.json({
-      kayitlar: liste.map((t) => talepCevabi(t, kim)),
-      toplam: liste.length,
+      kayitlar: list.map((t) => requestResponse(t, caller)),
+      toplam: list.length,
       sayfa: 1,
-      boyut: Math.max(liste.length, 1),
-      sayaclar: Object.fromEntries(Object.entries(GORUNUMLER).map(([k, f]) => [k, kaynak.filter((t) => f(t, kim)).length])),
+      boyut: Math.max(list.length, 1),
+      sayaclar: Object.fromEntries(Object.entries(VIEWS).map(([k, f]) => [k, source.filter((t) => f(t, caller)).length])),
     });
   }),
 
   http.get(uc("/iptal-iade-talepleri/uygun-islemler"), async ({ request }) => {
-    await gecikme();
-    const { kim, cevap } = yetkili(request);
-    if (cevap) return cevap;
-    const liste = uygunIslemler(kim).map((t) => ({ islemNo: t.islemNo, tarih: t.tarih, musteriUnvan: t.musteri.unvan, tutarKurus: t.tutarKurus }));
-    return HttpResponse.json({ kayitlar: liste });
+    await latency();
+    const { kim: caller, cevap: response } = authorized(request);
+    if (response) return response;
+    const list = eligibleTransactions(caller).map((t) => ({ islemNo: t.islemNo, tarih: t.tarih, musteriUnvan: t.musteri.unvan, tutarKurus: t.tutarKurus }));
+    return HttpResponse.json({ kayitlar: list });
   }),
 
   http.post(uc("/iptal-iade-talepleri"), async ({ request }) => {
-    await gecikme();
-    const { kim, cevap } = yetkili(request);
-    if (cevap) return cevap;
+    await latency();
+    const { kim: caller, cevap: response } = authorized(request);
+    if (response) return response;
     const g = await request.json().catch(() => null);
-    if (!g) return hata(400, "GECERSIZ_GOVDE", "İstek gövdesi okunamadı.");
-    const islem = uygunIslemler(kim).find((t) => t.islemNo === g.islemNo);
-    const alanlar = {};
-    if (!islem) alanlar.islemNo = "Talep girilebilecek bir işlem seçin.";
-    if (!["IADE", "IPTAL"].includes(g.tur)) alanlar.tur = "Talep türü İADE ya da İPTAL olmalı.";
-    const tutar = g.tur === "IPTAL" && islem ? islem.tutarKurus : g.tutarKurus;
-    if (islem && !(Number.isInteger(tutar) && tutar > 0 && tutar <= islem.tutarKurus)) alanlar.tutarKurus = `0 ile ₺ ${(islem.tutarKurus / 100).toLocaleString("tr-TR")} arasında bir tutar girin.`;
-    if (!String(g.aciklama || "").trim()) alanlar.aciklama = "Açıklama girin.";
-    if (Object.keys(alanlar).length) return kuralHatasi("DOGRULAMA", "Bazı alanlar hatalı.", alanlar);
+    if (!g) return error(400, "GECERSIZ_GOVDE", "İstek gövdesi okunamadı.");
+    const transaction = eligibleTransactions(caller).find((t) => t.islemNo === g.islemNo);
+    const fields = {};
+    if (!transaction) fields.islemNo = "Talep girilebilecek bir işlem seçin.";
+    if (!["IADE", "IPTAL"].includes(g.tur)) fields.tur = "Talep türü İADE ya da İPTAL olmalı.";
+    const amount = g.tur === "IPTAL" && transaction ? transaction.tutarKurus : g.tutarKurus;
+    if (transaction && !(Number.isInteger(amount) && amount > 0 && amount <= transaction.tutarKurus)) fields.tutarKurus = `0 ile ₺ ${(transaction.tutarKurus / 100).toLocaleString("tr-TR")} arasında bir tutar girin.`;
+    if (!String(g.aciklama || "").trim()) fields.aciklama = "Açıklama girin.";
+    if (Object.keys(fields).length) return ruleError("DOGRULAMA", "Bazı alanlar hatalı.", fields);
 
-    const anaFirmaMi = kim.rol === "ANA_FIRMA";
-    const durum = anaFirmaMi ? "ONAYLANDI" : kim.rol === "BAYI" ? "ANA_FIRMA_ONAYINDA" : "BAYI_ONAYINDA";
-    const no = Math.max(...depo.tablo("iptalIadeTalepleri").map((t) => Number(t.talepNo.replace(/\D/g, "")))) + 1;
-    const talep = {
+    const isMainCompany = caller.rol === "ANA_FIRMA";
+    const status = isMainCompany ? "ONAYLANDI" : caller.rol === "BAYI" ? "ANA_FIRMA_ONAYINDA" : "BAYI_ONAYINDA";
+    const no = Math.max(...store.table("cancelRefundRequests").map((t) => Number(t.talepNo.replace(/\D/g, "")))) + 1;
+    const requestRecord = {
       talepNo: `TLP-${no}`,
-      tarih: simdi(),
-      islemNo: islem.islemNo,
-      girenId: kim.firmaId,
+      tarih: now(),
+      islemNo: transaction.islemNo,
+      girenId: caller.firmaId,
       tur: g.tur,
-      tutarKurus: tutar,
+      tutarKurus: amount,
       aciklama: String(g.aciklama).trim(),
-      durum,
-      gecmis: [{ tarih: simdi(), firmaId: kim.firmaId, olay: "TALEP_GIRILDI", not: anaFirmaMi ? "Ana firma girişi, onay gerekmedi" : undefined }],
+      durum: status,
+      gecmis: [{ tarih: now(), firmaId: caller.firmaId, olay: "TALEP_GIRILDI", not: isMainCompany ? "Ana firma girişi, onay gerekmedi" : undefined }],
     };
-    depo.ekle("iptalIadeTalepleri", talep);
+    store.insert("cancelRefundRequests", requestRecord);
     // ana firmanın kendi talebi anında sonuçlanır: işlem durumu da değişir
-    if (anaFirmaMi) depo.degistir("islemler", "islemNo", islem.islemNo, (t) => ({ ...t, durum: g.tur }));
-    return HttpResponse.json(talepCevabi(talep, kim), { status: 201 });
+    if (isMainCompany) store.replace("transactions", "islemNo", transaction.islemNo, (t) => ({ ...t, durum: g.tur }));
+    return HttpResponse.json(requestResponse(requestRecord, caller), { status: 201 });
   }),
 
   http.post(uc("/iptal-iade-talepleri/:talepNo/onay"), async ({ request, params }) => {
-    await gecikme();
-    const { kim, cevap } = yetkili(request);
-    if (cevap) return cevap;
-    const t = depo.tablo("iptalIadeTalepleri").find((x) => x.talepNo === params.talepNo);
-    if (!t || !kapsamda(kim, t.girenId)) return hata(404, "TALEP_YOK", "Talep bulunamadı.");
-    if (!onayimda(kim, t)) return hata(403, "YETKI_YOK", "Bu talep sizin onayınızda değil.");
-    const bayiMi = kim.rol === "BAYI";
-    const guncel = depo.degistir("iptalIadeTalepleri", "talepNo", t.talepNo, (x) => ({
+    await latency();
+    const { kim: caller, cevap: response } = authorized(request);
+    if (response) return response;
+    const t = store.table("cancelRefundRequests").find((x) => x.talepNo === params.talepNo);
+    if (!t || !inScope(caller, t.girenId)) return error(404, "TALEP_YOK", "Talep bulunamadı.");
+    if (!awaitingMyApproval(caller, t)) return error(403, "YETKI_YOK", "Bu talep sizin onayınızda değil.");
+    const isDealer = caller.rol === "BAYI";
+    const current = store.replace("cancelRefundRequests", "talepNo", t.talepNo, (x) => ({
       ...x,
-      durum: bayiMi ? "ANA_FIRMA_ONAYINDA" : "ONAYLANDI",
-      gecmis: [...x.gecmis, { tarih: simdi(), firmaId: kim.firmaId, olay: bayiMi ? "ONAYLADI_ILETTI" : "ONAYLADI" }],
+      durum: isDealer ? "ANA_FIRMA_ONAYINDA" : "ONAYLANDI",
+      gecmis: [...x.gecmis, { tarih: now(), firmaId: caller.firmaId, olay: isDealer ? "ONAYLADI_ILETTI" : "ONAYLADI" }],
     }));
-    if (!bayiMi) depo.degistir("islemler", "islemNo", t.islemNo, (x) => ({ ...x, durum: t.tur }));
-    return HttpResponse.json({ ...talepCevabi(guncel, kim), bildirim: bayiMi ? "Talep onaylandı ve ana firma onayına iletildi." : "Talep onaylandı; talebi giren firma e-posta ile bilgilendirildi." });
+    if (!isDealer) store.replace("transactions", "islemNo", t.islemNo, (x) => ({ ...x, durum: t.tur }));
+    return HttpResponse.json({ ...requestResponse(current, caller), bildirim: isDealer ? "Talep onaylandı ve ana firma onayına iletildi." : "Talep onaylandı; talebi giren firma e-posta ile bilgilendirildi." });
   }),
 
   http.post(uc("/iptal-iade-talepleri/:talepNo/red"), async ({ request, params }) => {
-    await gecikme();
-    const { kim, cevap } = yetkili(request);
-    if (cevap) return cevap;
-    const t = depo.tablo("iptalIadeTalepleri").find((x) => x.talepNo === params.talepNo);
-    if (!t || !kapsamda(kim, t.girenId)) return hata(404, "TALEP_YOK", "Talep bulunamadı.");
-    if (!onayimda(kim, t)) return hata(403, "YETKI_YOK", "Bu talep sizin onayınızda değil.");
+    await latency();
+    const { kim: caller, cevap: response } = authorized(request);
+    if (response) return response;
+    const t = store.table("cancelRefundRequests").find((x) => x.talepNo === params.talepNo);
+    if (!t || !inScope(caller, t.girenId)) return error(404, "TALEP_YOK", "Talep bulunamadı.");
+    if (!awaitingMyApproval(caller, t)) return error(403, "YETKI_YOK", "Bu talep sizin onayınızda değil.");
     const g = await request.json().catch(() => ({}));
-    const gerekce = String(g?.gerekce || "").trim();
-    if (!gerekce) return kuralHatasi("DOGRULAMA", "Gerekçe girin.", { gerekce: "Gerekçe girin; talebi girene e-posta ile iletilir." });
-    const guncel = depo.degistir("iptalIadeTalepleri", "talepNo", t.talepNo, (x) => ({
+    const reason = String(g?.gerekce || "").trim();
+    if (!reason) return ruleError("DOGRULAMA", "Gerekçe girin.", { gerekce: "Gerekçe girin; talebi girene e-posta ile iletilir." });
+    const current = store.replace("cancelRefundRequests", "talepNo", t.talepNo, (x) => ({
       ...x,
       durum: "REDDEDILDI",
-      gecmis: [...x.gecmis, { tarih: simdi(), firmaId: kim.firmaId, olay: "REDDETTI", not: gerekce }],
+      gecmis: [...x.gecmis, { tarih: now(), firmaId: caller.firmaId, olay: "REDDETTI", not: reason }],
     }));
-    return HttpResponse.json({ ...talepCevabi(guncel, kim), bildirim: "Talep reddedildi; talebi giren firma e-posta ile bilgilendirildi." });
+    return HttpResponse.json({ ...requestResponse(current, caller), bildirim: "Talep reddedildi; talebi giren firma e-posta ile bilgilendirildi." });
   }),
 ];
 
-export { altBayileri };
+export { subDealersOf };

@@ -1,62 +1,62 @@
 // Sahte backend'in veritabanı: bellek içi tablolar. Tarayıcı oturumu boyunca sessionStorage'da kalıcıdır
 // (sekme kapanınca tohuma döner); "Demo verisini sıfırla" da tohuma döndürür.
-import * as tohum from "./seed";
+import * as seed from "./seed";
 
-const ANAHTAR = "nkb-demo-db-v2"; // tohum biçimi değişince sürüm artar; eski kayıt yok sayılır
-const TOHUM = Object.fromEntries(Object.entries(tohum));
+const KEY = "nkb-demo-db-v3"; // tohum biçimi değişince sürüm artar; eski kayıt yok sayılır
+const SEED = Object.fromEntries(Object.entries(seed));
 
-const kopya = (v) => JSON.parse(JSON.stringify(v));
+const clone = (v) => JSON.parse(JSON.stringify(v));
 
-function yukle() {
+function upload() {
   try {
-    const kayit = typeof sessionStorage !== "undefined" && sessionStorage.getItem(ANAHTAR);
-    if (kayit) {
-      const db = JSON.parse(kayit);
+    const record = typeof sessionStorage !== "undefined" && sessionStorage.getItem(KEY);
+    if (record) {
+      const db = JSON.parse(record);
       // tohuma sonradan eklenen tablolar eksikse tamamla
-      for (const k of Object.keys(TOHUM)) if (!(k in db)) db[k] = kopya(TOHUM[k]);
+      for (const k of Object.keys(SEED)) if (!(k in db)) db[k] = clone(SEED[k]);
       return db;
     }
   } catch (e) {
     /* bozuk kayıt → tohum */
   }
-  return kopya(TOHUM);
+  return clone(SEED);
 }
 
-let db = yukle();
+let db = upload();
 
-function kaydet() {
+function save() {
   try {
-    sessionStorage.setItem(ANAHTAR, JSON.stringify(db));
+    sessionStorage.setItem(KEY, JSON.stringify(db));
   } catch (e) {
     /* depolama kapalıysa yalnızca bellekte kalır */
   }
 }
 
-export const depo = {
+export const store = {
   /** @returns {any[]|object} tablonun kendisi (okuma için) */
-  tablo: (ad) => db[ad],
+  table: (name) => db[name],
 
   /** Tabloyu fn(eski) → yeni ile değiştirir ve kalıcılaştırır */
-  guncelle(ad, fn) {
-    db[ad] = fn(db[ad]);
-    kaydet();
-    return db[ad];
+  update(name, fn) {
+    db[name] = fn(db[name]);
+    save();
+    return db[name];
   },
 
   /** Listeye kayıt ekler (en başa: listeler en yeniden eskiye sıralı) */
-  ekle(ad, kayit) {
-    return this.guncelle(ad, (l) => [kayit, ...l]);
+  insert(name, record) {
+    return this.update(name, (l) => [record, ...l]);
   },
 
   /** anahtar alanı eşleşen kaydı fn ile değiştirir */
-  degistir(ad, anahtarAlani, deger, fn) {
-    let sonuc = null;
-    this.guncelle(ad, (l) => l.map((k) => (k[anahtarAlani] === deger ? (sonuc = fn(k)) : k)));
-    return sonuc;
+  replace(name, keyField, value, fn) {
+    let result = null;
+    this.update(name, (l) => l.map((k) => (k[keyField] === value ? (result = fn(k)) : k)));
+    return result;
   },
 
-  sifirla() {
-    db = kopya(TOHUM);
-    kaydet();
+  reset() {
+    db = clone(SEED);
+    save();
   },
 };

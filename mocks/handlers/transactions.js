@@ -1,17 +1,17 @@
 // GET /islemler — şartname s.7: müşteri türü, cari no, unvan, vergi no; rol kapsamı sunucuda
 import { http, HttpResponse } from "msw";
-import { depo } from "../db/store";
-import { firmaOzeti, icerir, kapsamda, sayaclar, sayfala, tarihAraligi } from "../rules";
-import { gecikme, uc, yetkili } from "./helpers";
+import { store } from "../db/store";
+import { companySummary, includes, inScope, counters, paginate, dateRange } from "../rules";
+import { latency, uc, authorized } from "./helpers";
 
-const DURUMLAR = ["BASARILI", "BASARISIZ", "IPTAL", "IADE"];
+const STATUSES = ["BASARILI", "BASARISIZ", "IPTAL", "IADE"];
 
 /** Depodaki ham işlem → sözleşmedeki Islem cevabı */
-export function islemCevabi(t) {
+export function transactionResponse(t) {
   return {
     islemNo: t.islemNo,
     tarih: t.tarih,
-    cekimYapan: firmaOzeti(t.cekimYapanId),
+    cekimYapan: companySummary(t.cekimYapanId),
     musteriTuru: t.musteriTuru,
     musteri: t.musteri,
     kart: { son4: t.kartSon4 },
@@ -24,52 +24,52 @@ export function islemCevabi(t) {
 }
 
 /** Oturumun görebildiği işlemler, en yeniden eskiye */
-export const kapsamdakiIslemler = (kim) =>
-  depo
-    .tablo("islemler")
-    .filter((t) => kapsamda(kim, t.cekimYapanId))
+export const scopedTransactions = (caller) =>
+  store
+    .table("transactions")
+    .filter((t) => inScope(caller, t.cekimYapanId))
     .sort((a, b) => (a.tarih < b.tarih ? 1 : -1));
 
-export const islemlerHandlers = [
+export const transactionsHandlers = [
   http.get(uc("/islemler"), async ({ request }) => {
-    await gecikme();
-    const { kim, cevap } = yetkili(request);
-    if (cevap) return cevap;
+    await latency();
+    const { kim: caller, cevap: response } = authorized(request);
+    if (response) return response;
     const s = new URL(request.url).searchParams;
-    const durum = s.get("durum");
-    const musteriTuru = s.get("musteriTuru");
-    const odemeTipi = s.get("odemeTipi");
+    const status = s.get("durum");
+    const customerKind = s.get("musteriTuru");
+    const paymentType = s.get("odemeTipi");
     const q = (s.get("q") || "").trim();
-    const firmaId = s.get("firmaId"); // çekimi yapan firma (bayi detay paneli)
-    const [siraAlan, siraYon] = (s.get("sira") || "tarih:desc").split(":");
-    const aralik = s.get("baslangic") || s.get("bitis") || s.get("donem") ? tarihAraligi(s) : null; // verilmezse tüm geçmiş
+    const companyId = s.get("firmaId"); // çekimi yapan firma (bayi detay paneli)
+    const [sortField, sortDirection] = (s.get("sira") || "tarih:desc").split(":");
+    const range = s.get("baslangic") || s.get("bitis") || s.get("donem") ? dateRange(s) : null; // verilmezse tüm geçmiş
 
-    const kaynak = kapsamdakiIslemler(kim);
+    const source = scopedTransactions(caller);
     // durum dışındaki filtreler: durum sekmelerinin sayıları bunların üzerinden hesaplanır
-    const adaylar = kaynak.filter(
+    const candidates = source.filter(
       (t) =>
-        (!firmaId || t.cekimYapanId === firmaId) &&
-        (!aralik || aralik.icinde(t.tarih)) &&
-        (!musteriTuru || t.musteriTuru === musteriTuru) &&
-        (!odemeTipi || t.odemeTipi === odemeTipi) &&
-        (!q || [t.islemNo, t.musteri.unvan, t.musteri.cariNo, t.musteri.vergiNo, t.kartSon4, firmaOzeti(t.cekimYapanId)?.unvan].some((f) => icerir(f, q)))
+        (!companyId || t.cekimYapanId === companyId) &&
+        (!range || range.icinde(t.tarih)) &&
+        (!customerKind || t.musteriTuru === customerKind) &&
+        (!paymentType || t.odemeTipi === paymentType) &&
+        (!q || [t.islemNo, t.musteri.unvan, t.musteri.cariNo, t.musteri.vergiNo, t.kartSon4, companySummary(t.cekimYapanId)?.unvan].some((f) => includes(f, q)))
     );
-    const liste = adaylar.filter((t) => !durum || t.durum === durum);
+    const list = candidates.filter((t) => !status || t.durum === status);
     // sıralama sunucuda (liste sayfalı): tarih, tutarKurus, islemNo
-    const al = { tarih: (t) => t.tarih, tutarKurus: (t) => t.tutarKurus, islemNo: (t) => t.islemNo }[siraAlan] || ((t) => t.tarih);
-    liste.sort((a, b) => (al(a) < al(b) ? -1 : al(a) > al(b) ? 1 : 0) * (siraYon === "asc" ? 1 : -1));
-    const sayfa = sayfala(liste, s);
+    const al = { tarih: (t) => t.tarih, tutarKurus: (t) => t.tutarKurus, islemNo: (t) => t.islemNo }[sortField] || ((t) => t.tarih);
+    list.sort((a, b) => (al(a) < al(b) ? -1 : al(a) > al(b) ? 1 : 0) * (sortDirection === "asc" ? 1 : -1));
+    const page = paginate(list, s);
     return HttpResponse.json({
-      ...sayfa,
-      kayitlar: sayfa.kayitlar.map(islemCevabi),
-      sayaclar: sayaclar(adaylar, "durum", DURUMLAR),
+      ...page,
+      kayitlar: page.kayitlar.map(transactionResponse),
+      sayaclar: counters(candidates, "durum", STATUSES),
       // filtreye uyan tüm kayıtların özeti (sayfadan bağımsız)
       ozet: {
-        toplamKurus: liste.reduce((a, t) => a + t.tutarKurus, 0),
-        basariliKurus: liste.filter((t) => t.durum === "BASARILI").reduce((a, t) => a + t.tutarKurus, 0),
+        toplamKurus: list.reduce((a, t) => a + t.tutarKurus, 0),
+        basariliKurus: list.filter((t) => t.durum === "BASARILI").reduce((a, t) => a + t.tutarKurus, 0),
       },
       // kapsamda görülen müşteri türleri (filtre listesi yalnızca bunları sunar)
-      musteriTurleri: [...new Set(kaynak.map((t) => t.musteriTuru))],
+      musteriTurleri: [...new Set(source.map((t) => t.musteriTuru))],
     });
   }),
 ];

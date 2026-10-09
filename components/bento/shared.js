@@ -3,18 +3,18 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import I from "@/components/DesignIcons";
-import { tarihSaat, yuzde } from "@/lib/format";
-import { DONEM_SECENEKLERI, donemAraligi, gunKisaMetni, ozelAralik } from "@/lib/period";
+import { formatDateTime, formatPercent } from "@/lib/format";
+import { PERIOD_OPTIONS, periodRange, shortDayText, customRange } from "@/lib/period";
 import { TrendArrow } from "./helpers";
 import { CARD, FOCUS } from "./theme";
 
 // Ortak pencere (modal): büyütülmüş grafik, iptal/iade talebi, red gerekçesi. Temanın renk değişkenleri için
 // sayfanın kök öğesine (#bn-root) taşınır; kart üzerine gelince oluşan transform da sabit konumu bozmaz.
-export function Pencere({ baslik, altBaslik, onClose, genislik = "max-w-5xl", children }) {
+export function Modal({ title, subtitle, onClose, width = "max-w-5xl", children }) {
   const closeRef = useRef(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose; // Esc her zaman güncel kapatıcıyı çağırır (içerik değişen pencereler)
-  const baslikId = `bn-pencere-${useId().replace(/:/g, "")}`;
+  const titleId = `bn-pencere-${useId().replace(/:/g, "")}`;
 
   useEffect(() => {
     closeRef.current?.focus();
@@ -37,15 +37,15 @@ export function Pencere({ baslik, altBaslik, onClose, genislik = "max-w-5xl", ch
       <div
         role="dialog"
         aria-modal="true"
-        aria-labelledby={baslikId}
-        className={`bn-pop relative max-h-[calc(100vh-24px)] w-full overflow-y-auto rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 [box-shadow:var(--pop-shadow)] sm:p-6 ${genislik}`}
+        aria-labelledby={titleId}
+        className={`bn-pop relative max-h-[calc(100vh-24px)] w-full overflow-y-auto rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 [box-shadow:var(--pop-shadow)] sm:p-6 ${width}`}
       >
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
-            <h2 id={baslikId} className="text-base font-bold text-[var(--fg)] sm:text-lg">
-              {baslik}
+            <h2 id={titleId} className="text-base font-bold text-[var(--fg)] sm:text-lg">
+              {title}
             </h2>
-            {altBaslik && <p className="mt-0.5 text-xs text-[var(--muted)]">{altBaslik}</p>}
+            {subtitle && <p className="mt-0.5 text-xs text-[var(--muted)]">{subtitle}</p>}
           </div>
           <button
             ref={closeRef}
@@ -66,11 +66,11 @@ export function Pencere({ baslik, altBaslik, onClose, genislik = "max-w-5xl", ch
 }
 
 // Sağdan açılan detay paneli (çekmece): liste satırının ayrıntısı, listeden ayrılmadan. Pencere ile aynı erişilebilirlik.
-export function YanPanel({ baslik, altBaslik, onClose, genislik = "max-w-xl", altBar, children }) {
+export function Drawer({ title, subtitle, onClose, width = "max-w-xl", bottomBar, children }) {
   const closeRef = useRef(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
-  const baslikId = `bn-panel-${useId().replace(/:/g, "")}`;
+  const titleId = `bn-panel-${useId().replace(/:/g, "")}`;
 
   useEffect(() => {
     closeRef.current?.focus();
@@ -90,20 +90,20 @@ export function YanPanel({ baslik, altBaslik, onClose, genislik = "max-w-xl", al
   return createPortal(
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="bn-fade absolute inset-0 bg-[rgba(15,18,40,0.45)] backdrop-blur-[1px]" onClick={onClose} aria-hidden="true" />
-      <aside role="dialog" aria-modal="true" aria-labelledby={baslikId} className={`bn-slide relative flex h-full w-full flex-col border-l border-[var(--border)] bg-[var(--surface)] [box-shadow:var(--pop-shadow)] ${genislik}`}>
+      <aside role="dialog" aria-modal="true" aria-labelledby={titleId} className={`bn-slide relative flex h-full w-full flex-col border-l border-[var(--border)] bg-[var(--surface)] [box-shadow:var(--pop-shadow)] ${width}`}>
         <div className="flex items-start justify-between gap-3 border-b border-[var(--border)] px-5 py-4">
           <div className="min-w-0">
-            <h2 id={baslikId} className="truncate text-base font-bold text-[var(--fg)]">
-              {baslik}
+            <h2 id={titleId} className="truncate text-base font-bold text-[var(--fg)]">
+              {title}
             </h2>
-            {altBaslik && <p className="mt-0.5 text-xs text-[var(--muted)]">{altBaslik}</p>}
+            {subtitle && <p className="mt-0.5 text-xs text-[var(--muted)]">{subtitle}</p>}
           </div>
           <button ref={closeRef} type="button" onClick={onClose} aria-label="Kapat" title="Kapat (Esc)" className={`grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--soft)] text-[var(--fg-2)] ring-1 ring-[var(--border)] transition hover:text-[var(--brand-text)] ${FOCUS}`}>
             <I name="x" size={16} />
           </button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
-        {altBar && <div className="flex flex-col-reverse gap-2 border-t border-[var(--border)] px-5 py-3 sm:flex-row sm:justify-end">{altBar}</div>}
+        {bottomBar && <div className="flex flex-col-reverse gap-2 border-t border-[var(--border)] px-5 py-3 sm:flex-row sm:justify-end">{bottomBar}</div>}
       </aside>
     </div>,
     root
@@ -111,40 +111,40 @@ export function YanPanel({ baslik, altBaslik, onClose, genislik = "max-w-xl", al
 }
 
 // Rapor dönemi seçici: hazır seçenekler + özel aralık. deger: { kod, baslangic, bitis } ya da null (tumu açıkken "Tümü")
-export function TarihAraligi({ deger, onChange, tumu = false }) {
-  const [ozel, setOzel] = useState(deger?.kod === "ozel");
-  const kod = deger ? (ozel ? "ozel" : deger.kod) : "tumu";
-  const cls = (secili) => `inline-flex h-8 items-center rounded-full px-3 text-[12px] transition ${secili ? "bg-[var(--brand)] font-bold text-white" : "bg-[var(--soft)] font-semibold text-[var(--fg-2)] hover:text-[var(--brand-text)]"} ${FOCUS}`;
-  const girdi = "h-8 rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-2.5 text-[12px] tabular-nums text-[var(--fg)] outline-none focus:border-[var(--brand)]";
+export function DateRange({ value, onChange, all = false }) {
+  const [custom, setCustom] = useState(value?.kod === "ozel");
+  const code = value ? (custom ? "ozel" : value.kod) : "tumu";
+  const cls = (selected) => `inline-flex h-8 items-center rounded-full px-3 text-[12px] transition ${selected ? "bg-[var(--brand)] font-bold text-white" : "bg-[var(--soft)] font-semibold text-[var(--fg-2)] hover:text-[var(--brand-text)]"} ${FOCUS}`;
+  const input = "h-8 rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-2.5 text-[12px] tabular-nums text-[var(--fg)] outline-none focus:border-[var(--brand)]";
   return (
     <div className="flex flex-wrap items-center gap-1">
       <div role="group" aria-label="Dönem" className="flex flex-wrap gap-1">
-        {tumu && (
-          <button type="button" aria-pressed={kod === "tumu"} onClick={() => { setOzel(false); onChange(null); }} className={cls(kod === "tumu")}>
+        {all && (
+          <button type="button" aria-pressed={code === "tumu"} onClick={() => { setCustom(false); onChange(null); }} className={cls(code === "tumu")}>
             Tümü
           </button>
         )}
-        {DONEM_SECENEKLERI.map(([k, ad]) => (
-          <button key={k} type="button" aria-pressed={kod === k} onClick={() => { setOzel(false); onChange(donemAraligi(k)); }} className={cls(kod === k)}>
-            {ad}
+        {PERIOD_OPTIONS.map(([k, name]) => (
+          <button key={k} type="button" aria-pressed={code === k} onClick={() => { setCustom(false); onChange(periodRange(k)); }} className={cls(code === k)}>
+            {name}
           </button>
         ))}
-        <button type="button" aria-pressed={kod === "ozel"} onClick={() => { setOzel(true); if (!deger) onChange(donemAraligi("30g")); }} className={cls(kod === "ozel")}>
+        <button type="button" aria-pressed={code === "ozel"} onClick={() => { setCustom(true); if (!value) onChange(periodRange("30g")); }} className={cls(code === "ozel")}>
           Özel
         </button>
       </div>
-      {ozel && deger && (
+      {custom && value && (
         <div className="flex items-center gap-1 text-[12px] text-[var(--muted)]">
           <label className="sr-only" htmlFor="bn-aralik-bas">Başlangıç</label>
-          <input id="bn-aralik-bas" type="date" value={deger.baslangic} max={deger.bitis} onChange={(e) => e.target.value && onChange(ozelAralik(e.target.value, deger.bitis))} className={girdi} />
+          <input id="bn-aralik-bas" type="date" value={value.baslangic} max={value.bitis} onChange={(e) => e.target.value && onChange(customRange(e.target.value, value.bitis))} className={input} />
           <span aria-hidden="true">–</span>
           <label className="sr-only" htmlFor="bn-aralik-bit">Bitiş</label>
-          <input id="bn-aralik-bit" type="date" value={deger.bitis} min={deger.baslangic} onChange={(e) => e.target.value && onChange(ozelAralik(deger.baslangic, e.target.value))} className={girdi} />
+          <input id="bn-aralik-bit" type="date" value={value.bitis} min={value.baslangic} onChange={(e) => e.target.value && onChange(customRange(value.baslangic, e.target.value))} className={input} />
         </div>
       )}
-      {deger && !ozel && (
+      {value && !custom && (
         <span className="ml-1 text-[11.5px] tabular-nums text-[var(--muted)]">
-          {gunKisaMetni(deger.baslangic)} – {gunKisaMetni(deger.bitis)}
+          {shortDayText(value.baslangic)} – {shortDayText(value.bitis)}
         </span>
       )}
     </div>
@@ -152,7 +152,7 @@ export function TarihAraligi({ deger, onChange, tumu = false }) {
 }
 
 // Yazdır düğmesi: tarayıcının yazdırma / PDF kaydetme penceresi; kabuk ve düğmeler print CSS ile gizlenir
-export function YazdirDugmesi({ className = "" }) {
+export function PrintButton({ className = "" }) {
   return (
     <button
       type="button"
@@ -167,20 +167,20 @@ export function YazdirDugmesi({ className = "" }) {
 }
 
 // Önceki döneme göre değişim rozeti: ▲ %12 / ▼ %8; önceki 0 ise "yeni", tersi: düşüş iyidir (bekleyen fatura gibi)
-export function DegisimRozeti({ simdiki, onceki, tersi = false, koyu = false }) {
-  if (onceki == null || simdiki == null) return null;
-  const s = Number(simdiki);
-  const o = Number(onceki);
+export function ChangeBadge({ current, previous, reverse = false, dark = false }) {
+  if (previous == null || current == null) return null;
+  const s = Number(current);
+  const o = Number(previous);
   if (!o && !s) return null;
-  const artis = s >= o;
-  const iyi = tersi ? !artis : artis;
-  const renk = koyu ? "bg-white/20 text-white" : iyi ? "bg-[var(--success-soft)] text-[var(--success-text)]" : "bg-[var(--danger-soft)] text-[var(--danger-text)]";
+  const increase = s >= o;
+  const good = reverse ? !increase : increase;
+  const color = dark ? "bg-white/20 text-white" : good ? "bg-[var(--success-soft)] text-[var(--success-text)]" : "bg-[var(--danger-soft)] text-[var(--danger-text)]";
   return (
-    <span className={`inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-px text-[10.5px] font-bold tabular-nums ${renk}`} title="Önceki döneme göre">
+    <span className={`inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-px text-[10.5px] font-bold tabular-nums ${color}`} title="Önceki döneme göre">
       {o ? (
         <>
-          <TrendArrow up={artis} />
-          {yuzde(Math.abs(((s - o) / o) * 100), 0)}
+          <TrendArrow up={increase} />
+          {formatPercent(Math.abs(((s - o) / o) * 100), 0)}
         </>
       ) : (
         "yeni"
@@ -190,28 +190,28 @@ export function DegisimRozeti({ simdiki, onceki, tersi = false, koyu = false }) 
 }
 
 // Denetim izi notu: "Son değişiklik: Ad Soyad · 08.10.2026 14:12" (yoksa oluşturan; ikisi de yoksa görünmez)
-export function DenetimNotu({ kayit, className = "" }) {
-  const degisiklik = kayit?.sonDegisiklik;
-  const d = degisiklik || kayit?.olusturma;
+export function AuditNote({ record, className = "" }) {
+  const change = record?.sonDegisiklik;
+  const d = change || record?.olusturma;
   if (!d) return null;
   return (
     <p className={`text-[11px] text-[var(--muted)] ${className}`}>
-      {degisiklik ? "Son değişiklik" : "Oluşturan"}: <span className="font-semibold text-[var(--fg-2)]">{d.adSoyad}</span> · <span className="tabular-nums">{tarihSaat(d.tarih)}</span>
+      {change ? "Son değişiklik" : "Oluşturan"}: <span className="font-semibold text-[var(--fg-2)]">{d.adSoyad}</span> · <span className="tabular-nums">{formatDateTime(d.tarih)}</span>
     </p>
   );
 }
 
 // Sayfa başlığının üstündeki konum satırı: Ana Sayfa › grup › ekran
-export function Konum({ onHome, yol }) {
+export function Breadcrumb({ onHome, path }) {
   return (
     <nav aria-label="Konum" className="mb-1 flex items-center gap-1 text-[11.5px] font-medium text-[var(--muted)]">
       <button type="button" onClick={onHome} className={`rounded hover:text-[var(--brand-text)] ${FOCUS}`}>
         Ana Sayfa
       </button>
-      {yol.map((y, i) => (
+      {path.map((y, i) => (
         <span key={y} className="contents">
           <I name="chevronRight" size={11} />
-          {i === yol.length - 1 ? (
+          {i === path.length - 1 ? (
             <span aria-current="page" className="font-semibold text-[var(--fg-2)]">
               {y}
             </span>
@@ -224,40 +224,40 @@ export function Konum({ onHome, yol }) {
   );
 }
 
-export function inputCls(hata) {
+export function inputCls(error) {
   return `h-10 w-full rounded-xl border bg-[var(--surface)] px-3 text-[13px] text-[var(--fg)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--brand)] read-only:bg-[var(--soft)] read-only:text-[var(--fg-2)] ${
-    hata ? "border-[var(--danger)]" : "border-[var(--border-strong)]"
+    error ? "border-[var(--danger)]" : "border-[var(--border-strong)]"
   }`;
 }
 
-export function Alan({ id, etiket, hata, ipucu, className = "", children }) {
+export function Field({ id, label, error, hint, className = "", children }) {
   return (
     <div className={className}>
       <label htmlFor={id} className="mb-1 block text-[12px] font-semibold text-[var(--fg-2)]">
-        {etiket}
+        {label}
       </label>
       {children}
-      {hata ? (
+      {error ? (
         <p id={`${id}-hata`} className="mt-1 text-[11.5px] font-semibold text-[var(--danger-text)]">
-          {hata}
+          {error}
         </p>
-      ) : ipucu ? (
-        <p className="mt-1 text-[11.5px] text-[var(--muted)]">{ipucu}</p>
+      ) : hint ? (
+        <p className="mt-1 text-[11.5px] text-[var(--muted)]">{hint}</p>
       ) : null}
     </div>
   );
 }
 
-export function FormBolum({ no, baslik, aciklama, i, children }) {
+export function FormSection({ no, title, description, i, children }) {
   return (
     <section style={{ "--i": i }} className={`bn-rise p-4 sm:p-5 ${CARD} hover:!translate-y-0`} aria-labelledby={`bn-bolum-${no}`}>
       <div className="mb-4 flex items-start gap-3">
         <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--brand)] text-[12px] font-extrabold text-white">{no}</span>
         <div>
           <h2 id={`bn-bolum-${no}`} className="text-sm font-bold text-[var(--fg)]">
-            {baslik}
+            {title}
           </h2>
-          {aciklama && <p className="mt-0.5 text-[12px] text-[var(--muted)]">{aciklama}</p>}
+          {description && <p className="mt-0.5 text-[12px] text-[var(--muted)]">{description}</p>}
         </div>
       </div>
       {children}
@@ -266,91 +266,91 @@ export function FormBolum({ no, baslik, aciklama, i, children }) {
 }
 
 // Tanımlı müşteriyi unvan, cari no ya da vergi no ile arayıp seçtiren liste kutusu (combobox)
-export function MusteriSecici({ id, secenekler, secili, onSec, hata }) {
-  const [acik, setAcik] = useState(false);
-  const [arama, setArama] = useState("");
-  const [aktif, setAktif] = useState(0);
-  const kutuRef = useRef(null);
-  const kucuk = (x) => x.toLocaleLowerCase("tr-TR");
-  const liste = secenekler.filter((m) => !arama || [m.unvan, m.cariNo, m.vergiNo].some((f) => kucuk(f).includes(kucuk(arama))));
+export function CustomerPicker({ id, options, selected, onSelect, error }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [active, setActive] = useState(0);
+  const boxRef = useRef(null);
+  const small = (x) => x.toLocaleLowerCase("tr-TR");
+  const list = options.filter((m) => !search || [m.unvan, m.cariNo, m.vergiNo].some((f) => small(f).includes(small(search))));
 
   useEffect(() => {
-    if (!acik) return undefined;
-    const disari = (e) => !kutuRef.current?.contains(e.target) && setAcik(false);
-    document.addEventListener("mousedown", disari);
-    return () => document.removeEventListener("mousedown", disari);
-  }, [acik]);
+    if (!open) return undefined;
+    const outside = (e) => !boxRef.current?.contains(e.target) && setOpen(false);
+    document.addEventListener("mousedown", outside);
+    return () => document.removeEventListener("mousedown", outside);
+  }, [open]);
 
-  const sec = (m) => {
-    onSec(m);
-    setArama("");
-    setAcik(false);
+  const select = (m) => {
+    onSelect(m);
+    setSearch("");
+    setOpen(false);
   };
   const onKey = (e) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setAcik(true);
-      setAktif((a) => Math.min(a + 1, liste.length - 1));
+      setOpen(true);
+      setActive((a) => Math.min(a + 1, list.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setAktif((a) => Math.max(a - 1, 0));
-    } else if (e.key === "Enter" && acik && liste[aktif]) {
+      setActive((a) => Math.max(a - 1, 0));
+    } else if (e.key === "Enter" && open && list[active]) {
       e.preventDefault();
-      sec(liste[aktif]);
+      select(list[active]);
     } else if (e.key === "Escape") {
-      setAcik(false);
+      setOpen(false);
     }
   };
 
   return (
-    <div ref={kutuRef} className="relative">
+    <div ref={boxRef} className="relative">
       <input
         id={id}
         type="text"
         role="combobox"
         autoComplete="off"
-        aria-expanded={acik}
+        aria-expanded={open}
         aria-controls={`${id}-liste`}
         aria-autocomplete="list"
-        aria-activedescendant={acik && liste[aktif] ? `${id}-sec-${aktif}` : undefined}
-        aria-invalid={hata ? true : undefined}
-        aria-describedby={hata ? `${id}-hata` : undefined}
-        value={acik || !secili ? arama : `${secili.unvan} — ${secili.cariNo}`}
+        aria-activedescendant={open && list[active] ? `${id}-sec-${active}` : undefined}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-hata` : undefined}
+        value={open || !selected ? search : `${selected.unvan} — ${selected.cariNo}`}
         placeholder="Unvan, cari no ya da vergi no ile arayın"
         onFocus={() => {
-          setAcik(true);
-          setAktif(0);
+          setOpen(true);
+          setActive(0);
         }}
         onChange={(e) => {
-          setArama(e.target.value);
-          setAktif(0);
-          setAcik(true);
+          setSearch(e.target.value);
+          setActive(0);
+          setOpen(true);
         }}
         onKeyDown={onKey}
-        className={`${inputCls(hata)} pr-9`}
+        className={`${inputCls(error)} pr-9`}
       />
       <I name="chevronDown" size={15} className="pointer-events-none absolute right-3 top-[13px] text-[var(--muted)]" />
-      {acik && (
+      {open && (
         <ul
           id={`${id}-liste`}
           role="listbox"
           className="bn-pop absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1 [box-shadow:var(--pop-shadow)]"
         >
-          {liste.length === 0 ? (
+          {list.length === 0 ? (
             <li className="px-3 py-2 text-[12.5px] text-[var(--muted)]">Eşleşen kayıt yok</li>
           ) : (
-            liste.map((m, i) => (
+            list.map((m, i) => (
               <li
                 key={m.cariNo}
                 id={`${id}-sec-${i}`}
                 role="option"
-                aria-selected={secili?.cariNo === m.cariNo}
+                aria-selected={selected?.cariNo === m.cariNo}
                 onMouseDown={(e) => {
                   e.preventDefault();
-                  sec(m);
+                  select(m);
                 }}
-                onMouseEnter={() => setAktif(i)}
-                className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg px-3 py-2 ${i === aktif ? "bg-[var(--soft)]" : ""}`}
+                onMouseEnter={() => setActive(i)}
+                className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg px-3 py-2 ${i === active ? "bg-[var(--soft)]" : ""}`}
               >
                 <span className="min-w-0">
                   <span className="block truncate text-[13px] font-semibold text-[var(--fg)]">{m.unvan}</span>
@@ -358,7 +358,7 @@ export function MusteriSecici({ id, secenekler, secili, onSec, hata }) {
                     {m.cariNo} · VKN {m.vergiNo}
                   </span>
                 </span>
-                {secili?.cariNo === m.cariNo && <I name="check" size={15} className="shrink-0 text-[var(--brand-text)]" />}
+                {selected?.cariNo === m.cariNo && <I name="check" size={15} className="shrink-0 text-[var(--brand-text)]" />}
               </li>
             ))
           )}
@@ -368,81 +368,81 @@ export function MusteriSecici({ id, secenekler, secili, onSec, hata }) {
   );
 }
 
-export function KopyalaDugmesi({ metin, kucuk = false }) {
-  const [durum, setDurum] = useState(null); // null | "tamam" | "hata"
-  const zaman = useRef(null);
-  useEffect(() => () => clearTimeout(zaman.current), []);
-  const kopyala = async () => {
+export function CopyButton({ text, small = false }) {
+  const [status, setStatus] = useState(null); // null | "tamam" | "hata"
+  const time = useRef(null);
+  useEffect(() => () => clearTimeout(time.current), []);
+  const copy = async () => {
     try {
-      await navigator.clipboard.writeText(metin);
-      setDurum("tamam");
+      await navigator.clipboard.writeText(text);
+      setStatus("tamam");
     } catch (e) {
-      setDurum("hata");
+      setStatus("hata");
     }
-    clearTimeout(zaman.current);
-    zaman.current = setTimeout(() => setDurum(null), 1600);
+    clearTimeout(time.current);
+    time.current = setTimeout(() => setStatus(null), 1600);
   };
-  const etiket = durum === "tamam" ? "Kopyalandı" : durum === "hata" ? "Kopyalanamadı" : "Kopyala";
+  const label = status === "tamam" ? "Kopyalandı" : status === "hata" ? "Kopyalanamadı" : "Kopyala";
   return (
     <button
       type="button"
-      onClick={kopyala}
+      onClick={copy}
       aria-live="polite"
       className={`inline-flex shrink-0 items-center gap-1 rounded-full font-bold transition ${
-        kucuk ? "h-7 px-2.5 text-[11.5px]" : "h-10 px-4 text-[12.5px]"
-      } ${durum === "tamam" ? "bg-[var(--success-soft)] text-[var(--success-text)]" : "bg-[var(--soft)] text-[var(--brand-text)] hover:bg-[var(--soft-2)]"} ${FOCUS}`}
+        small ? "h-7 px-2.5 text-[11.5px]" : "h-10 px-4 text-[12.5px]"
+      } ${status === "tamam" ? "bg-[var(--success-soft)] text-[var(--success-text)]" : "bg-[var(--soft)] text-[var(--brand-text)] hover:bg-[var(--soft-2)]"} ${FOCUS}`}
     >
-      <I name={durum === "tamam" ? "check" : "link"} size={kucuk ? 12 : 14} />
-      {etiket}
+      <I name={status === "tamam" ? "check" : "link"} size={small ? 12 : 14} />
+      {label}
     </button>
   );
 }
 
 // Geri alınamayan ya da başkasını etkileyen işlem öncesi onay: arşivleme, pasife alma, talep onayı
-export function OnayPenceresi({ baslik, mesaj, onayEtiketi = "Onayla", tonu = "brand", mesgul = false, onOnay, onClose }) {
+export function ConfirmModal({ title, message, confirmLabel = "Onayla", tone = "brand", busy = false, onApprove, onClose }) {
   return (
-    <Pencere baslik={baslik} onClose={onClose} genislik="max-w-md">
-      <p className="text-[13px] leading-relaxed text-[var(--fg-2)]">{mesaj}</p>
+    <Modal title={title} onClose={onClose} width="max-w-md">
+      <p className="text-[13px] leading-relaxed text-[var(--fg-2)]">{message}</p>
       <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <button type="button" onClick={onClose} className={`inline-flex h-10 items-center justify-center rounded-full border border-[var(--border-strong)] px-5 text-[13px] font-semibold text-[var(--fg-2)] hover:border-[var(--brand)] ${FOCUS}`}>
           Vazgeç
         </button>
         <button
           type="button"
-          disabled={mesgul}
-          onClick={onOnay}
-          className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-full px-6 text-[13px] font-bold text-white hover:brightness-110 disabled:cursor-wait disabled:opacity-70 ${tonu === "danger" ? "bg-[var(--danger)]" : "bg-[var(--brand)]"} ${FOCUS}`}
+          disabled={busy}
+          onClick={onApprove}
+          className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-full px-6 text-[13px] font-bold text-white hover:brightness-110 disabled:cursor-wait disabled:opacity-70 ${tone === "danger" ? "bg-[var(--danger)]" : "bg-[var(--brand)]"} ${FOCUS}`}
         >
-          {mesgul ? "İşleniyor…" : onayEtiketi}
+          {busy ? "İşleniyor…" : confirmLabel}
         </button>
       </div>
-    </Pencere>
+    </Modal>
   );
 }
 
 // Ekranın altında beliren kısa bilgi (toast). eylem: { etiket, onClick } — "Geri al" gibi; varsa daha uzun kalır.
-export function Bildirim({ metin, onBitti, eylem }) {
-  const eylemVar = !!eylem;
+export function Notice({ text, onDone, action }) {
+  const hasActions = !!action;
   useEffect(() => {
-    const z = setTimeout(onBitti, eylemVar ? 7000 : 3500);
+    const z = setTimeout(onDone, hasActions ? 7000 : 3500);
     return () => clearTimeout(z);
-  }, [metin, onBitti, eylemVar]);
+  }, [text, onDone, hasActions]);
   const root = typeof document !== "undefined" ? document.getElementById("bn-root") : null;
   if (!root) return null;
   return createPortal(
     <div role="status" className="bn-pop fixed inset-x-3 bottom-4 z-50 mx-auto flex max-w-md items-center gap-2.5 rounded-2xl bg-[var(--fg)] px-4 py-3 text-[12.5px] font-semibold text-[var(--bg)] [box-shadow:var(--pop-shadow)]">
       <I name="check" size={16} className="shrink-0" />
-      <span className="flex-1">{metin}</span>
-      {eylem && (
+      <span className="flex-1">{text}</span>
+      {action && (
         <button
           type="button"
           onClick={() => {
-            onBitti();
-            eylem.onClick();
+            onDone();
+            action.onClick();
           }}
           className={`shrink-0 rounded-full bg-white/15 px-3 py-1 text-[12px] font-bold text-[var(--bg)] transition hover:bg-white/25 ${FOCUS}`}
         >
-          {eylem.etiket}
+          {action.etiket}
         </button>
       )}
     </div>,

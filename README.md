@@ -45,14 +45,14 @@ components/
     theme.js            renk değişkenleri (açık / koyu), animasyonlar, ortak sınıflar
     routes.js           hazır ekranların adresleri (?sayfa=<anahtar> ↔ menü href)
     helpers.js          tutar / tarih biçimleri, sayaç, eğri, durum renkleri
-    shared.js           Konum, Pencere, Bildirim, form alanları, müşteri seçici, kopyala
+    shared.js           Breadcrumb, Modal, Notice, form alanları, müşteri seçici, kopyala
     payment.js          manuel ve link ile ödemenin ortak müşteri bölümü, ödeme koşulları
     Shell.js            logo, sol menü, kullanıcı menüsü
     Login.js            giriş ekranı
     screens/            Dashboard, TransactionDetails, ManualPayment, LinkPayment,
                         CancelRefund, DealerDefinition, InvoiceUpload
 lib/
-  api/                  uç nokta fonksiyonları (client.js tek fetch noktası, error.js ApiHatasi, session.js …)
+  api/                  uç nokta fonksiyonları (client.js tek fetch noktası, error.js ApiError, session.js …)
   queries/              React Query kancaları (keys.js önbellek anahtarları, provider.js QueryClient)
   format.js             kuruş → ₺, ISO → tarih; labels.js kod → ekran etiketi
   roles.js              3 rol (rol değiştirici etiketleri)
@@ -69,7 +69,7 @@ archive/                seçilmeyen tasarımlar ve galeri — yorum satırında,
 ```
 
 Yeni bir ekran eklemek için: `components/bento/screens/` altına ekranı yazın, `routes.js`'teki
-`SAYFALAR` tablosuna adresini ekleyin ve `pages/designs/bento.js`'te ilgili koşulda çizdirin.
+`ROUTES` tablosuna adresini ekleyin ve `pages/designs/bento.js`'te ilgili koşulda çizdirin.
 Menüdeki öğe kendiliğinden tıklanabilir olur.
 
 Ekranın verisi için sıra: `docs/api/openapi.yaml`'a uç noktayı yaz → `lib/api/<kaynak>.js` fonksiyonu →

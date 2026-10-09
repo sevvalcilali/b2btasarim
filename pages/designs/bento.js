@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ROLES, ROLE_META, ROLE_ORDER } from "@/lib/roles";
 import { useRole } from "@/components/RoleContext";
-import { useOturum } from "@/lib/queries/session";
+import { useSession } from "@/lib/queries/session";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import CompanyLogo from "@/components/CompanyLogo";
@@ -9,24 +9,24 @@ import I from "@/components/DesignIcons";
 import { LoginView } from "@/components/bento/Login";
 import { Sidebar, UserMenu } from "@/components/bento/Shell";
 import { Dashboard } from "@/components/bento/screens/Dashboard";
-import { BayiListesi, BayiTanimlama } from "@/components/bento/screens/DealerDefinition";
-import { FaturaYukleme } from "@/components/bento/screens/InvoiceUpload";
-import { BayiOzet } from "@/components/bento/screens/DealerSummary";
-import { BayiFaturaOzet } from "@/components/bento/screens/DealerInvoiceSummary";
-import { VadeFarkiProfilTanim } from "@/components/bento/screens/MaturityProfile";
-import { KullaniciTanim } from "@/components/bento/screens/UserDefinition";
-import { KurBilgisi } from "@/components/bento/screens/ExchangeRates";
-import { BakiyeBorc } from "@/components/bento/screens/BalanceDebt";
-import { FirmaBilgileri } from "@/components/bento/screens/CompanyInfo";
-import { DuyuruYonetimi, DuyuruPenceresi } from "@/components/bento/screens/Announcements";
-import { BayiCariSecimi } from "@/components/bento/screens/AccountSelection";
-import { TopluBayiEkleme, TopluBakiyeYukleme } from "@/components/bento/screens/BulkUpload";
-import { IptalIade } from "@/components/bento/screens/CancelRefund";
-import { IslemDetaylari } from "@/components/bento/screens/TransactionDetails";
-import { LinkOdeme } from "@/components/bento/screens/LinkPayment";
-import { ManuelOdeme } from "@/components/bento/screens/ManualPayment";
-import { HOME, SAYFALAR, KALICI_PARAMETRELER } from "@/components/bento/routes";
-import { useBekleyenler } from "@/lib/queries/panel";
+import { DealerList, DealerDefinition } from "@/components/bento/screens/DealerDefinition";
+import { InvoiceUpload } from "@/components/bento/screens/InvoiceUpload";
+import { DealerSummary } from "@/components/bento/screens/DealerSummary";
+import { DealerInvoiceSummary } from "@/components/bento/screens/DealerInvoiceSummary";
+import { MaturityProfileDefinition } from "@/components/bento/screens/MaturityProfile";
+import { UserDefinition } from "@/components/bento/screens/UserDefinition";
+import { ExchangeRates } from "@/components/bento/screens/ExchangeRates";
+import { BalanceDebt } from "@/components/bento/screens/BalanceDebt";
+import { CompanyInfo } from "@/components/bento/screens/CompanyInfo";
+import { AnnouncementManagement, AnnouncementModal } from "@/components/bento/screens/Announcements";
+import { DealerAccountSelection } from "@/components/bento/screens/AccountSelection";
+import { BulkDealerAdd, BulkBalanceUpload } from "@/components/bento/screens/BulkUpload";
+import { CancelRefund } from "@/components/bento/screens/CancelRefund";
+import { TransactionDetails } from "@/components/bento/screens/TransactionDetails";
+import { LinkPayment } from "@/components/bento/screens/LinkPayment";
+import { ManualPayment } from "@/components/bento/screens/ManualPayment";
+import { HOME, ROUTES, PERSISTENT_PARAMS } from "@/components/bento/routes";
+import { usePendingItems } from "@/lib/queries/panel";
 import { light, dark, MOTION_CSS, FOCUS, GHOST } from "@/components/bento/theme";
 
 // N Kolay Bayim paneli — seçilen tasarım: Bento (Tasarım 03). Diğer tasarımlar arsiv/ klasöründe.
@@ -37,31 +37,31 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
   const [desktopOpen, setDesktopOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(true);
-  const [duyurularAcik, setDuyurularAcik] = useState(false);
+  const [announcementsOpen, setAnnouncementsOpen] = useState(false);
   // rolün demo meta verisi; firma unvanı GET /oturum'dan gelir (ekranlar meta.company ile başlık yazar)
-  const oturum = useOturum();
-  const meta = { ...ROLE_META[role], company: oturum.data?.firma.unvan || ROLE_META[role].company };
-  const anaFirma = oturum.data?.anaFirma;
+  const session = useSession();
+  const meta = { ...ROLE_META[role], company: session.data?.firma.unvan || ROLE_META[role].company };
+  const mainCompany = session.data?.anaFirma;
 
   // menü rozetleri — GET /panel/bekleyenler (onay / yükleme sonrası ilgili kancalar yeniler)
-  const bekleyenler = useBekleyenler();
-  const rozetler = {
-    "/iptal-iade/onay": bekleyenler.data?.onayBekleyenTalep || 0,
-    "/raporlar/fatura-yukleme": bekleyenler.data?.faturasiBekleyenIslem || 0,
+  const pendingItems = usePendingItems();
+  const badges = {
+    "/iptal-iade/onay": pendingItems.data?.onayBekleyenTalep || 0,
+    "/raporlar/fatura-yukleme": pendingItems.data?.faturasiBekleyenIslem || 0,
   };
 
   // açık ekran adres çubuğunda (?sayfa=) tutulur: yenileme ve geri tuşu çalışır
   const router = useRouter();
   const slug = typeof router.query.sayfa === "string" ? router.query.sayfa : null;
-  const current = SAYFALAR[slug] || HOME;
+  const current = ROUTES[slug] || HOME;
   // ek: ekrana özel parametreler (ör. { musteri: "320.01.001" }); bir sonraki geçişte temizlenir
   const navigate = (href, ek = {}) => {
-    const sayfa = Object.keys(SAYFALAR).find((k) => SAYFALAR[k] === href);
-    const query = Object.fromEntries(KALICI_PARAMETRELER.filter((k) => router.query[k] != null).map((k) => [k, router.query[k]]));
-    router.push({ pathname: router.pathname, query: { ...query, ...(sayfa ? { sayfa } : {}), ...ek } }, undefined, { shallow: true });
+    const page = Object.keys(ROUTES).find((k) => ROUTES[k] === href);
+    const query = Object.fromEntries(PERSISTENT_PARAMS.filter((k) => router.query[k] != null).map((k) => [k, router.query[k]]));
+    router.push({ pathname: router.pathname, query: { ...query, ...(page ? { sayfa: page } : {}), ...ek } }, undefined, { shallow: true });
     setMobileOpen(false);
   };
-  const parametre = (k) => (typeof router.query[k] === "string" ? router.query[k] : null);
+  const param = (k) => (typeof router.query[k] === "string" ? router.query[k] : null);
 
   useEffect(() => {
     try {
@@ -100,7 +100,7 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
         onLogout={onLogout}
         current={current}
         onNavigate={navigate}
-        rozetler={rozetler}
+        badges={badges}
       />
 
       <div className="flex min-w-0 flex-1 flex-col px-3 lg:px-4">
@@ -126,9 +126,9 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
               aria-hidden={desktopOpen && isDesktop ? "true" : undefined}
             >
               <div className="flex items-center gap-2.5 whitespace-nowrap">
-                <CompanyLogo name={anaFirma?.unvan || "N Kolay Bayim"} size={32} className="shrink-0" />
+                <CompanyLogo name={mainCompany?.unvan || "N Kolay Bayim"} size={32} className="shrink-0" />
                 <span className="hidden leading-tight sm:block">
-                  <span className="block text-[13.5px] font-extrabold text-[var(--fg)]">{anaFirma?.unvan || "…"}</span>
+                  <span className="block text-[13.5px] font-extrabold text-[var(--fg)]">{mainCompany?.unvan || "…"}</span>
                   <span className="block text-[10.5px] font-medium text-[var(--muted)]">Ana Firma · N Kolay Bayim</span>
                 </span>
               </div>
@@ -175,25 +175,25 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
               </button>
               <button
                 type="button"
-                onClick={() => setDuyurularAcik(true)}
-                aria-label={bekleyenler.data?.okunmamisDuyuru ? `Duyurular, ${bekleyenler.data.okunmamisDuyuru} okunmamış` : "Duyurular"}
+                onClick={() => setAnnouncementsOpen(true)}
+                aria-label={pendingItems.data?.okunmamisDuyuru ? `Duyurular, ${pendingItems.data.okunmamisDuyuru} okunmamış` : "Duyurular"}
                 title="Duyurular"
                 className={`${GHOST} relative`}
               >
                 <I name="bell" size={16} />
-                {bekleyenler.data?.okunmamisDuyuru > 0 && (
+                {pendingItems.data?.okunmamisDuyuru > 0 && (
                   <span className="absolute right-1.5 top-1.5 flex h-2 w-2" aria-hidden="true">
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--danger)] opacity-60 motion-reduce:hidden" />
                     <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--danger)] ring-2 ring-[var(--surface)]" />
                   </span>
                 )}
               </button>
-              <UserMenu meta={meta} isDark={isDark} onToggleTheme={onToggleTheme} onLogout={onLogout} onFirmaBilgileri={role !== ROLES.ANA_FIRMA ? () => navigate("/ayarlar/firma") : null} />
+              <UserMenu meta={meta} isDark={isDark} onToggleTheme={onToggleTheme} onLogout={onLogout} onCompanyInfo={role !== ROLES.ANA_FIRMA ? () => navigate("/ayarlar/firma") : null} />
             </div>
           </header>
         </div>
 
-        {duyurularAcik && <DuyuruPenceresi role={role} onClose={() => setDuyurularAcik(false)} />}
+        {announcementsOpen && <AnnouncementModal role={role} onClose={() => setAnnouncementsOpen(false)} />}
 
         {/* key: rol ya da ekran değişince giriş animasyonları yeniden oynar */}
         <main key={`${role}-${current}`} className="mx-auto w-full max-w-[1280px] flex-1 py-4">
@@ -202,51 +202,51 @@ function PanelView({ role, setRole, isDark, onToggleTheme, onLogout }) {
             {meta.company} · N Kolay Bayim · yazdırma: {new Date().toLocaleString("tr-TR")}
           </p>
           {current === "/raporlar/islem-detaylari" ? (
-            <IslemDetaylari role={role} meta={meta} onHome={() => navigate(HOME)} />
+            <TransactionDetails role={role} meta={meta} onHome={() => navigate(HOME)} />
           ) : current === "/odeme/manuel" ? (
-            <ManuelOdeme key={parametre("musteri")} role={role} meta={meta} onNavigate={navigate} onerilenCari={parametre("musteri")} />
+            <ManualPayment key={param("musteri")} role={role} meta={meta} onNavigate={navigate} suggestedAccount={param("musteri")} />
           ) : current === "/odeme/link" ? (
-            <LinkOdeme role={role} meta={meta} onNavigate={navigate} />
+            <LinkPayment role={role} meta={meta} onNavigate={navigate} />
           ) : current === "/bayi-tanim/tanimlama" && role !== ROLES.ALT_BAYI ? (
-            <BayiTanimlama key={parametre("duzenle")} role={role} meta={meta} duzenleCari={parametre("duzenle")} onNavigate={navigate} />
+            <DealerDefinition key={param("duzenle")} role={role} meta={meta} editingAccountNo={param("duzenle")} onNavigate={navigate} />
           ) : (current === "/bayi-tanim/liste" || current === "/bayi-tanim/alt-bayi-liste") && role !== ROLES.ALT_BAYI ? (
-            <BayiListesi
+            <DealerList
               role={role}
               meta={meta}
-              tumAltBayiler={current === "/bayi-tanim/alt-bayi-liste"}
-              vurgu={parametre("kaydedildi")}
-              kayitAdi={parametre("ad")}
+              allSubDealers={current === "/bayi-tanim/alt-bayi-liste"}
+              accent={param("kaydedildi")}
+              recordName={param("ad")}
               onNavigate={navigate}
             />
           ) : current === "/bayi-tanim/excel-ekleme" && role !== ROLES.ALT_BAYI ? (
-            <TopluBayiEkleme role={role} meta={meta} onNavigate={navigate} />
+            <BulkDealerAdd role={role} meta={meta} onNavigate={navigate} />
           ) : current === "/bayi-tanim/bakiye-borc-yukleme" && role !== ROLES.ALT_BAYI ? (
-            <TopluBakiyeYukleme role={role} meta={meta} onNavigate={navigate} />
+            <BulkBalanceUpload role={role} meta={meta} onNavigate={navigate} />
           ) : current === "/raporlar/bayi-ozet" && role !== ROLES.ALT_BAYI ? (
-            <BayiOzet role={role} meta={meta} onNavigate={navigate} />
+            <DealerSummary role={role} meta={meta} onNavigate={navigate} />
           ) : current === "/raporlar/bayi-fatura-ozet" && role !== ROLES.ALT_BAYI ? (
-            <BayiFaturaOzet role={role} meta={meta} onNavigate={navigate} />
+            <DealerInvoiceSummary role={role} meta={meta} onNavigate={navigate} />
           ) : current === "/duyuru" && role === ROLES.ANA_FIRMA ? (
-            <DuyuruYonetimi meta={meta} onNavigate={navigate} />
+            <AnnouncementManagement meta={meta} onNavigate={navigate} />
           ) : current === "/odeme/bayi-cari" && role === ROLES.ALT_BAYI ? (
-            <BayiCariSecimi meta={meta} onNavigate={navigate} />
+            <DealerAccountSelection meta={meta} onNavigate={navigate} />
           ) : current === "/odeme/kur" ? (
-            <KurBilgisi meta={meta} onNavigate={navigate} />
+            <ExchangeRates meta={meta} onNavigate={navigate} />
           ) : (current === "/odeme/ana-firma-bakiye" && role === ROLES.BAYI) || (current === "/odeme/bayi-bakiye" && role === ROLES.ALT_BAYI) ? (
-            <BakiyeBorc role={role} meta={meta} onNavigate={navigate} />
+            <BalanceDebt role={role} meta={meta} onNavigate={navigate} />
           ) : current === "/ayarlar/firma" && role !== ROLES.ANA_FIRMA ? (
-            <FirmaBilgileri role={role} meta={meta} onNavigate={navigate} />
+            <CompanyInfo role={role} meta={meta} onNavigate={navigate} />
           ) : current === "/ayarlar/kullanici" ? (
-            <KullaniciTanim meta={meta} onNavigate={navigate} />
+            <UserDefinition meta={meta} onNavigate={navigate} />
           ) : current === "/ayarlar/vade-farki" && role === ROLES.ANA_FIRMA ? (
-            <VadeFarkiProfilTanim meta={meta} onNavigate={navigate} />
+            <MaturityProfileDefinition meta={meta} onNavigate={navigate} />
           ) : current === "/raporlar/fatura-yukleme" ? (
-            <FaturaYukleme role={role} meta={meta} onNavigate={navigate} />
+            <InvoiceUpload role={role} meta={meta} onNavigate={navigate} />
           ) : current === "/iptal-iade/onay" || current === "/iptal-iade/takip" ? (
-            <IptalIade
+            <CancelRefund
               role={role}
               meta={meta}
-              mod={current === "/iptal-iade/onay" ? "onay" : "takip"}
+              mode={current === "/iptal-iade/onay" ? "onay" : "takip"}
               onNavigate={navigate}
             />
           ) : (

@@ -1,5 +1,5 @@
 // Küçük ekran yardımcıları: sayaç animasyonu, eğri yolu, trend oku, kapatma kısayolu, gecikmeli değer.
-// Biçimlendirme (kuruş → ₺, ISO → tarih) lib/bicim.js'te; etiketler lib/etiketler.js'te.
+// Biçimlendirme (kuruş → ₺, ISO → tarih) lib/format.js'te; etiketler lib/labels.js'te.
 
 import { useEffect, useState } from "react";
 
@@ -28,7 +28,7 @@ export function curveThrough(pts) {
 function useCountUp(target) {
   const [val, setVal] = useState(target);
   useEffect(() => {
-    let raf;
+    let rafId;
     try {
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
         setVal(target);
@@ -39,18 +39,18 @@ function useCountUp(target) {
       return undefined;
     }
     const start = performance.now();
-    const dur = 900;
+    const stop = 900;
     const tick = (now) => {
-      const p = Math.min((now - start) / dur, 1);
+      const p = Math.min((now - start) / stop, 1);
       setVal(Math.round(target * (1 - Math.pow(1 - p, 3))));
-      if (p < 1) raf = requestAnimationFrame(tick);
+      if (p < 1) rafId = requestAnimationFrame(tick);
     };
     setVal(0);
-    raf = requestAnimationFrame(tick);
+    rafId = requestAnimationFrame(tick);
     // güvenlik: animasyon karesi gelmese bile (ör. arka plandaki sekme) rakam gerçek değere oturur
-    const done = setTimeout(() => setVal(target), dur + 150);
+    const done = setTimeout(() => setVal(target), stop + 150);
     return () => {
-      cancelAnimationFrame(raf);
+      cancelAnimationFrame(rafId);
       clearTimeout(done);
     };
   }, [target]);
@@ -58,23 +58,23 @@ function useCountUp(target) {
 }
 
 /** Kuruş tutarını sayarak gösterir: ₺ 12.400 */
-export function Money({ kurus }) {
-  const v = useCountUp(Math.round((kurus || 0) / 100));
+export function Money({ cents }) {
+  const v = useCountUp(Math.round((cents || 0) / 100));
   return <>₺ {v.toLocaleString("tr-TR")}</>;
 }
 
 // Değeri `ms` boyunca değişmeyince döner: arama kutusu her tuşta değil, yazma durunca istek atar.
-export function useGecikmeli(deger, ms = 300) {
-  const [gecikmeli, setGecikmeli] = useState(deger);
+export function useDebounced(value, ms = 300) {
+  const [delayed, setDelayed] = useState(value);
   useEffect(() => {
-    if (deger === "") {
-      setGecikmeli(""); // temizleme beklemez: eski arama bir an bile gönderilmez
+    if (value === "") {
+      setDelayed(""); // temizleme beklemez: eski arama bir an bile gönderilmez
       return undefined;
     }
-    const z = setTimeout(() => setGecikmeli(deger), ms);
+    const z = setTimeout(() => setDelayed(value), ms);
     return () => clearTimeout(z);
-  }, [deger, ms]);
-  return deger === "" ? "" : gecikmeli;
+  }, [value, ms]);
+  return value === "" ? "" : delayed;
 }
 
 export function useDismiss(open, close) {
@@ -94,4 +94,4 @@ export function TrendArrow({ up }) {
   );
 }
 
-export const rakamlar = (x) => String(x ?? "").replace(/\D/g, "");
+export const figures = (x) => String(x ?? "").replace(/\D/g, "");

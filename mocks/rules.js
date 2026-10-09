@@ -1,21 +1,21 @@
 // Sunucu tarafı kurallar — gerçek backend'in de uygulaması gereken iş mantığı, çalışan kod olarak.
 // Şartname: s.3 yetki, s.5 bayi tanımı sınırları, s.7 rol kapsamı, s.8 onay zinciri, s.9 fatura.
-import { depo } from "./db/store";
+import { store } from "./db/store";
 
 /** Authorization: Bearer <token> → oturum kaydı, yoksa null. Demo tokenları: demo-<ROL>. */
-export function oturum(request) {
-  const yetki = request.headers.get("authorization") || "";
-  const token = yetki.replace(/^Bearer\s+/i, "").trim();
-  return depo.tablo("oturumlar")[token] || null;
+export function session(request) {
+  const permission = request.headers.get("authorization") || "";
+  const token = permission.replace(/^Bearer\s+/i, "").trim();
+  return store.table("sessions")[token] || null;
 }
 
-export const firma = (firmaId) => depo.tablo("firmalar").find((f) => f.firmaId === firmaId) || null;
-export const anaFirma = () => depo.tablo("firmalar").find((f) => f.tur === "ANA_FIRMA");
-export const altBayileri = (firmaId) => depo.tablo("firmalar").filter((f) => f.tur === "ALT_BAYI" && f.bagliFirmaId === firmaId);
+export const company = (companyId) => store.table("companies").find((f) => f.firmaId === companyId) || null;
+export const mainCompany = () => store.table("companies").find((f) => f.tur === "ANA_FIRMA");
+export const subDealersOf = (companyId) => store.table("companies").filter((f) => f.tur === "ALT_BAYI" && f.bagliFirmaId === companyId);
 
 /** Firma özeti — cevaplarda "cekimYapan", "giren", "bagli" gibi alanlar bu biçimde döner */
-export function firmaOzeti(firmaId) {
-  const f = firma(firmaId);
+export function companySummary(companyId) {
+  const f = company(companyId);
   return f ? { firmaId: f.firmaId, unvan: f.unvan, tur: f.tur } : null;
 }
 
@@ -23,20 +23,20 @@ export function firmaOzeti(firmaId) {
  * Oturumun görebildiği firmalar (şartname s.7): ana firma hepsini, bayi kendisini ve alt bayilerini,
  * alt bayi yalnızca kendisini görür.
  */
-export function kapsam(kim) {
-  if (kim.rol === "ANA_FIRMA") return null; // sınırsız
-  const ids = new Set([kim.firmaId]);
-  if (kim.rol === "BAYI") altBayileri(kim.firmaId).forEach((a) => ids.add(a.firmaId));
+export function scopeOf(caller) {
+  if (caller.rol === "ANA_FIRMA") return null; // sınırsız
+  const ids = new Set([caller.firmaId]);
+  if (caller.rol === "BAYI") subDealersOf(caller.firmaId).forEach((a) => ids.add(a.firmaId));
   return ids;
 }
-export const kapsamda = (kim, firmaId) => {
-  const k = kapsam(kim);
-  return k === null || k.has(firmaId);
+export const inScope = (caller, companyId) => {
+  const k = scopeOf(caller);
+  return k === null || k.has(companyId);
 };
 
 /** Depodaki firma kaydı → sözleşmedeki Bayi cevabı (vade profili açılmış, bağlı firma özeti, alt bayi sayısı) */
-export function firmaCevabi(f) {
-  const profil = f.vadeProfilId ? depo.tablo("vadeFarkiProfilleri").find((v) => v.id === f.vadeProfilId) : null;
+export function companyResponse(f) {
+  const profile = f.vadeProfilId ? store.table("maturityProfiles").find((v) => v.id === f.vadeProfilId) : null;
   return {
     firmaId: f.firmaId,
     tur: f.tur,
@@ -47,12 +47,12 @@ export function firmaCevabi(f) {
     email: f.email,
     adres: f.adres,
     vadeProfilId: f.vadeProfilId ?? null,
-    vadeProfil: profil ? { id: profil.id, ad: profil.ad, oranYuzde: profil.oranYuzde } : null,
+    vadeProfil: profile ? { id: profile.id, ad: profile.ad, oranYuzde: profile.oranYuzde } : null,
     taksitler: f.taksitler || [],
     islemLimitiKurus: f.islemLimitiKurus ?? null,
     altBayiYetkisi: f.tur === "BAYI" ? !!f.altBayiYetkisi : undefined,
-    altBayiSayisi: f.tur === "BAYI" ? altBayileri(f.firmaId).length : undefined,
-    bagli: f.bagliFirmaId ? firmaOzeti(f.bagliFirmaId) : null,
+    altBayiSayisi: f.tur === "BAYI" ? subDealersOf(f.firmaId).length : undefined,
+    bagli: f.bagliFirmaId ? companySummary(f.bagliFirmaId) : null,
     uyeIsyerleri: f.uyeIsyerleri || [],
     ortaklar: f.ortaklar || [],
     logoRenk: f.logoRenk || null,
@@ -62,66 +62,66 @@ export function firmaCevabi(f) {
   };
 }
 
-const CARI_BICIMI = /^\d{3}\.\d{2}\.\d{3}$/;
-const EPOSTA_BICIMI = /^\S+@\S+\.\S+$/;
-const rakam = (x) => String(x ?? "").replace(/\D/g, "");
+const ACCOUNT_FORMAT = /^\d{3}\.\d{2}\.\d{3}$/;
+const EMAIL_FORMAT = /^\S+@\S+\.\S+$/;
+const digit = (x) => String(x ?? "").replace(/\D/g, "");
 
 /** Kimlik alanları (bayi, alt bayi ve müşteri ortak). Dönüş: { alanAdi: mesaj } */
-export function kimlikHatalari(g, { mevcutCariNo } = {}) {
+export function authErrors(g, { mevcutCariNo: existingAccountNo } = {}) {
   const h = {};
   if (!String(g.unvan || "").trim()) h.unvan = "Unvan girin.";
-  if (!CARI_BICIMI.test(g.cariNo || "")) h.cariNo = "Cari no 000.00.000 biçiminde olmalı.";
-  else if (g.cariNo !== mevcutCariNo && cariKullanimda(g.cariNo)) h.cariNo = "Bu cari no başka bir kayıtta kullanılıyor.";
-  if (rakam(g.vergiNo).length !== 10) h.vergiNo = "10 haneli vergi no girin.";
-  if (rakam(g.telefon).length < 10) h.telefon = "Geçerli bir telefon girin.";
-  if (!EPOSTA_BICIMI.test(g.email || "")) h.email = "Geçerli bir e-posta girin.";
+  if (!ACCOUNT_FORMAT.test(g.cariNo || "")) h.cariNo = "Cari no 000.00.000 biçiminde olmalı.";
+  else if (g.cariNo !== existingAccountNo && accountInUse(g.cariNo)) h.cariNo = "Bu cari no başka bir kayıtta kullanılıyor.";
+  if (digit(g.vergiNo).length !== 10) h.vergiNo = "10 haneli vergi no girin.";
+  if (digit(g.telefon).length < 10) h.telefon = "Geçerli bir telefon girin.";
+  if (!EMAIL_FORMAT.test(g.email || "")) h.email = "Geçerli bir e-posta girin.";
   if (!String(g.adres || "").trim()) h.adres = "Adres girin.";
   return h;
 }
 
-export const cariKullanimda = (cariNo) =>
-  depo.tablo("firmalar").some((f) => f.cariNo === cariNo) || depo.tablo("musteriler").some((m) => m.cariNo === cariNo) || depo.tablo("uyeIsyerleri").some((u) => u.cariNo === cariNo);
+export const accountInUse = (accountNo) =>
+  store.table("companies").some((f) => f.cariNo === accountNo) || store.table("customers").some((m) => m.cariNo === accountNo) || store.table("merchants").some((u) => u.cariNo === accountNo);
 
 /**
  * Ödeme koşulları (şartname s.5). ust: tanımı yapan firmanın kendi kaydı — alt bayiye verilen sınırlar onu aşamaz;
  * ana firma için ust = null (tüm taksitler ve tüm üye işyerleri açık).
  */
-export function kosulHatalari(g, ust, { mevcutProfilId } = {}) {
+export function conditionErrors(g, parent, { mevcutProfilId: existingProfileId } = {}) {
   const h = {};
-  const profil = depo.tablo("vadeFarkiProfilleri").find((v) => v.id === g.vadeProfilId);
-  const izinliTaksit = ust ? ust.taksitler : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-  const izinliUye = ust ? ust.uyeIsyerleri : depo.tablo("uyeIsyerleri").map((u) => u.cariNo);
-  if (!profil) h.vadeProfilId = "Vade farkı profili seçin.";
-  else if (profil.durum === "PASIF" && profil.id !== mevcutProfilId) h.vadeProfilId = "Pasif profil atanamaz; aktif bir profil seçin."; // mevcut atama korunur
+  const profile = store.table("maturityProfiles").find((v) => v.id === g.vadeProfilId);
+  const allowedInstallments = parent ? parent.taksitler : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  const allowedMerchant = parent ? parent.uyeIsyerleri : store.table("merchants").map((u) => u.cariNo);
+  if (!profile) h.vadeProfilId = "Vade farkı profili seçin.";
+  else if (profile.durum === "PASIF" && profile.id !== existingProfileId) h.vadeProfilId = "Pasif profil atanamaz; aktif bir profil seçin."; // mevcut atama korunur
   if (!Array.isArray(g.taksitler) || g.taksitler.length === 0) h.taksitler = "En az bir taksit açık olmalı.";
-  else if (g.taksitler.some((n) => !izinliTaksit.includes(n))) h.taksitler = "Yalnızca sizin görebildiğiniz taksitler verilebilir.";
+  else if (g.taksitler.some((n) => !allowedInstallments.includes(n))) h.taksitler = "Yalnızca sizin görebildiğiniz taksitler verilebilir.";
   if (!(Number.isInteger(g.islemLimitiKurus) && g.islemLimitiKurus > 0)) h.islemLimitiKurus = "İşlem bazlı ödeme limiti girin.";
-  else if (ust?.islemLimitiKurus && g.islemLimitiKurus > ust.islemLimitiKurus) h.islemLimitiKurus = `Kendi limitinizi (₺ ${(ust.islemLimitiKurus / 100).toLocaleString("tr-TR")}) aşamaz.`;
+  else if (parent?.islemLimitiKurus && g.islemLimitiKurus > parent.islemLimitiKurus) h.islemLimitiKurus = `Kendi limitinizi (₺ ${(parent.islemLimitiKurus / 100).toLocaleString("tr-TR")}) aşamaz.`;
   if (!Array.isArray(g.uyeIsyerleri) || g.uyeIsyerleri.length === 0) h.uyeIsyerleri = "En az bir üye işyeri seçin.";
-  else if (g.uyeIsyerleri.some((c) => !izinliUye.includes(c))) h.uyeIsyerleri = "Yalnızca size açık üye işyerleri verilebilir.";
+  else if (g.uyeIsyerleri.some((c) => !allowedMerchant.includes(c))) h.uyeIsyerleri = "Yalnızca size açık üye işyerleri verilebilir.";
   if (!["AKTIF", "PASIF"].includes(g.durum)) h.durum = "Durum AKTIF ya da PASIF olmalı.";
   return h;
 }
 
-const ANA_FIRMA_TAKSITLER = [1, 2, 3, 6, 9, 12];
+const MAIN_COMPANY_INSTALLMENTS = [1, 2, 3, 6, 9, 12];
 
 /**
  * Ödeme koşulları (şartname s.4–5): taksitler ve limit oturum firmasının tanımından; vade profili firmanın kendi
  * profili, ana firma bir bayiden tahsilat yapıyorsa o bayinin profili, aksi halde Profil 1.
  */
-export function odemeKosullari(kim, musteriTuru, musteriCariNo) {
-  const f = firma(kim.firmaId);
-  const profiller = depo.tablo("vadeFarkiProfilleri");
-  let profilId = f?.vadeProfilId;
-  if (kim.rol === "ANA_FIRMA") {
-    const bayi = musteriTuru === "BAYI" && musteriCariNo ? depo.tablo("firmalar").find((x) => x.cariNo === musteriCariNo) : null;
-    profilId = bayi?.vadeProfilId || 1;
+export function paymentTerms(caller, customerKind, customerAccountNo) {
+  const f = company(caller.firmaId);
+  const profiles = store.table("maturityProfiles");
+  let profileId = f?.vadeProfilId;
+  if (caller.rol === "ANA_FIRMA") {
+    const dealer = customerKind === "BAYI" && customerAccountNo ? store.table("companies").find((x) => x.cariNo === customerAccountNo) : null;
+    profileId = dealer?.vadeProfilId || 1;
   }
-  const profil = profiller.find((p) => p.id === profilId) || profiller[0];
+  const profile = profiles.find((p) => p.id === profileId) || profiles[0];
   return {
-    taksitler: kim.rol === "ANA_FIRMA" ? ANA_FIRMA_TAKSITLER : f?.taksitler || [1],
-    limitKurus: kim.rol === "ANA_FIRMA" ? null : f?.islemLimitiKurus || null,
-    profil: { id: profil.id, ad: profil.ad, oranYuzde: profil.oranYuzde },
+    taksitler: caller.rol === "ANA_FIRMA" ? MAIN_COMPANY_INSTALLMENTS : f?.taksitler || [1],
+    limitKurus: caller.rol === "ANA_FIRMA" ? null : f?.islemLimitiKurus || null,
+    profil: { id: profile.id, ad: profile.ad, oranYuzde: profile.oranYuzde },
   };
 }
 
@@ -129,53 +129,53 @@ export function odemeKosullari(kim, musteriTuru, musteriCariNo) {
  * Vade farkı — DEMO VARSAYIMI: tutar × aylık oran × (taksit − 1); gerçek formülü backend ekibi belirleyecek.
  * Dönüş kuruş cinsinden tam sayılar.
  */
-export function taksitHesabi(tutarKurus, taksit, oranYuzde) {
-  const vade = taksit > 1 ? Math.round((tutarKurus * oranYuzde * (taksit - 1)) / 100) : 0;
-  const toplam = tutarKurus + vade;
-  return { taksit, vadeFarkiKurus: vade, toplamKurus: toplam, aylikKurus: Math.round(toplam / taksit) };
+export function installmentCalc(amountCents, installment, ratePercent) {
+  const maturity = installment > 1 ? Math.round((amountCents * ratePercent * (installment - 1)) / 100) : 0;
+  const total = amountCents + maturity;
+  return { taksit: installment, vadeFarkiKurus: maturity, toplamKurus: total, aylikKurus: Math.round(total / installment) };
 }
 
 /** Müşteri türüne göre müşteri kaydını doğrular; { musteri: {...}, hata? } */
-export function musteriCoz(kim, g) {
-  const tur = g.musteriTuru;
-  if (tur === "BAYI" || tur === "ALT_BAYI") {
-    const f = depo.tablo("firmalar").find((x) => x.tur === tur && x.cariNo === g.musteri?.cariNo && x.durum === "AKTIF");
+export function resolveCustomer(caller, g) {
+  const kind = g.musteriTuru;
+  if (kind === "BAYI" || kind === "ALT_BAYI") {
+    const f = store.table("companies").find((x) => x.tur === kind && x.cariNo === g.musteri?.cariNo && x.durum === "AKTIF");
     if (!f) return { hata: { musteriCariNo: "Listeden bir müşteri seçin." } };
-    if (tur === "ALT_BAYI" && f.bagliFirmaId !== kim.firmaId) return { hata: { musteriCariNo: "Bu alt bayi size bağlı değil." } };
+    if (kind === "ALT_BAYI" && f.bagliFirmaId !== caller.firmaId) return { hata: { musteriCariNo: "Bu alt bayi size bağlı değil." } };
     return { musteri: { unvan: f.unvan, cariNo: f.cariNo, vergiNo: f.vergiNo } };
   }
-  if (tur === "DUZENLI_MUSTERI") {
-    const m = depo.tablo("musteriler").find((x) => x.sahipFirmaId === kim.firmaId && x.cariNo === g.musteri?.cariNo);
+  if (kind === "DUZENLI_MUSTERI") {
+    const m = store.table("customers").find((x) => x.sahipFirmaId === caller.firmaId && x.cariNo === g.musteri?.cariNo);
     if (!m) return { hata: { musteriCariNo: "Listeden bir müşteri seçin." } };
     return { musteri: { unvan: m.unvan, cariNo: m.cariNo, vergiNo: m.vergiNo } };
   }
-  if (tur === "KENDI_KARTI") {
-    const f = firma(kim.firmaId);
-    const sahip = g.kartSahibi;
-    if (!sahip || ![f.unvan, ...(f.ortaklar || [])].includes(sahip)) return { hata: { kartSahibi: "Kartın kime ait olduğunu seçin." } };
-    return { musteri: { unvan: sahip, cariNo: f.cariNo, vergiNo: f.vergiNo } };
+  if (kind === "KENDI_KARTI") {
+    const f = company(caller.firmaId);
+    const owner = g.kartSahibi;
+    if (!owner || ![f.unvan, ...(f.ortaklar || [])].includes(owner)) return { hata: { kartSahibi: "Kartın kime ait olduğunu seçin." } };
+    return { musteri: { unvan: owner, cariNo: f.cariNo, vergiNo: f.vergiNo } };
   }
   // DUZENSIZ_MUSTERI, MUSTERI_KARTI: kısıtlı bilgi, tanım oluşturulmaz
   const h = {};
-  const ad = String(g.musteri?.unvan || "").trim();
-  if (!ad) h.musteriUnvan = "Ad soyad ya da unvan girin.";
+  const name = String(g.musteri?.unvan || "").trim();
+  if (!name) h.musteriUnvan = "Ad soyad ya da unvan girin.";
   if (String(g.musteri?.telefon || "").replace(/\D/g, "").length < 10) h.musteriTelefon = "Geçerli bir telefon numarası girin.";
-  const kimlik = String(g.musteri?.kimlikNo || "").replace(/\D/g, "");
-  if (tur === "DUZENSIZ_MUSTERI" && ![10, 11].includes(kimlik.length)) h.musteriKimlikNo = "10 haneli VKN ya da 11 haneli TCKN girin.";
+  const auth = String(g.musteri?.kimlikNo || "").replace(/\D/g, "");
+  if (kind === "DUZENSIZ_MUSTERI" && ![10, 11].includes(auth.length)) h.musteriKimlikNo = "10 haneli VKN ya da 11 haneli TCKN girin.";
   if (Object.keys(h).length) return { hata: h };
-  return { musteri: { unvan: ad, cariNo: null, vergiNo: kimlik || null, telefon: g.musteri.telefon, email: g.musteri.email || null } };
+  return { musteri: { unvan: name, cariNo: null, vergiNo: auth || null, telefon: g.musteri.telefon, email: g.musteri.email || null } };
 }
 
 /** Tahsilat carisi doğrulaması: oturumun görebildiği cariler arasında olmalı */
-export function tahsilatCarileri(kim) {
-  const f = firma(kim.firmaId);
-  if (kim.rol === "ANA_FIRMA") return { etiket: "Üye İşyeri", kayitlar: depo.tablo("uyeIsyerleri").map((u) => ({ cariNo: u.cariNo, ad: u.ad })) };
-  if (kim.rol === "BAYI") {
-    const acik = f?.uyeIsyerleri || [];
-    return { etiket: "Ana Firma Carisi", kayitlar: depo.tablo("uyeIsyerleri").filter((u) => acik.includes(u.cariNo)).map((u) => ({ cariNo: u.cariNo, ad: u.ad })) };
+export function collectionAccounts(caller) {
+  const f = company(caller.firmaId);
+  if (caller.rol === "ANA_FIRMA") return { etiket: "Üye İşyeri", kayitlar: store.table("merchants").map((u) => ({ cariNo: u.cariNo, ad: u.ad })) };
+  if (caller.rol === "BAYI") {
+    const open = f?.uyeIsyerleri || [];
+    return { etiket: "Ana Firma Carisi", kayitlar: store.table("merchants").filter((u) => open.includes(u.cariNo)).map((u) => ({ cariNo: u.cariNo, ad: u.ad })) };
   }
-  const bayi = f?.bagliFirmaId ? firma(f.bagliFirmaId) : null;
-  return { etiket: "Bayi Carisi", kayitlar: bayi ? [{ cariNo: bayi.cariNo, ad: bayi.unvan }] : [] };
+  const dealer = f?.bagliFirmaId ? company(f.bagliFirmaId) : null;
+  return { etiket: "Bayi Carisi", kayitlar: dealer ? [{ cariNo: dealer.cariNo, ad: dealer.unvan }] : [] };
 }
 
 // ---- iptal / iade (şartname s.8) ------------------------------------------------------------------
@@ -183,94 +183,94 @@ export function tahsilatCarileri(kim) {
 // Bayinin talebi doğrudan ana firma onayına düşer; ana firmanın kendi talebi onay gerektirmeden sonuçlanır.
 
 /** Talep bu oturumun onayını mı bekliyor? */
-export function onayimda(kim, t) {
-  if (kim.rol === "ANA_FIRMA") return t.durum === "ANA_FIRMA_ONAYINDA";
-  if (kim.rol === "BAYI") return t.durum === "BAYI_ONAYINDA" && altBayileri(kim.firmaId).some((a) => a.firmaId === t.girenId);
+export function awaitingMyApproval(caller, t) {
+  if (caller.rol === "ANA_FIRMA") return t.durum === "ANA_FIRMA_ONAYINDA";
+  if (caller.rol === "BAYI") return t.durum === "BAYI_ONAYINDA" && subDealersOf(caller.firmaId).some((a) => a.firmaId === t.girenId);
   return false;
 }
 
 /** Depodaki talep → sözleşmedeki Talep cevabı */
-export function talepCevabi(t, kim) {
-  const islem = depo.tablo("islemler").find((i) => i.islemNo === t.islemNo);
+export function requestResponse(t, caller) {
+  const transaction = store.table("transactions").find((i) => i.islemNo === t.islemNo);
   return {
     talepNo: t.talepNo,
     tarih: t.tarih,
     islemNo: t.islemNo,
-    giren: firmaOzeti(t.girenId),
-    musteriUnvan: islem?.musteri.unvan || "—",
-    islemTutariKurus: islem?.tutarKurus ?? null,
+    giren: companySummary(t.girenId),
+    musteriUnvan: transaction?.musteri.unvan || "—",
+    islemTutariKurus: transaction?.tutarKurus ?? null,
     tutarKurus: t.tutarKurus,
     tur: t.tur,
     aciklama: t.aciklama,
     durum: t.durum,
-    onayimda: onayimda(kim, t),
-    gecmis: t.gecmis.map((g) => ({ tarih: g.tarih, firma: firmaOzeti(g.firmaId), olay: g.olay, not: g.not || null })),
+    onayimda: awaitingMyApproval(caller, t),
+    gecmis: t.gecmis.map((g) => ({ tarih: g.tarih, firma: companySummary(g.firmaId), olay: g.olay, not: g.not || null })),
   };
 }
 
 // ---- fatura (şartname s.9) ---------------------------------------------------------------------
 /** Fatura gereken işlem: bayi / alt bayi çekimi, kendi kartı olmayan, başarılı */
-export const faturaGerekli = (islem) => firma(islem.cekimYapanId)?.tur !== "ANA_FIRMA" && islem.musteriTuru !== "KENDI_KARTI" && islem.durum === "BASARILI";
+export const invoiceRequired = (transaction) => company(transaction.cekimYapanId)?.tur !== "ANA_FIRMA" && transaction.musteriTuru !== "KENDI_KARTI" && transaction.durum === "BASARILI";
 
 /** İşlemin fatura kaydı ve durumu (kaydı yoksa BEKLIYOR) */
-export function faturaDurumu(islemNo) {
-  const kayit = depo.tablo("faturalar").find((f) => f.islemNo === islemNo) || null;
-  return { kayit, durum: kayit ? kayit.durum : "BEKLIYOR" };
+export function invoiceStatus(transactionNo) {
+  const record = store.table("invoices").find((f) => f.islemNo === transactionNo) || null;
+  return { kayit: record, durum: record ? record.durum : "BEKLIYOR" };
 }
 
 /** Sayfalama: { kayitlar, toplam, sayfa, boyut } */
-export function sayfala(liste, sorgu) {
-  const sayfa = Math.max(1, Number(sorgu.get("sayfa")) || 1);
-  const boyut = Math.min(200, Math.max(1, Number(sorgu.get("boyut")) || 50));
-  return { kayitlar: liste.slice((sayfa - 1) * boyut, sayfa * boyut), toplam: liste.length, sayfa, boyut };
+export function paginate(list, query) {
+  const page = Math.max(1, Number(query.get("sayfa")) || 1);
+  const size = Math.min(200, Math.max(1, Number(query.get("boyut")) || 50));
+  return { kayitlar: list.slice((page - 1) * size, page * size), toplam: list.length, sayfa: page, boyut: size };
 }
 
 /** Durum sayaçları: { TUMU: n, <durum>: n … } */
-export function sayaclar(liste, alan, kodlar) {
-  const s = { TUMU: liste.length };
-  for (const k of kodlar) s[k] = liste.filter((x) => x[alan] === k).length;
+export function counters(list, field, codes) {
+  const s = { TUMU: list.length };
+  for (const k of codes) s[k] = list.filter((x) => x[field] === k).length;
   return s;
 }
 
 /** Türkçe duyarsız metin araması */
-export const icerir = (metin, aranan) => String(metin ?? "").toLocaleLowerCase("tr-TR").includes(String(aranan).toLocaleLowerCase("tr-TR"));
+export const includes = (text, searchTerm) => String(text ?? "").toLocaleLowerCase("tr-TR").includes(String(searchTerm).toLocaleLowerCase("tr-TR"));
 
 /** Şu an, tohumla aynı biçimde (+03:00): metin sıralaması ve dönem eşikleri tutarlı kalır. ms ile başka bir an. */
-export function simdi(ms = Date.now()) {
+export function now(ms = Date.now()) {
   return new Date(ms + 3 * 3600000).toISOString().replace(/\.\d{3}Z$/, "+03:00");
 }
 
-const GUN_MS = 86400000;
-const gunMetni = (ms) => simdi(ms).slice(0, 10);
-const gunSonrasi = (g, n = 1) => gunMetni(Date.parse(`${g}T12:00:00+03:00`) + n * GUN_MS);
+const DAY_MS = 86400000;
+const dayText = (ms) => now(ms).slice(0, 10);
+const daysAfter = (g, n = 1) => dayText(Date.parse(`${g}T12:00:00+03:00`) + n * DAY_MS);
 
 /**
  * Rapor tarih aralığı: ?baslangic=YYYY-AA-GG&bitis=YYYY-AA-GG (ikisi de dahil). Verilmezse son `varsayilanGun` gün;
  * eski ?donem=7g|30g|90g da kabul edilir. Dönüş: icinde(tarihISO) süzgeci ve aynı uzunluktaki önceki dönem.
  * Karşılaştırma metin üzerinden (tüm tarihler +03:00 biçiminde).
  */
-export function tarihAraligi(s, varsayilanGun = 30) {
-  const gecerli = (x) => /^\d{4}-\d{2}-\d{2}$/.test(x || "");
-  let bas = s.get("baslangic");
-  let bit = s.get("bitis");
-  if (!gecerli(bas) || !gecerli(bit)) {
-    const gun = { "7g": 7, "30g": 30, "90g": 90 }[s.get("donem")] || varsayilanGun;
-    bit = gunMetni(Date.now());
-    bas = gunSonrasi(bit, -(gun - 1));
+export function dateRange(s, defaultDays = 30) {
+  const valid = (x) => /^\d{4}-\d{2}-\d{2}$/.test(x || "");
+  let startDate = s.get("baslangic");
+  let endDate = s.get("bitis");
+  if (!valid(startDate) || !valid(endDate)) {
+    const day = { "7g": 7, "30g": 30, "90g": 90 }[s.get("donem")] || defaultDays;
+    endDate = dayText(Date.now());
+    startDate = daysAfter(endDate, -(day - 1));
   }
-  if (bas > bit) [bas, bit] = [bit, bas];
-  const gun = Math.round((Date.parse(bit) - Date.parse(bas)) / GUN_MS) + 1;
-  const aralik = (a, b) => (tarih) => tarih >= a && tarih < gunSonrasi(b);
-  const oncekiBit = gunSonrasi(bas, -1);
-  const oncekiBas = gunSonrasi(bas, -gun);
-  return { baslangic: bas, bitis: bit, gun, icinde: aralik(bas, bit), onceki: { baslangic: oncekiBas, bitis: oncekiBit, icinde: aralik(oncekiBas, oncekiBit) } };
+  if (startDate > endDate) [startDate, endDate] = [endDate, startDate];
+  const day = Math.round((Date.parse(endDate) - Date.parse(startDate)) / DAY_MS) + 1;
+  const range = (a, b) => (date) => date >= a && date < daysAfter(b);
+  const prevEnd = daysAfter(startDate, -1);
+  const prevStart = daysAfter(startDate, -day);
+  return { baslangic: startDate, bitis: endDate, gun: day, icinde: range(startDate, endDate), onceki: { baslangic: prevStart, bitis: prevEnd, icinde: range(prevStart, prevEnd) } };
 }
 
 /** Denetim izi: kaydı kim, ne zaman oluşturdu / değiştirdi (sözleşme: Denetim) */
-export const denetim = (kim) => ({ kullaniciId: kim.kullaniciId, adSoyad: kim.adSoyad, tarih: simdi() });
+export const audit = (caller) => ({ kullaniciId: caller.kullaniciId, adSoyad: caller.adSoyad, tarih: now() });
 
 // Şartname s.3: yetki → açılan ekranlar / işlemler
-export const YETKI_EKRANLARI = {
+export const PERMISSION_SCREENS = {
   YONETICI: ["ODEME", "RAPOR", "IPTAL_IADE_GIRIS", "IPTAL_IADE_ONAY", "BAYI_TANIM", "KULLANICI_TANIM", "AYARLAR"],
   ODEME: ["ODEME", "RAPOR", "IPTAL_IADE_GIRIS"],
   RAPORLAMA: ["RAPOR"],

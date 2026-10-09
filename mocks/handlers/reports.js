@@ -1,63 +1,63 @@
 // GET /raporlar/bayi-ozet — şartname s.7: müşteri türü filtresi; işlem adet, tutar, vade farkı, hesaba geçecek rakam.
 // Ana firma tüm bayi / alt bayileri, bayi kendisini ve alt bayilerini görür; alt bayinin özet raporu yoktur (403).
 import { http, HttpResponse } from "msw";
-import { depo } from "../db/store";
-import { altBayileri, faturaDurumu, faturaGerekli, firma, firmaOzeti, kapsamda, taksitHesabi, tarihAraligi } from "../rules";
-import { gecikme, hata, uc, yetkili } from "./helpers";
+import { store } from "../db/store";
+import { subDealersOf, invoiceStatus, invoiceRequired, company, companySummary, inScope, installmentCalc, dateRange } from "../rules";
+import { latency, error, uc, authorized } from "./helpers";
 
 
 /** İşlemin vade farkı: çekimi yapan firmanın profiliyle (ana firma bayiden çekimde o bayinin profili) */
-function vadeFarki(t) {
+function maturityDiff(t) {
   if (t.taksit <= 1) return 0;
-  const yapan = firma(t.cekimYapanId);
-  let profilId = yapan?.vadeProfilId;
-  if (yapan?.tur === "ANA_FIRMA") {
-    const bayi = t.musteriTuru === "BAYI" ? depo.tablo("firmalar").find((f) => f.cariNo === t.musteri.cariNo) : null;
-    profilId = bayi?.vadeProfilId || 1;
+  const actor = company(t.cekimYapanId);
+  let profileId = actor?.vadeProfilId;
+  if (actor?.tur === "ANA_FIRMA") {
+    const dealer = t.musteriTuru === "BAYI" ? store.table("companies").find((f) => f.cariNo === t.musteri.cariNo) : null;
+    profileId = dealer?.vadeProfilId || 1;
   }
-  const profil = depo.tablo("vadeFarkiProfilleri").find((p) => p.id === profilId) || depo.tablo("vadeFarkiProfilleri")[0];
-  return taksitHesabi(t.tutarKurus, t.taksit, profil.oranYuzde).vadeFarkiKurus;
+  const profile = store.table("maturityProfiles").find((p) => p.id === profileId) || store.table("maturityProfiles")[0];
+  return installmentCalc(t.tutarKurus, t.taksit, profile.oranYuzde).vadeFarkiKurus;
 }
 
-const BOS = () => ({ islemAdet: 0, basariliAdet: 0, basarisizAdet: 0, ciroKurus: 0, vadeFarkiKurus: 0, iptalIadeKurus: 0, hesabaGececekKurus: 0 });
+const EMPTY = () => ({ islemAdet: 0, basariliAdet: 0, basarisizAdet: 0, ciroKurus: 0, vadeFarkiKurus: 0, iptalIadeKurus: 0, hesabaGececekKurus: 0 });
 
-function topla(ozet, t) {
-  ozet.islemAdet += 1;
+function sumBy(summary, t) {
+  summary.islemAdet += 1;
   if (t.durum === "BASARILI") {
-    ozet.basariliAdet += 1;
-    ozet.ciroKurus += t.tutarKurus;
-    ozet.vadeFarkiKurus += vadeFarki(t);
-  } else if (t.durum === "BASARISIZ") ozet.basarisizAdet += 1;
-  else ozet.iptalIadeKurus += t.tutarKurus; // IPTAL, IADE
+    summary.basariliAdet += 1;
+    summary.ciroKurus += t.tutarKurus;
+    summary.vadeFarkiKurus += maturityDiff(t);
+  } else if (t.durum === "BASARISIZ") summary.basarisizAdet += 1;
+  else summary.iptalIadeKurus += t.tutarKurus; // IPTAL, IADE
   // DEMO VARSAYIMI: hesaba geçecek = başarılı ciro + vade farkı − iptal/iade (asıl hesabı backend belirleyecek)
-  ozet.hesabaGececekKurus = ozet.ciroKurus + ozet.vadeFarkiKurus - ozet.iptalIadeKurus;
-  return ozet;
+  summary.hesabaGececekKurus = summary.ciroKurus + summary.vadeFarkiKurus - summary.iptalIadeKurus;
+  return summary;
 }
 
 /** Rolün rapor satırı firmaları ve tarih aralığı (iki özet raporunda ortak) */
-function raporKapsami(kim, s) {
-  const aralik = tarihAraligi(s);
-  const firmalar =
-    kim.rol === "ANA_FIRMA"
-      ? depo.tablo("firmalar").filter((f) => f.tur !== "ANA_FIRMA")
-      : [firma(kim.firmaId), ...altBayileri(kim.firmaId)].filter(Boolean);
-  return { aralik, firmalar };
+function reportScope(caller, s) {
+  const range = dateRange(s);
+  const companies =
+    caller.rol === "ANA_FIRMA"
+      ? store.table("companies").filter((f) => f.tur !== "ANA_FIRMA")
+      : [company(caller.firmaId), ...subDealersOf(caller.firmaId)].filter(Boolean);
+  return { aralik: range, firmalar: companies };
 }
-const aralikCevabi = (a) => ({ baslangic: a.baslangic, bitis: a.bitis, gun: a.gun, onceki: { baslangic: a.onceki.baslangic, bitis: a.onceki.bitis } });
+const rangeResponse = (a) => ({ baslangic: a.baslangic, bitis: a.bitis, gun: a.gun, onceki: { baslangic: a.onceki.baslangic, bitis: a.onceki.bitis } });
 
-export const raporlarHandlers = [
+export const reportsHandlers = [
   // Şartname s.2 / s.9: bayi başına fatura durumu — gereken, yüklenen, bekleyen, reddedilen; bekleyen tutar
   http.get(uc("/raporlar/bayi-fatura-ozet"), async ({ request }) => {
-    await gecikme();
-    const { kim, cevap } = yetkili(request);
-    if (cevap) return cevap;
-    if (kim.rol === "ALT_BAYI") return hata(403, "YETKI_YOK", "Alt bayinin fatura özet raporu yoktur; Fatura Yükleme Detay ekranını kullanın.");
-    const { aralik, firmalar } = raporKapsami(kim, new URL(request.url).searchParams);
-    const kapsamdakiler = depo.tablo("islemler").filter((t) => kapsamda(kim, t.cekimYapanId) && faturaGerekli(t));
-    const islemler = kapsamdakiler.filter((t) => aralik.icinde(t.tarih));
-    const bos = () => ({ gereken: 0, yuklenen: 0, bekleyen: 0, reddedilen: 0, bekleyenKurus: 0 });
-    const topla = (o, t) => {
-      const d = faturaDurumu(t.islemNo).durum;
+    await latency();
+    const { kim: caller, cevap: response } = authorized(request);
+    if (response) return response;
+    if (caller.rol === "ALT_BAYI") return error(403, "YETKI_YOK", "Alt bayinin fatura özet raporu yoktur; Fatura Yükleme Detay ekranını kullanın.");
+    const { aralik: range, firmalar: companies } = reportScope(caller, new URL(request.url).searchParams);
+    const scopedItems = store.table("transactions").filter((t) => inScope(caller, t.cekimYapanId) && invoiceRequired(t));
+    const transactions = scopedItems.filter((t) => range.icinde(t.tarih));
+    const empty = () => ({ gereken: 0, yuklenen: 0, bekleyen: 0, reddedilen: 0, bekleyenKurus: 0 });
+    const sumBy = (o, t) => {
+      const d = invoiceStatus(t.islemNo).durum;
       o.gereken += 1;
       if (d === "YUKLENDI") o.yuklenen += 1;
       else {
@@ -67,49 +67,49 @@ export const raporlarHandlers = [
       }
       return o;
     };
-    const kayitlar = firmalar
+    const records = companies
       .map((f) => ({
-        firma: firmaOzeti(f.firmaId),
-        bagli: f.bagliFirmaId ? firmaOzeti(f.bagliFirmaId) : null,
+        firma: companySummary(f.firmaId),
+        bagli: f.bagliFirmaId ? companySummary(f.bagliFirmaId) : null,
         durum: f.durum,
-        ...islemler.filter((t) => t.cekimYapanId === f.firmaId).reduce(topla, bos()),
+        ...transactions.filter((t) => t.cekimYapanId === f.firmaId).reduce(sumBy, empty()),
       }))
       .sort((a, b) => b.bekleyen + b.reddedilen - (a.bekleyen + a.reddedilen) || b.gereken - a.gereken);
     return HttpResponse.json({
-      aralik: aralikCevabi(aralik),
-      kayitlar,
-      toplam: { ...islemler.reduce(topla, bos()), firmaAdet: kayitlar.length },
-      onceki: kapsamdakiler.filter((t) => aralik.onceki.icinde(t.tarih)).reduce(topla, bos()), // önceki döneme göre değişim için
+      aralik: rangeResponse(range),
+      kayitlar: records,
+      toplam: { ...transactions.reduce(sumBy, empty()), firmaAdet: records.length },
+      onceki: scopedItems.filter((t) => range.onceki.icinde(t.tarih)).reduce(sumBy, empty()), // önceki döneme göre değişim için
     });
   }),
 
   http.get(uc("/raporlar/bayi-ozet"), async ({ request }) => {
-    await gecikme();
-    const { kim, cevap } = yetkili(request);
-    if (cevap) return cevap;
-    if (kim.rol === "ALT_BAYI") return hata(403, "YETKI_YOK", "Alt bayinin özet raporu yoktur; işlem detaylarını kullanın.");
+    await latency();
+    const { kim: caller, cevap: response } = authorized(request);
+    if (response) return response;
+    if (caller.rol === "ALT_BAYI") return error(403, "YETKI_YOK", "Alt bayinin özet raporu yoktur; işlem detaylarını kullanın.");
     const s = new URL(request.url).searchParams;
-    const musteriTuru = s.get("musteriTuru");
+    const customerKind = s.get("musteriTuru");
     // rapor satırları: ana firma → bayiler + tüm alt bayiler; bayi → kendisi + alt bayileri
-    const { aralik, firmalar } = raporKapsami(kim, s);
+    const { aralik: range, firmalar: companies } = reportScope(caller, s);
     // yalnız rapor satırındaki firmaların çekimleri: ana firmanın kendi tahsilatı bayi özetine girmez (toplam = satırların toplamı)
-    const satirFirmalari = new Set(firmalar.map((f) => f.firmaId));
-    const kapsamdakiler = depo.tablo("islemler").filter((t) => satirFirmalari.has(t.cekimYapanId) && (!musteriTuru || t.musteriTuru === musteriTuru));
-    const islemler = kapsamdakiler.filter((t) => aralik.icinde(t.tarih));
+    const rowCompanies = new Set(companies.map((f) => f.firmaId));
+    const scopedItems = store.table("transactions").filter((t) => rowCompanies.has(t.cekimYapanId) && (!customerKind || t.musteriTuru === customerKind));
+    const transactions = scopedItems.filter((t) => range.icinde(t.tarih));
 
-    const kayitlar = firmalar
+    const records = companies
       .map((f) => {
-        const ozet = islemler.filter((t) => t.cekimYapanId === f.firmaId).reduce(topla, BOS());
-        return { firma: firmaOzeti(f.firmaId), bagli: f.bagliFirmaId ? firmaOzeti(f.bagliFirmaId) : null, vadeProfil: f.vadeProfilId ? depo.tablo("vadeFarkiProfilleri").find((p) => p.id === f.vadeProfilId)?.ad.replace("Vade Farkı ", "") : null, durum: f.durum, ...ozet };
+        const summary = transactions.filter((t) => t.cekimYapanId === f.firmaId).reduce(sumBy, EMPTY());
+        return { firma: companySummary(f.firmaId), bagli: f.bagliFirmaId ? companySummary(f.bagliFirmaId) : null, vadeProfil: f.vadeProfilId ? store.table("maturityProfiles").find((p) => p.id === f.vadeProfilId)?.ad.replace("Vade Farkı ", "") : null, durum: f.durum, ...summary };
       })
       .sort((a, b) => b.ciroKurus - a.ciroKurus);
-    const toplam = islemler.reduce(topla, BOS());
+    const total = transactions.reduce(sumBy, EMPTY());
     return HttpResponse.json({
-      aralik: aralikCevabi(aralik),
-      kayitlar,
-      toplam: { ...toplam, firmaAdet: kayitlar.length },
-      onceki: kapsamdakiler.filter((t) => aralik.onceki.icinde(t.tarih)).reduce(topla, BOS()),
-      musteriTurleri: [...new Set(depo.tablo("islemler").filter((t) => kapsamda(kim, t.cekimYapanId)).map((t) => t.musteriTuru))],
+      aralik: rangeResponse(range),
+      kayitlar: records,
+      toplam: { ...total, firmaAdet: records.length },
+      onceki: scopedItems.filter((t) => range.onceki.icinde(t.tarih)).reduce(sumBy, EMPTY()),
+      musteriTurleri: [...new Set(store.table("transactions").filter((t) => inScope(caller, t.cekimYapanId)).map((t) => t.musteriTuru))],
     });
   }),
 ];

@@ -2,56 +2,56 @@
 import { useState } from "react";
 import { ROLES } from "@/lib/roles";
 import I from "@/components/DesignIcons";
-import { sayi, tarihSaat, taksitMetni, tl } from "@/lib/format";
-import { ETIKET, durumTonu, etiket } from "@/lib/labels";
-import { useIslemler } from "@/lib/queries/transactions";
-import { BosDurum, HataKutusu, Yukleniyor } from "../states";
-import { csvIndir, csvTutar } from "@/lib/export";
-import { SiraliBaslik, siralamaDegistir } from "../table";
-import { aralikSorgusu } from "@/lib/period";
-import { Konum, TarihAraligi, YazdirDugmesi } from "../shared";
+import { formatNumber, formatDateTime, installmentText, tl } from "@/lib/format";
+import { LABEL, statusTone, labelOf } from "@/lib/labels";
+import { useTransactions } from "@/lib/queries/transactions";
+import { EmptyState, ErrorBox, Loading } from "../states";
+import { downloadCsv, csvAmount } from "@/lib/export";
+import { SortableHeader, changeSorting } from "../table";
+import { rangeQuery } from "@/lib/period";
+import { Breadcrumb, DateRange, PrintButton } from "../shared";
 import { CARD, FOCUS } from "../theme";
-import { useGecikmeli } from "../helpers";
+import { useDebounced } from "../helpers";
 
-const DURUM_SEKMELERI = ["TUMU", "BASARILI", "BASARISIZ", "IPTAL", "IADE"];
+const STATUS_TABS = ["TUMU", "BASARILI", "BASARISIZ", "IPTAL", "IADE"];
 
-const KAPSAM = {
+const SCOPE = {
   [ROLES.ANA_FIRMA]: "Tüm bayi ve alt bayi işlemleri",
   [ROLES.BAYI]: "Kendi ve alt bayi işlemleri",
   [ROLES.ALT_BAYI]: "Kendi işlemleri",
 };
 
-function musteriTuruTonu(tur) {
-  if (tur === "BAYI" || tur === "ALT_BAYI") return "bg-[var(--brand-soft)] text-[var(--brand-text)]";
-  if (tur === "KENDI_KARTI") return "bg-[var(--success-soft)] text-[var(--success-text)]";
-  if (tur === "DUZENSIZ_MUSTERI" || tur === "MUSTERI_KARTI") return "bg-[var(--warning-soft)] text-[var(--warning-text)]";
+function customerKindTone(kind) {
+  if (kind === "BAYI" || kind === "ALT_BAYI") return "bg-[var(--brand-soft)] text-[var(--brand-text)]";
+  if (kind === "KENDI_KARTI") return "bg-[var(--success-soft)] text-[var(--success-text)]";
+  if (kind === "DUZENSIZ_MUSTERI" || kind === "MUSTERI_KARTI") return "bg-[var(--warning-soft)] text-[var(--warning-text)]";
   return "bg-[var(--soft-2)] text-[var(--fg-2)]";
 }
 
-export function IslemDetaylari({ role, meta, onHome }) {
-  const [arama, setArama] = useState("");
-  const [durum, setDurum] = useState("TUMU");
-  const [odemeTipi, setOdemeTipi] = useState("");
-  const [musteriTuru, setMusteriTuru] = useState("");
-  const [aralik, setAralik] = useState(null); // null: tüm geçmiş
-  const q = useGecikmeli(arama.trim());
-  const [siralama, setSiralama] = useState({ alan: "tarih", yon: "desc" }); // sayfalı liste: sıralama sunucuda
-  const sirala = (alan) => setSiralama((s) => siralamaDegistir(s, alan, alan === "islemNo" ? "asc" : "desc"));
+export function TransactionDetails({ role, meta, onHome }) {
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("TUMU");
+  const [paymentType, setPaymentType] = useState("");
+  const [customerKind, setCustomerKind] = useState("");
+  const [range, setRange] = useState(null); // null: tüm geçmiş
+  const q = useDebounced(search.trim());
+  const [sorting, setSorting] = useState({ field: "tarih", direction: "desc" }); // sayfalı liste: sıralama sunucuda
+  const sort = (field) => setSorting((s) => changeSorting(s, field, field === "islemNo" ? "asc" : "desc"));
 
-  const sorgu = useIslemler({ durum: durum === "TUMU" ? undefined : durum, musteriTuru: musteriTuru || undefined, odemeTipi: odemeTipi || undefined, q: q || undefined, ...aralikSorgusu(aralik), sira: `${siralama.alan}:${siralama.yon}` });
-  const veri = sorgu.data;
-  const satirlar = veri?.kayitlar || [];
-  const adet = (d) => veri?.sayaclar?.[d] ?? "–";
+  const query = useTransactions({ durum: status === "TUMU" ? undefined : status, musteriTuru: customerKind || undefined, odemeTipi: paymentType || undefined, q: q || undefined, ...rangeQuery(range), sira: `${sorting.field}:${sorting.direction}` });
+  const data = query.data;
+  const rows = data?.kayitlar || [];
+  const count = (d) => data?.sayaclar?.[d] ?? "–";
 
   // alt bayi yalnızca kendi işlemlerini gördüğü için "çekim yapan" sütunu ona gösterilmez
-  const yapanGoster = role !== ROLES.ALT_BAYI;
-  const filtreVar = arama !== "" || durum !== "TUMU" || odemeTipi !== "" || musteriTuru !== "" || aralik !== null;
-  const temizle = () => {
-    setArama("");
-    setDurum("TUMU");
-    setOdemeTipi("");
-    setMusteriTuru("");
-    setAralik(null);
+  const showActor = role !== ROLES.ALT_BAYI;
+  const hasFilter = search !== "" || status !== "TUMU" || paymentType !== "" || customerKind !== "" || range !== null;
+  const clear = () => {
+    setSearch("");
+    setStatus("TUMU");
+    setPaymentType("");
+    setCustomerKind("");
+    setRange(null);
   };
   const selectCls = `h-9 rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-[12.5px] font-medium text-[var(--fg-2)] ${FOCUS}`;
   const th = "whitespace-nowrap px-4 py-2";
@@ -61,66 +61,66 @@ export function IslemDetaylari({ role, meta, onHome }) {
     <>
       <div className="bn-rise mb-4 flex flex-col gap-3 px-1 md:flex-row md:items-end md:justify-between">
         <div>
-          <Konum onHome={onHome} yol={["Raporlar", "İşlem Detayları"]} />
+          <Breadcrumb onHome={onHome} path={["Raporlar", "İşlem Detayları"]} />
           <h1 className="text-xl font-extrabold tracking-tight text-[var(--fg)]">İşlem Detayları</h1>
           <p className="mt-0.5 text-[12.5px] text-[var(--muted)]">
-            {meta.company} · {KAPSAM[role]}
+            {meta.company} · {SCOPE[role]}
           </p>
         </div>
         <div className="flex gap-2 self-start md:self-auto">
         <button
           type="button"
           onClick={() =>
-            csvIndir(
+            downloadCsv(
               "islem-detaylari",
               ["İşlem No", "Tarih", "Çekim Yapan", "Müşteri Türü", "Unvan", "Cari No", "Vergi No", "Ödeme", "Taksit", "Tutar (TL)", "Durum"],
-              satirlar.map((t) => [t.islemNo, tarihSaat(t.tarih), t.cekimYapan?.unvan, etiket("musteriTuru", t.musteriTuru), t.musteri.unvan, t.musteri.cariNo, t.musteri.vergiNo, ETIKET.odemeTipi[t.odemeTipi], t.taksit, csvTutar(t.tutarKurus), etiket("islemDurumu", t.durum)])
+              rows.map((t) => [t.islemNo, formatDateTime(t.tarih), t.cekimYapan?.unvan, labelOf("customerKind", t.musteriTuru), t.musteri.unvan, t.musteri.cariNo, t.musteri.vergiNo, LABEL.paymentType[t.odemeTipi], t.taksit, csvAmount(t.tutarKurus), labelOf("transactionStatus", t.durum)])
             )
           }
-          disabled={satirlar.length === 0}
+          disabled={rows.length === 0}
           title="Görünen sayfayı CSV olarak indirir"
           className={`inline-flex h-9 items-center gap-1.5 self-start rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 text-[12.5px] font-semibold text-[var(--fg-2)] transition active:scale-[0.97] hover:border-[var(--brand)] hover:text-[var(--brand-text)] disabled:cursor-not-allowed disabled:opacity-50 md:self-auto ${FOCUS}`}
         >
           <I name="download" size={14} />
           Dışa Aktar
         </button>
-        <YazdirDugmesi />
+        <PrintButton />
         </div>
       </div>
 
       {/* filtrelenen işlemlerin özeti — sunucudan (sayfadan bağımsız) */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: "İşlem", value: veri ? sayi(veri.toplam) : "—", ink: "text-[var(--brand-text)]", wrap: "bg-[var(--brand-soft)]" },
-          { label: "Toplam tutar", value: veri ? tl(veri.ozet.toplamKurus) : "—", ink: "text-[var(--brand-text)]", wrap: "border border-[var(--border)] bg-[var(--surface)]" },
-          { label: "Başarılı tutar", value: veri ? tl(veri.ozet.basariliKurus) : "—", ink: "text-[var(--success-text)]", wrap: "bg-[var(--success-soft)]" },
+          { label: "İşlem", value: data ? formatNumber(data.toplam) : "—", ink: "text-[var(--brand-text)]", wrap: "bg-[var(--brand-soft)]" },
+          { label: "Toplam tutar", value: data ? tl(data.ozet.toplamKurus) : "—", ink: "text-[var(--brand-text)]", wrap: "border border-[var(--border)] bg-[var(--surface)]" },
+          { label: "Başarılı tutar", value: data ? tl(data.ozet.basariliKurus) : "—", ink: "text-[var(--success-text)]", wrap: "bg-[var(--success-soft)]" },
         ].map((k, i) => (
           <div key={k.label} style={{ "--i": i }} className={`bn-rise rounded-2xl p-3 sm:p-4 ${k.wrap}`}>
             <p className={`text-[11.5px] font-semibold sm:text-[12.5px] ${k.ink}`}>{k.label}</p>
-            <p className={`mt-1.5 text-[15px] font-extrabold leading-none tracking-tight tabular-nums text-[var(--fg)] sm:text-[19px] ${sorgu.isFetching ? "opacity-60" : ""}`}>
+            <p className={`mt-1.5 text-[15px] font-extrabold leading-none tracking-tight tabular-nums text-[var(--fg)] sm:text-[19px] ${query.isFetching ? "opacity-60" : ""}`}>
               {k.value}
             </p>
           </div>
         ))}
       </div>
 
-      <section style={{ "--i": 3 }} className={`bn-rise mt-3 overflow-hidden ${CARD} hover:!translate-y-0`} aria-label="İşlem listesi" aria-busy={sorgu.isFetching}>
+      <section style={{ "--i": 3 }} className={`bn-rise mt-3 overflow-hidden ${CARD} hover:!translate-y-0`} aria-label="İşlem listesi" aria-busy={query.isFetching}>
         {/* filtreler */}
         <div className="flex flex-col gap-3 p-3 sm:p-4 xl:flex-row xl:items-center xl:justify-between">
           <div role="group" aria-label="Durum" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-0.5">
-            {DURUM_SEKMELERI.map((d) => (
+            {STATUS_TABS.map((d) => (
               <button
                 key={d}
                 type="button"
-                onClick={() => setDurum(d)}
-                aria-pressed={durum === d}
+                onClick={() => setStatus(d)}
+                aria-pressed={status === d}
                 className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[12px] transition ${
-                  durum === d ? "bg-[var(--brand)] font-bold text-white" : "bg-[var(--soft)] font-semibold text-[var(--fg-2)] hover:text-[var(--brand-text)]"
+                  status === d ? "bg-[var(--brand)] font-bold text-white" : "bg-[var(--soft)] font-semibold text-[var(--fg-2)] hover:text-[var(--brand-text)]"
                 } ${FOCUS}`}
               >
-                {d === "TUMU" ? "Tümü" : etiket("islemDurumu", d)}
-                <span className={`rounded-full px-1.5 text-[10.5px] font-bold tabular-nums ${durum === d ? "bg-white/20 text-white" : "bg-[var(--surface)] text-[var(--muted)]"}`}>
-                  {adet(d)}
+                {d === "TUMU" ? "Tümü" : labelOf("transactionStatus", d)}
+                <span className={`rounded-full px-1.5 text-[10.5px] font-bold tabular-nums ${status === d ? "bg-white/20 text-white" : "bg-[var(--surface)] text-[var(--muted)]"}`}>
+                  {count(d)}
                 </span>
               </button>
             ))}
@@ -133,21 +133,21 @@ export function IslemDetaylari({ role, meta, onHome }) {
               </span>
               <input
                 type="search"
-                value={arama}
-                onChange={(e) => setArama(e.target.value)}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
                 placeholder="İşlem no, unvan, cari, vergi no"
                 className="h-9 w-full rounded-full border border-[var(--border-strong)] bg-[var(--surface)] pl-8 pr-3 text-[12.5px] text-[var(--fg)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--brand)]"
               />
             </label>
-            <select aria-label="Müşteri türü" value={musteriTuru} onChange={(e) => setMusteriTuru(e.target.value)} className={selectCls}>
+            <select aria-label="Müşteri türü" value={customerKind} onChange={(e) => setCustomerKind(e.target.value)} className={selectCls}>
               <option value="">Tüm müşteri türleri</option>
-              {(veri?.musteriTurleri || []).map((m) => (
+              {(data?.musteriTurleri || []).map((m) => (
                 <option key={m} value={m}>
-                  {etiket("musteriTuru", m)}
+                  {labelOf("customerKind", m)}
                 </option>
               ))}
             </select>
-            <select aria-label="Ödeme tipi" value={odemeTipi} onChange={(e) => setOdemeTipi(e.target.value)} className={selectCls}>
+            <select aria-label="Ödeme tipi" value={paymentType} onChange={(e) => setPaymentType(e.target.value)} className={selectCls}>
               <option value="">Tüm ödeme tipleri</option>
               <option value="MANUEL">Manuel ödeme</option>
               <option value="LINK">Link ile ödeme</option>
@@ -155,43 +155,43 @@ export function IslemDetaylari({ role, meta, onHome }) {
           </div>
         </div>
         <div className="border-t border-[var(--border)] px-3 py-2.5 sm:px-4">
-          <TarihAraligi deger={aralik} onChange={setAralik} tumu />
+          <DateRange value={range} onChange={setRange} all />
         </div>
 
-        {sorgu.isPending ? (
-          <Yukleniyor satir={6} baslik={false} />
-        ) : sorgu.isError ? (
-          <HataKutusu hata={sorgu.error} onTekrar={() => sorgu.refetch()} />
+        {query.isPending ? (
+          <Loading row={6} title={false} />
+        ) : query.isError ? (
+          <ErrorBox error={query.error} onRetry={() => query.refetch()} />
         ) : (
           <>
-            <div className={`overflow-x-auto transition-opacity ${sorgu.isFetching ? "opacity-60" : ""}`}>
+            <div className={`overflow-x-auto transition-opacity ${query.isFetching ? "opacity-60" : ""}`}>
               <table className="min-w-full text-[12.5px]">
                 <thead>
                   <tr className="border-y border-[var(--border)] bg-[var(--soft)] text-left text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                    <SiraliBaslik alan="islemNo" siralama={siralama} onSirala={sirala} className={th}>İşlem No</SiraliBaslik>
-                    <SiraliBaslik alan="tarih" siralama={siralama} onSirala={sirala} className={th}>Tarih</SiraliBaslik>
-                    {yapanGoster && <th scope="col" className={th}>Çekim Yapan</th>}
+                    <SortableHeader field="islemNo" sorting={sorting} onSort={sort} className={th}>İşlem No</SortableHeader>
+                    <SortableHeader field="tarih" sorting={sorting} onSort={sort} className={th}>Tarih</SortableHeader>
+                    {showActor && <th scope="col" className={th}>Çekim Yapan</th>}
                     <th scope="col" className={th}>Müşteri Türü</th>
                     <th scope="col" className={th}>Unvan / Cari No</th>
                     <th scope="col" className={th}>Vergi No</th>
                     <th scope="col" className={th}>Ödeme</th>
-                    <SiraliBaslik alan="tutarKurus" siralama={siralama} onSirala={sirala} className={`${th} text-right`}>Tutar</SiraliBaslik>
+                    <SortableHeader field="tutarKurus" sorting={sorting} onSort={sort} className={`${th} text-right`}>Tutar</SortableHeader>
                     <th scope="col" className={th}>Durum</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {satirlar.map((t, i) => (
+                  {rows.map((t, i) => (
                     <tr key={t.islemNo} className={`transition-colors hover:bg-[var(--soft)] ${i > 0 ? "border-t border-[var(--border)]" : ""}`}>
                       <td className={`${td} font-bold text-[var(--brand-text)]`}>{t.islemNo}</td>
-                      <td className={`${td} tabular-nums text-[var(--muted)]`}>{tarihSaat(t.tarih)}</td>
-                      {yapanGoster && (
+                      <td className={`${td} tabular-nums text-[var(--muted)]`}>{formatDateTime(t.tarih)}</td>
+                      {showActor && (
                         <td className={td}>
                           <span className="block font-semibold text-[var(--fg-2)]">{t.cekimYapan?.unvan}</span>
-                          <span className="block text-[11px] text-[var(--muted)]">{etiket("firmaTuru", t.cekimYapan?.tur)}</span>
+                          <span className="block text-[11px] text-[var(--muted)]">{labelOf("companyKind", t.cekimYapan?.tur)}</span>
                         </td>
                       )}
                       <td className={td}>
-                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${musteriTuruTonu(t.musteriTuru)}`}>{etiket("musteriTuru", t.musteriTuru)}</span>
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${customerKindTone(t.musteriTuru)}`}>{labelOf("customerKind", t.musteriTuru)}</span>
                       </td>
                       <td className={td}>
                         <span className="block font-semibold text-[var(--fg)]">{t.musteri.unvan}</span>
@@ -204,33 +204,33 @@ export function IslemDetaylari({ role, meta, onHome }) {
                           **** {t.kart.son4}
                         </span>
                         <span className="block text-[11px] text-[var(--muted)]">
-                          {ETIKET.odemeTipi[t.odemeTipi]} · {taksitMetni(t.taksit)}
+                          {LABEL.paymentType[t.odemeTipi]} · {installmentText(t.taksit)}
                         </span>
                       </td>
                       <td className={`${td} text-right font-bold tabular-nums text-[var(--fg)]`}>{tl(t.tutarKurus)}</td>
                       <td className={td}>
-                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${durumTonu(t.durum)}`}>{etiket("islemDurumu", t.durum)}</span>
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${statusTone(t.durum)}`}>{labelOf("transactionStatus", t.durum)}</span>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {satirlar.length === 0 && (
-                <BosDurum baslik="Bu filtrelere uyan işlem yok">
-                  <button type="button" onClick={temizle} className={`rounded-full text-[12.5px] font-bold text-[var(--brand-text)] hover:underline ${FOCUS}`}>
+              {rows.length === 0 && (
+                <EmptyState title="Bu filtrelere uyan işlem yok">
+                  <button type="button" onClick={clear} className={`rounded-full text-[12.5px] font-bold text-[var(--brand-text)] hover:underline ${FOCUS}`}>
                     Filtreleri temizle
                   </button>
-                </BosDurum>
+                </EmptyState>
               )}
             </div>
 
             <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-2.5 text-[11.5px] text-[var(--muted)]">
               <span>
-                {sayi(veri.sayaclar.TUMU)} işlemden <b className="font-bold text-[var(--fg-2)]">{sayi(veri.toplam)}</b> tanesi gösteriliyor
-                {veri.toplam > satirlar.length && ` (ilk ${satirlar.length})`}
+                {formatNumber(data.sayaclar.TUMU)} işlemden <b className="font-bold text-[var(--fg-2)]">{formatNumber(data.toplam)}</b> tanesi gösteriliyor
+                {data.toplam > rows.length && ` (ilk ${rows.length})`}
               </span>
-              {filtreVar && satirlar.length > 0 && (
-                <button type="button" onClick={temizle} className={`rounded-full font-bold text-[var(--brand-text)] hover:underline ${FOCUS}`}>
+              {hasFilter && rows.length > 0 && (
+                <button type="button" onClick={clear} className={`rounded-full font-bold text-[var(--brand-text)] hover:underline ${FOCUS}`}>
                   Filtreleri temizle
                 </button>
               )}

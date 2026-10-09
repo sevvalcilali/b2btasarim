@@ -3,54 +3,54 @@
 // Veri: GET/POST /duyurular, PUT /duyurular/{id}, POST /duyurular/{id}/okundu
 import { useCallback, useState } from "react";
 import I from "@/components/DesignIcons";
-import { ApiHatasi } from "@/lib/api/error";
-import { sayi, tarih } from "@/lib/format";
-import { durumTonu, etiket } from "@/lib/labels";
-import { useDuyuruGuncelle, useDuyuruOkundu, useDuyuruOlustur, useDuyurular } from "@/lib/queries/announcements";
-import { BosDurum, HataKutusu, Yukleniyor } from "../states";
-import { hataBaglayici } from "../payment";
-import { Alan, Bildirim, Konum, Pencere, inputCls, OnayPenceresi, DenetimNotu } from "../shared";
+import { ApiError } from "@/lib/api/error";
+import { formatNumber, formatDate } from "@/lib/format";
+import { statusTone, labelOf } from "@/lib/labels";
+import { useUpdateAnnouncement, useMarkAnnouncementRead, useCreateAnnouncement, useAnnouncements } from "@/lib/queries/announcements";
+import { EmptyState, ErrorBox, Loading } from "../states";
+import { errorHandler } from "../payment";
+import { Field, Notice, Breadcrumb, Modal, inputCls, ConfirmModal, AuditNote } from "../shared";
 import { HOME } from "../routes";
 import { CARD, FOCUS } from "../theme";
 
-const HEDEFLER = ["BAYI", "ALT_BAYI"];
+const TARGETS = ["BAYI", "ALT_BAYI"];
 
-const HedefRozetleri = ({ hedef }) => (
+const TargetBadges = ({ target }) => (
   <span className="flex flex-wrap gap-1">
-    {hedef.map((r) => (
+    {target.map((r) => (
       <span key={r} className="rounded-full bg-[var(--soft)] px-2 py-0.5 text-[11px] font-semibold text-[var(--fg-2)]">
-        {etiket("firmaTuru", r)}
+        {labelOf("companyKind", r)}
       </span>
     ))}
   </span>
 );
 
 // ───────────────────────── Ana firma: Duyuru yönetimi ─────────────────────────
-export function DuyuruYonetimi({ meta, onNavigate }) {
-  const sorgu = useDuyurular();
-  const kayitlar = sorgu.data?.kayitlar || [];
-  const duzenlenebilir = sorgu.data?.duzenlenebilir ?? false;
-  const guncelle = useDuyuruGuncelle();
-  const [arama, setArama] = useState("");
-  const [durumFiltresi, setDurumFiltresi] = useState("");
-  const q = arama.trim().toLocaleLowerCase("tr-TR");
-  const gorunen = kayitlar.filter((d) => (!durumFiltresi || d.durum === durumFiltresi) && (!q || `${d.baslik} ${d.icerik}`.toLocaleLowerCase("tr-TR").includes(q)));
-  const [duzenlenen, setDuzenlenen] = useState(null); // null · "yeni" · kayıt
-  const [bildirim, setBildirim] = useState(null);
-  const bildirimBitti = useCallback(() => setBildirim(null), []);
-  const yayinda = kayitlar.filter((d) => d.durum === "YAYINDA").length;
+export function AnnouncementManagement({ meta, onNavigate }) {
+  const query = useAnnouncements();
+  const records = query.data?.kayitlar || [];
+  const editable = query.data?.duzenlenebilir ?? false;
+  const update = useUpdateAnnouncement();
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const q = search.trim().toLocaleLowerCase("tr-TR");
+  const visible = records.filter((d) => (!statusFilter || d.durum === statusFilter) && (!q || `${d.baslik} ${d.icerik}`.toLocaleLowerCase("tr-TR").includes(q)));
+  const [editingItem, setEditingItem] = useState(null); // null · "yeni" · kayıt
+  const [notice, setNotice] = useState(null);
+  const noticeDone = useCallback(() => setNotice(null), []);
+  const published = records.filter((d) => d.durum === "YAYINDA").length;
 
-  const [arsivlenecek, setArsivlenecek] = useState(null); // onay bekleyen arşivleme
-  const durumDegistir = async (d) => {
-    const durum = d.durum === "YAYINDA" ? "ARSIV" : "YAYINDA";
+  const [toArchive, setToArchive] = useState(null); // onay bekleyen arşivleme
+  const changeStatus = async (d) => {
+    const status = d.durum === "YAYINDA" ? "ARSIV" : "YAYINDA";
     try {
-      await guncelle.mutateAsync({ duyuruId: d.duyuruId, govde: { baslik: d.baslik, icerik: d.icerik, hedef: d.hedef, durum } });
+      await update.mutateAsync({ duyuruId: d.duyuruId, body: { baslik: d.baslik, icerik: d.icerik, hedef: d.hedef, durum: status } });
       // arşivleme geri alınabilir: bildirimdeki "Geri al" duyuruyu yeniden yayına alır
-      setBildirim(durum === "YAYINDA" ? { metin: `"${d.baslik}" yeniden yayında.` } : { metin: `"${d.baslik}" arşivlendi.`, eylem: { etiket: "Geri al", onClick: () => durumDegistir({ ...d, durum: "ARSIV" }) } });
+      setNotice(status === "YAYINDA" ? { text: `"${d.baslik}" yeniden yayında.` } : { text: `"${d.baslik}" arşivlendi.`, action: { etiket: "Geri al", onClick: () => changeStatus({ ...d, durum: "ARSIV" }) } });
     } catch (err) {
-      setBildirim({ metin: err?.message || "Güncellenemedi." });
+      setNotice({ text: err?.message || "Güncellenemedi." });
     } finally {
-      setArsivlenecek(null);
+      setToArchive(null);
     }
   };
   const th = "whitespace-nowrap px-4 py-2";
@@ -60,16 +60,16 @@ export function DuyuruYonetimi({ meta, onNavigate }) {
     <>
       <div className="bn-rise mb-4 flex flex-col gap-3 px-1 md:flex-row md:items-end md:justify-between">
         <div>
-          <Konum onHome={() => onNavigate(HOME)} yol={["Duyuru"]} />
+          <Breadcrumb onHome={() => onNavigate(HOME)} path={["Duyuru"]} />
           <h1 className="text-xl font-extrabold tracking-tight text-[var(--fg)]">Duyuru</h1>
           <p className="mt-0.5 text-[12.5px] text-[var(--muted)]">
-            {meta.company} · {sorgu.data ? `${sayi(yayinda)} yayında · ${sayi(kayitlar.length - yayinda)} arşiv` : "Yükleniyor…"} · Yayındaki duyuru bayi ve alt bayi ekranlarına pop-up olarak düşer
+            {meta.company} · {query.data ? `${formatNumber(published)} yayında · ${formatNumber(records.length - published)} arşiv` : "Yükleniyor…"} · Yayındaki duyuru bayi ve alt bayi ekranlarına pop-up olarak düşer
           </p>
         </div>
-        {duzenlenebilir && (
+        {editable && (
           <button
             type="button"
-            onClick={() => setDuzenlenen("yeni")}
+            onClick={() => setEditingItem("yeni")}
             className={`inline-flex h-9 items-center gap-1.5 self-start rounded-full bg-[var(--brand)] px-4 text-[12.5px] font-bold text-white transition [box-shadow:0_8px_18px_-10px_rgba(12,52,231,0.8)] hover:brightness-110 md:self-auto ${FOCUS}`}
           >
             <I name="plus" size={14} />
@@ -78,17 +78,17 @@ export function DuyuruYonetimi({ meta, onNavigate }) {
         )}
       </div>
 
-      <section style={{ "--i": 1 }} className={`bn-rise overflow-hidden ${CARD} hover:!translate-y-0`} aria-label="Duyurular" aria-busy={sorgu.isFetching || guncelle.isPending}>
+      <section style={{ "--i": 1 }} className={`bn-rise overflow-hidden ${CARD} hover:!translate-y-0`} aria-label="Duyurular" aria-busy={query.isFetching || update.isPending}>
         <div className="flex flex-col gap-3 p-3 sm:p-4 md:flex-row md:items-center md:justify-between">
           <div role="group" aria-label="Durum" className="flex gap-1">
             {[
-              ["", "Tümü", kayitlar.length],
-              ["YAYINDA", "Yayında", yayinda],
-              ["ARSIV", "Arşiv", kayitlar.length - yayinda],
-            ].map(([deger, ad, adet]) => (
-              <button key={ad} type="button" onClick={() => setDurumFiltresi(deger)} aria-pressed={durumFiltresi === deger} className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12px] transition ${durumFiltresi === deger ? "bg-[var(--brand)] font-bold text-white" : "bg-[var(--soft)] font-semibold text-[var(--fg-2)] hover:text-[var(--brand-text)]"} ${FOCUS}`}>
-                {ad}
-                <span className={`rounded-full px-1.5 text-[10.5px] font-bold tabular-nums ${durumFiltresi === deger ? "bg-white/20 text-white" : "bg-[var(--surface)] text-[var(--muted)]"}`}>{sorgu.data ? adet : "–"}</span>
+              ["", "Tümü", records.length],
+              ["YAYINDA", "Yayında", published],
+              ["ARSIV", "Arşiv", records.length - published],
+            ].map(([value, name, count]) => (
+              <button key={name} type="button" onClick={() => setStatusFilter(value)} aria-pressed={statusFilter === value} className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12px] transition ${statusFilter === value ? "bg-[var(--brand)] font-bold text-white" : "bg-[var(--soft)] font-semibold text-[var(--fg-2)] hover:text-[var(--brand-text)]"} ${FOCUS}`}>
+                {name}
+                <span className={`rounded-full px-1.5 text-[10.5px] font-bold tabular-nums ${statusFilter === value ? "bg-white/20 text-white" : "bg-[var(--surface)] text-[var(--muted)]"}`}>{query.data ? count : "–"}</span>
               </button>
             ))}
           </div>
@@ -97,17 +97,17 @@ export function DuyuruYonetimi({ meta, onNavigate }) {
             <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]">
               <I name="search" size={14} />
             </span>
-            <input type="search" value={arama} onChange={(e) => setArama(e.target.value)} placeholder="Başlık ya da metin" className="h-9 w-full rounded-full border border-[var(--border-strong)] bg-[var(--surface)] pl-8 pr-3 text-[12.5px] text-[var(--fg)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--brand)]" />
+            <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Başlık ya da metin" className="h-9 w-full rounded-full border border-[var(--border-strong)] bg-[var(--surface)] pl-8 pr-3 text-[12.5px] text-[var(--fg)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--brand)]" />
           </label>
         </div>
-        {sorgu.isPending ? (
-          <Yukleniyor satir={3} baslik={false} />
-        ) : sorgu.isError ? (
-          <HataKutusu hata={sorgu.error} onTekrar={() => sorgu.refetch()} />
-        ) : kayitlar.length > 0 && gorunen.length === 0 ? (
-          <BosDurum baslik="Filtreye uyan duyuru yok" eylemler={[{ etiket: "Filtreleri temizle", onClick: () => { setArama(""); setDurumFiltresi(""); } }]} />
-        ) : kayitlar.length === 0 ? (
-          <BosDurum baslik="Henüz duyuru yok" aciklama="Yayınladığınız duyuru bayi ve alt bayi ekranlarına pop-up olarak düşer." ikon="megaphone" eylemler={duzenlenebilir && [{ etiket: "Yeni Duyuru", ikon: "plus", birincil: true, onClick: () => setDuzenlenen("yeni") }]} />
+        {query.isPending ? (
+          <Loading row={3} title={false} />
+        ) : query.isError ? (
+          <ErrorBox error={query.error} onRetry={() => query.refetch()} />
+        ) : records.length > 0 && visible.length === 0 ? (
+          <EmptyState title="Filtreye uyan duyuru yok" actions={[{ etiket: "Filtreleri temizle", onClick: () => { setSearch(""); setStatusFilter(""); } }]} />
+        ) : records.length === 0 ? (
+          <EmptyState title="Henüz duyuru yok" description="Yayınladığınız duyuru bayi ve alt bayi ekranlarına pop-up olarak düşer." icon="megaphone" actions={editable && [{ etiket: "Yeni Duyuru", icon: "plus", primary: true, onClick: () => setEditingItem("yeni") }]} />
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-[12.5px]">
@@ -118,33 +118,33 @@ export function DuyuruYonetimi({ meta, onNavigate }) {
                   <th scope="col" className={th}>Tarih</th>
                   <th scope="col" className={th}>Okunma</th>
                   <th scope="col" className={th}>Durum</th>
-                  {duzenlenebilir && <th scope="col" className={`${th} text-right`}>İşlem</th>}
+                  {editable && <th scope="col" className={`${th} text-right`}>İşlem</th>}
                 </tr>
               </thead>
               <tbody>
-                {gorunen.map((d, i) => (
+                {visible.map((d, i) => (
                   <tr key={d.duyuruId} className={`transition-colors hover:bg-[var(--soft)] ${i > 0 ? "border-t border-[var(--border)]" : ""} ${d.durum === "ARSIV" ? "opacity-70" : ""}`}>
                     <td className={td}>
                       <span className="block font-semibold text-[var(--fg)]">{d.baslik}</span>
                       <span className="mt-0.5 block max-w-md text-[11.5px] leading-snug text-[var(--muted)]">{d.icerik}</span>
-                      <DenetimNotu kayit={d} className="mt-1" />
+                      <AuditNote record={d} className="mt-1" />
                     </td>
-                    <td className={`${td} whitespace-nowrap`}><HedefRozetleri hedef={d.hedef} /></td>
-                    <td className={`${td} whitespace-nowrap tabular-nums text-[var(--fg-2)]`}>{tarih(d.tarih)}</td>
+                    <td className={`${td} whitespace-nowrap`}><TargetBadges target={d.hedef} /></td>
+                    <td className={`${td} whitespace-nowrap tabular-nums text-[var(--fg-2)]`}>{formatDate(d.tarih)}</td>
                     <td className={`${td} whitespace-nowrap tabular-nums text-[var(--fg-2)]`}>
-                      {sayi(d.okunma.okuyanAdet)} / {sayi(d.okunma.hedefAdet)} kullanıcı
+                      {formatNumber(d.okunma.okuyanAdet)} / {formatNumber(d.okunma.hedefAdet)} kullanıcı
                     </td>
                     <td className={`${td} whitespace-nowrap`}>
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${durumTonu(d.durum)}`}>{etiket("duyuruDurumu", d.durum)}</span>
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${statusTone(d.durum)}`}>{labelOf("announcementStatus", d.durum)}</span>
                     </td>
-                    {duzenlenebilir && (
+                    {editable && (
                       <td className={`${td} whitespace-nowrap text-right`}>
                         <span className="inline-flex gap-1">
-                          <button type="button" onClick={() => setDuzenlenen(d)} className={`inline-flex h-8 items-center gap-1 rounded-full border border-[var(--border-strong)] px-3 text-[12px] font-semibold text-[var(--fg-2)] transition hover:border-[var(--brand)] hover:text-[var(--brand-text)] ${FOCUS}`}>
+                          <button type="button" onClick={() => setEditingItem(d)} className={`inline-flex h-8 items-center gap-1 rounded-full border border-[var(--border-strong)] px-3 text-[12px] font-semibold text-[var(--fg-2)] transition hover:border-[var(--brand)] hover:text-[var(--brand-text)] ${FOCUS}`}>
                             <I name="edit" size={13} />
                             Düzenle
                           </button>
-                          <button type="button" onClick={() => (d.durum === "YAYINDA" ? setArsivlenecek(d) : durumDegistir(d))} disabled={guncelle.isPending} className={`inline-flex h-8 items-center rounded-full border border-[var(--border-strong)] px-3 text-[12px] font-semibold text-[var(--fg-2)] transition hover:border-[var(--brand)] hover:text-[var(--brand-text)] disabled:opacity-60 ${FOCUS}`}>
+                          <button type="button" onClick={() => (d.durum === "YAYINDA" ? setToArchive(d) : changeStatus(d))} disabled={update.isPending} className={`inline-flex h-8 items-center rounded-full border border-[var(--border-strong)] px-3 text-[12px] font-semibold text-[var(--fg-2)] transition hover:border-[var(--brand)] hover:text-[var(--brand-text)] disabled:opacity-60 ${FOCUS}`}>
                             {d.durum === "YAYINDA" ? "Arşivle" : "Yayına Al"}
                           </button>
                         </span>
@@ -158,95 +158,95 @@ export function DuyuruYonetimi({ meta, onNavigate }) {
         )}
       </section>
 
-      {duzenlenen && (
-        <DuyuruFormu
-          mevcut={duzenlenen === "yeni" ? null : duzenlenen}
-          onClose={() => setDuzenlenen(null)}
-          onKaydedildi={(d, yeniMi) => {
-            setDuzenlenen(null);
-            setBildirim({ metin: yeniMi ? (d.durum === "YAYINDA" ? `"${d.baslik}" yayınlandı; hedef ekranlarda pop-up olarak görünecek.` : `"${d.baslik}" arşive kaydedildi.`) : `"${d.baslik}" kaydedildi.` });
+      {editingItem && (
+        <AnnouncementForm
+          existing={editingItem === "yeni" ? null : editingItem}
+          onClose={() => setEditingItem(null)}
+          onSaved={(d, isNew) => {
+            setEditingItem(null);
+            setNotice({ text: isNew ? (d.durum === "YAYINDA" ? `"${d.baslik}" yayınlandı; hedef ekranlarda pop-up olarak görünecek.` : `"${d.baslik}" arşive kaydedildi.`) : `"${d.baslik}" kaydedildi.` });
           }}
         />
       )}
-      {arsivlenecek && (
-        <OnayPenceresi
-          baslik={`"${arsivlenecek.baslik}" arşivlensin mi?`}
-          mesaj="Arşivlenen duyuru bayi ekranlarından kalkar; okunmamış olanlara pop-up açılmaz. Daha sonra yeniden yayına alabilirsiniz."
-          onayEtiketi="Arşivle"
-          mesgul={guncelle.isPending}
-          onOnay={() => durumDegistir(arsivlenecek)}
-          onClose={() => setArsivlenecek(null)}
+      {toArchive && (
+        <ConfirmModal
+          title={`"${toArchive.baslik}" arşivlensin mi?`}
+          message="Arşivlenen duyuru bayi ekranlarından kalkar; okunmamış olanlara pop-up açılmaz. Daha sonra yeniden yayına alabilirsiniz."
+          confirmLabel="Arşivle"
+          busy={update.isPending}
+          onApprove={() => changeStatus(toArchive)}
+          onClose={() => setToArchive(null)}
         />
       )}
-      {bildirim && <Bildirim metin={bildirim.metin} eylem={bildirim.eylem} onBitti={bildirimBitti} />}
+      {notice && <Notice text={notice.text} action={notice.action} onDone={noticeDone} />}
     </>
   );
 }
 
-function DuyuruFormu({ mevcut, onClose, onKaydedildi }) {
-  const [f, setF] = useState({ baslik: mevcut?.baslik || "", icerik: mevcut?.icerik || "", hedef: mevcut?.hedef || [...HEDEFLER], durum: mevcut?.durum || "YAYINDA" });
-  const [denendi, setDenendi] = useState(false);
-  const [sunucuHatalari, setSunucuHatalari] = useState({});
-  const [sunucuMesaji, setSunucuMesaji] = useState(null);
-  const olustur = useDuyuruOlustur();
-  const guncelle = useDuyuruGuncelle();
-  const gonderiliyor = olustur.isPending || guncelle.isPending;
+function AnnouncementForm({ existing, onClose, onSaved }) {
+  const [f, setF] = useState({ baslik: existing?.baslik || "", icerik: existing?.icerik || "", hedef: existing?.hedef || [...TARGETS], durum: existing?.durum || "YAYINDA" });
+  const [attempted, setAttempted] = useState(false);
+  const [serverErrors, setServerErrors] = useState({});
+  const [serverMessage, setServerMessage] = useState(null);
+  const create = useCreateAnnouncement();
+  const update = useUpdateAnnouncement();
+  const sending = create.isPending || update.isPending;
 
-  const hatalar = {};
-  if (!f.baslik.trim()) hatalar.baslik = "Başlık girin.";
-  if (!f.icerik.trim()) hatalar.icerik = "Duyuru metnini girin.";
-  if (f.hedef.length === 0) hatalar.hedef = "En az bir hedef seçin.";
-  const h = hataBaglayici(denendi, hatalar, sunucuHatalari);
-  const degistir = (yeni) => {
-    setF(yeni);
-    if (Object.keys(sunucuHatalari).length) setSunucuHatalari({});
+  const errors = {};
+  if (!f.baslik.trim()) errors.baslik = "Başlık girin.";
+  if (!f.icerik.trim()) errors.icerik = "Duyuru metnini girin.";
+  if (f.hedef.length === 0) errors.hedef = "En az bir hedef seçin.";
+  const h = errorHandler(attempted, errors, serverErrors);
+  const change = (draft) => {
+    setF(draft);
+    if (Object.keys(serverErrors).length) setServerErrors({});
   };
 
-  const kaydet = async (e) => {
+  const save = async (e) => {
     e.preventDefault();
-    setDenendi(true);
-    setSunucuMesaji(null);
-    if (Object.keys(hatalar).length) {
+    setAttempted(true);
+    setServerMessage(null);
+    if (Object.keys(errors).length) {
       requestAnimationFrame(() => document.querySelector('#bn-duyuru-form [aria-invalid="true"]')?.focus());
       return;
     }
-    const govde = { baslik: f.baslik.trim(), icerik: f.icerik.trim(), hedef: f.hedef, durum: f.durum };
+    const body = { baslik: f.baslik.trim(), icerik: f.icerik.trim(), hedef: f.hedef, durum: f.durum };
     try {
-      onKaydedildi(mevcut ? await guncelle.mutateAsync({ duyuruId: mevcut.duyuruId, govde }) : await olustur.mutateAsync(govde), !mevcut);
+      onSaved(existing ? await update.mutateAsync({ duyuruId: existing.duyuruId, body }) : await create.mutateAsync(body), !existing);
     } catch (err) {
-      if (err instanceof ApiHatasi && Object.keys(err.alanlar).length) {
-        setSunucuHatalari(err.alanlar);
+      if (err instanceof ApiError && Object.keys(err.alanlar).length) {
+        setServerErrors(err.alanlar);
         requestAnimationFrame(() => document.querySelector('#bn-duyuru-form [aria-invalid="true"]')?.focus());
       } else {
-        setSunucuMesaji(err?.message || "Kayıt yapılamadı.");
+        setServerMessage(err?.message || "Kayıt yapılamadı.");
       }
     }
   };
 
   return (
-    <Pencere baslik={mevcut ? "Duyuruyu düzenle" : "Yeni duyuru"} altBaslik="Yayındaki duyuru hedef rollerin ana sayfasında pop-up olarak açılır; her kullanıcı bir kez okur." onClose={onClose} genislik="max-w-lg">
-      <form id="bn-duyuru-form" noValidate onSubmit={kaydet} className="flex flex-col gap-3" aria-busy={gonderiliyor}>
-        <Alan id="bn-d-baslik" etiket="Başlık" hata={h("baslik")}>
-          <input id="bn-d-baslik" value={f.baslik} onChange={(e) => degistir({ ...f, baslik: e.target.value })} aria-invalid={h("baslik") ? true : undefined} className={inputCls(h("baslik"))} />
-        </Alan>
-        <Alan id="bn-d-icerik" etiket="Duyuru metni" hata={h("icerik")}>
-          <textarea id="bn-d-icerik" rows={4} value={f.icerik} onChange={(e) => degistir({ ...f, icerik: e.target.value })} aria-invalid={h("icerik") ? true : undefined} className={`${inputCls(h("icerik"))} h-auto py-2`} />
-        </Alan>
+    <Modal title={existing ? "Duyuruyu düzenle" : "Yeni duyuru"} subtitle="Yayındaki duyuru hedef rollerin ana sayfasında pop-up olarak açılır; her kullanıcı bir kez okur." onClose={onClose} width="max-w-lg">
+      <form id="bn-duyuru-form" noValidate onSubmit={save} className="flex flex-col gap-3" aria-busy={sending}>
+        <Field id="bn-d-baslik" label="Başlık" error={h("baslik")}>
+          <input id="bn-d-baslik" value={f.baslik} onChange={(e) => change({ ...f, baslik: e.target.value })} aria-invalid={h("baslik") ? true : undefined} className={inputCls(h("baslik"))} />
+        </Field>
+        <Field id="bn-d-icerik" label="Duyuru metni" error={h("icerik")}>
+          <textarea id="bn-d-icerik" rows={4} value={f.icerik} onChange={(e) => change({ ...f, icerik: e.target.value })} aria-invalid={h("icerik") ? true : undefined} className={`${inputCls(h("icerik"))} h-auto py-2`} />
+        </Field>
         <fieldset aria-describedby={h("hedef") ? "bn-d-hedef-hata" : undefined}>
           <legend className="mb-1.5 text-[12px] font-semibold text-[var(--fg-2)]">Hedef</legend>
           <div className="flex gap-1">
-            {HEDEFLER.map((r) => {
-              const secili = f.hedef.includes(r);
+            {TARGETS.map((r) => {
+              const selected = f.hedef.includes(r);
               return (
                 <button
                   key={r}
                   type="button"
                   role="checkbox"
-                  aria-checked={secili}
-                  onClick={() => degistir({ ...f, hedef: secili ? f.hedef.filter((x) => x !== r) : [...f.hedef, r] })}
-                  className={`inline-flex h-9 items-center rounded-full px-3.5 text-[12.5px] transition ${secili ? "bg-[var(--brand)] font-bold text-white" : "bg-[var(--soft)] font-semibold text-[var(--fg-2)] hover:text-[var(--brand-text)]"} ${FOCUS}`}
+                  aria-checked={selected}
+                  onClick={() => change({ ...f, hedef: selected ? f.hedef.filter((x) => x !== r) : [...f.hedef, r] })}
+                  className={`inline-flex h-9 items-center rounded-full px-3.5 text-[12.5px] transition ${selected ? "bg-[var(--brand)] font-bold text-white" : "bg-[var(--soft)] font-semibold text-[var(--fg-2)] hover:text-[var(--brand-text)]"} ${FOCUS}`}
                 >
-                  {etiket("firmaTuru", r)}
+                  {labelOf("companyKind", r)}
                 </button>
               );
             })}
@@ -258,90 +258,90 @@ function DuyuruFormu({ mevcut, onClose, onKaydedildi }) {
           )}
         </fieldset>
         <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[var(--border-strong)] p-3">
-          <input type="checkbox" role="switch" checked={f.durum === "YAYINDA"} onChange={(e) => degistir({ ...f, durum: e.target.checked ? "YAYINDA" : "ARSIV" })} className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--brand)]" />
+          <input type="checkbox" role="switch" checked={f.durum === "YAYINDA"} onChange={(e) => change({ ...f, durum: e.target.checked ? "YAYINDA" : "ARSIV" })} className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--brand)]" />
           <span className="leading-snug">
             <span className="block text-[12.5px] font-bold text-[var(--fg)]">Yayında</span>
             <span className="block text-[11.5px] text-[var(--muted)]">Kapalıysa duyuru arşivde kalır, bayilere gösterilmez.</span>
           </span>
         </label>
-        {sunucuMesaji && (
+        {serverMessage && (
           <p role="alert" className="rounded-xl bg-[var(--danger-soft)] px-4 py-2.5 text-[12.5px] font-semibold text-[var(--danger-text)]">
-            {sunucuMesaji}
+            {serverMessage}
           </p>
         )}
         <div className="mt-1 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} className={`inline-flex h-10 items-center justify-center rounded-full border border-[var(--border-strong)] px-5 text-[13px] font-semibold text-[var(--fg-2)] hover:border-[var(--brand)] ${FOCUS}`}>
             Vazgeç
           </button>
-          <button type="submit" disabled={gonderiliyor} className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-[var(--brand)] px-6 text-[13px] font-bold text-white hover:brightness-110 disabled:cursor-wait disabled:opacity-70 ${FOCUS}`}>
+          <button type="submit" disabled={sending} className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-[var(--brand)] px-6 text-[13px] font-bold text-white hover:brightness-110 disabled:cursor-wait disabled:opacity-70 ${FOCUS}`}>
             <I name="check" size={15} strokeWidth={2.2} />
-            {gonderiliyor ? "Kaydediliyor…" : mevcut ? "Değişiklikleri Kaydet" : f.durum === "YAYINDA" ? "Yayınla" : "Kaydet"}
+            {sending ? "Kaydediliyor…" : existing ? "Değişiklikleri Kaydet" : f.durum === "YAYINDA" ? "Yayınla" : "Kaydet"}
           </button>
         </div>
       </form>
-    </Pencere>
+    </Modal>
   );
 }
 
 // ───────────────────────── Bayi / alt bayi: pop-up ve zil penceresi ─────────────────────────
 
 // Ana sayfada okunmamış duyuruları sırayla açar; "Okudum" sunucuya yazılır (şartname s.2 pop-up)
-export function DuyuruPopup() {
-  const sorgu = useDuyurular();
-  const okundu = useDuyuruOkundu();
-  const [kapatilan, setKapatilan] = useState(() => new Set()); // bu oturumda kapatılanlar (sunucu cevabı gelene kadar)
-  const okunmamis = (sorgu.data?.kayitlar || []).filter((d) => !d.okundu && !kapatilan.has(d.duyuruId));
-  const d = okunmamis[0];
+export function AnnouncementPopup() {
+  const query = useAnnouncements();
+  const read = useMarkAnnouncementRead();
+  const [closing, setClosing] = useState(() => new Set()); // bu oturumda kapatılanlar (sunucu cevabı gelene kadar)
+  const unread = (query.data?.kayitlar || []).filter((d) => !d.okundu && !closing.has(d.duyuruId));
+  const d = unread[0];
   if (!d) return null;
-  const kapat = () => {
-    setKapatilan((s) => new Set(s).add(d.duyuruId));
-    okundu.mutate(d.duyuruId);
+  const close = () => {
+    setClosing((s) => new Set(s).add(d.duyuruId));
+    read.mutate(d.duyuruId);
   };
   return (
-    <Pencere key={d.duyuruId} baslik={d.baslik} altBaslik={`Ana firma duyurusu · ${tarih(d.tarih)}`} onClose={kapat} genislik="max-w-md">
+    <Modal key={d.duyuruId} title={d.baslik} subtitle={`Ana firma duyurusu · ${formatDate(d.tarih)}`} onClose={close} width="max-w-md">
       <p className="whitespace-pre-line text-[13px] leading-relaxed text-[var(--fg)]">{d.icerik}</p>
       <div className="mt-5 flex items-center justify-between gap-3">
-        <span className="text-[11.5px] text-[var(--muted)]">{okunmamis.length > 1 ? `${okunmamis.length} okunmamış duyuru` : "Son okunmamış duyuru"}</span>
-        <button type="button" onClick={kapat} className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-[var(--brand)] px-6 text-[13px] font-bold text-white hover:brightness-110 ${FOCUS}`}>
+        <span className="text-[11.5px] text-[var(--muted)]">{unread.length > 1 ? `${unread.length} okunmamış duyuru` : "Son okunmamış duyuru"}</span>
+        <button type="button" onClick={close} className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-[var(--brand)] px-6 text-[13px] font-bold text-white hover:brightness-110 ${FOCUS}`}>
           <I name="check" size={15} strokeWidth={2.2} />
           Okudum
         </button>
       </div>
-    </Pencere>
+    </Modal>
   );
 }
 
 // Üst bardaki zil: rolün görebildiği tüm duyurular (ana firma: yönetim listesine kısayol)
-export function DuyuruPenceresi({ role, onClose }) {
-  const sorgu = useDuyurular();
-  const okundu = useDuyuruOkundu();
-  const kayitlar = (sorgu.data?.kayitlar || []).filter((d) => d.durum === "YAYINDA");
-  const anaMi = role === "ANA_FIRMA";
+export function AnnouncementModal({ role, onClose }) {
+  const query = useAnnouncements();
+  const read = useMarkAnnouncementRead();
+  const records = (query.data?.kayitlar || []).filter((d) => d.durum === "YAYINDA");
+  const isMain = role === "ANA_FIRMA";
   return (
-    <Pencere baslik="Duyurular" altBaslik={anaMi ? "Yayındaki duyurular; düzenlemek için menüden Duyuru ekranını açın." : "Ana firmanın yayındaki duyuruları"} onClose={onClose} genislik="max-w-lg">
-      {sorgu.isPending ? (
-        <Yukleniyor satir={3} baslik={false} />
-      ) : sorgu.isError ? (
-        <HataKutusu hata={sorgu.error} onTekrar={() => sorgu.refetch()} />
-      ) : kayitlar.length === 0 ? (
-        <BosDurum baslik="Yayında duyuru yok" ikon="megaphone" />
+    <Modal title="Duyurular" subtitle={isMain ? "Yayındaki duyurular; düzenlemek için menüden Duyuru ekranını açın." : "Ana firmanın yayındaki duyuruları"} onClose={onClose} width="max-w-lg">
+      {query.isPending ? (
+        <Loading row={3} title={false} />
+      ) : query.isError ? (
+        <ErrorBox error={query.error} onRetry={() => query.refetch()} />
+      ) : records.length === 0 ? (
+        <EmptyState title="Yayında duyuru yok" icon="megaphone" />
       ) : (
         <ul className="divide-y divide-[var(--border)]">
-          {kayitlar.map((d) => (
+          {records.map((d) => (
             <li key={d.duyuruId} className="flex items-start gap-3 py-3">
-              <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${!anaMi && !d.okundu ? "bg-[var(--brand)]" : "bg-transparent"}`} aria-hidden="true" />
+              <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${!isMain && !d.okundu ? "bg-[var(--brand)]" : "bg-transparent"}`} aria-hidden="true" />
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <h3 className="text-[13px] font-bold text-[var(--fg)]">{d.baslik}</h3>
-                  <span className="text-[11px] tabular-nums text-[var(--muted)]">{tarih(d.tarih)}</span>
-                  {!anaMi && !d.okundu && <span className="rounded-full bg-[var(--brand-soft)] px-1.5 py-px text-[10px] font-bold text-[var(--brand-text)]">Yeni</span>}
+                  <span className="text-[11px] tabular-nums text-[var(--muted)]">{formatDate(d.tarih)}</span>
+                  {!isMain && !d.okundu && <span className="rounded-full bg-[var(--brand-soft)] px-1.5 py-px text-[10px] font-bold text-[var(--brand-text)]">Yeni</span>}
                 </div>
                 <p className="mt-1 whitespace-pre-line text-[12.5px] leading-relaxed text-[var(--fg-2)]">{d.icerik}</p>
-                {anaMi ? (
-                  <div className="mt-1.5"><HedefRozetleri hedef={d.hedef} /></div>
+                {isMain ? (
+                  <div className="mt-1.5"><TargetBadges target={d.hedef} /></div>
                 ) : (
                   !d.okundu && (
-                    <button type="button" onClick={() => okundu.mutate(d.duyuruId)} disabled={okundu.isPending} className={`mt-2 inline-flex h-8 items-center gap-1 rounded-full border border-[var(--border-strong)] px-3 text-[12px] font-semibold text-[var(--fg-2)] transition hover:border-[var(--brand)] hover:text-[var(--brand-text)] disabled:opacity-60 ${FOCUS}`}>
+                    <button type="button" onClick={() => read.mutate(d.duyuruId)} disabled={read.isPending} className={`mt-2 inline-flex h-8 items-center gap-1 rounded-full border border-[var(--border-strong)] px-3 text-[12px] font-semibold text-[var(--fg-2)] transition hover:border-[var(--brand)] hover:text-[var(--brand-text)] disabled:opacity-60 ${FOCUS}`}>
                       <I name="check" size={13} />
                       Okudum
                     </button>
@@ -352,6 +352,6 @@ export function DuyuruPenceresi({ role, onClose }) {
           ))}
         </ul>
       )}
-    </Pencere>
+    </Modal>
   );
 }

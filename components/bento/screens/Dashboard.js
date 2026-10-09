@@ -3,31 +3,31 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { ROLES } from "@/lib/roles";
 import I from "@/components/DesignIcons";
-import { gunKisa, tl, tlKisa, tarihSaat, yuzde } from "@/lib/format";
-import { durumTonu, etiket } from "@/lib/labels";
-import { useIslemler } from "@/lib/queries/transactions";
-import { useBakiye, useHaftalikHacim, usePanelOzet } from "@/lib/queries/panel";
-import { BosDurum, HataKutusu, Yukleniyor, YukleniyorKutu } from "../states";
-import { Pencere } from "../shared";
+import { shortDay, tl, tlShort, formatDateTime, formatPercent } from "@/lib/format";
+import { statusTone, labelOf } from "@/lib/labels";
+import { useTransactions } from "@/lib/queries/transactions";
+import { useBalance, useWeeklyVolume, usePanelSummary } from "@/lib/queries/panel";
+import { EmptyState, ErrorBox, Loading, LoadingBox } from "../states";
+import { Modal } from "../shared";
 import { isReady } from "../routes";
 import { CARD, FOCUS } from "../theme";
 import { smoothPath, curveThrough, Money, TrendArrow } from "../helpers";
-import { DuyuruPopup } from "./Announcements";
-import { CariSecici } from "./AccountSelection";
+import { AnnouncementPopup } from "./Announcements";
+import { AccountPicker } from "./AccountSelection";
 
 // ---- KPI blokları ------------------------------------------------------------------------
 // Küçük renkli KPI blokları (toplam ve başarılı büyük bloklarda ayrı çizilir)
 const TILE = {
-  basarisiz: { wrap: "bg-[var(--danger-soft)]", ink: "text-[var(--danger-text)]", fill: "bg-[var(--danger)]" },
-  iptal: { wrap: "bg-[var(--warning-soft)]", ink: "text-[var(--warning-text)]", fill: "bg-[var(--warning)]" },
-  iade: { wrap: "bg-[var(--brand-soft)]", ink: "text-[var(--brand-text)]", fill: "bg-[var(--chart-from)]" },
+  failed: { wrap: "bg-[var(--danger-soft)]", ink: "text-[var(--danger-text)]", fill: "bg-[var(--danger)]" },
+  cancelled: { wrap: "bg-[var(--warning-soft)]", ink: "text-[var(--warning-text)]", fill: "bg-[var(--warning)]" },
+  refunded: { wrap: "bg-[var(--brand-soft)]", ink: "text-[var(--brand-text)]", fill: "bg-[var(--chart-from)]" },
 };
 
 const SEGMENTS = [
-  { key: "basarili", label: "Başarılı", fill: "bg-[var(--success)]" },
-  { key: "basarisiz", label: "Başarısız", fill: "bg-[var(--danger)]" },
-  { key: "iptal", label: "İptal", fill: "bg-[var(--warning)]" },
-  { key: "iade", label: "İade", fill: "bg-[var(--chart-from)]" },
+  { key: "successful", label: "Başarılı", fill: "bg-[var(--success)]" },
+  { key: "failed", label: "Başarısız", fill: "bg-[var(--danger)]" },
+  { key: "cancelled", label: "İptal", fill: "bg-[var(--warning)]" },
+  { key: "refunded", label: "İade", fill: "bg-[var(--chart-from)]" },
 ];
 
 const QUICK = [
@@ -40,13 +40,13 @@ const QUICK = [
 // Büyük bloklar: Toplam ve Başarılı eşit ağırlıkta, panonun ilk satırı.
 // Koyu zeminler beyaz yazıda okunurluğu korur (kontrast ≥ 4.5:1).
 const BIG = {
-  basarili: {
+  successful: {
     title: "Başarılı İşlemler",
     icon: "check",
     bg: "bg-[linear-gradient(135deg,#078350,#04603A)] [box-shadow:0_16px_34px_-16px_rgba(4,96,58,0.75)]",
     glow: "bg-[#7CE3B1]",
   },
-  toplam: {
+  total: {
     title: "Toplam İşlem",
     icon: "trendingUp",
     bg: "bg-[linear-gradient(135deg,#0C34E7,#0A23A8)] [box-shadow:0_16px_34px_-16px_rgba(12,52,231,0.75)]",
@@ -78,7 +78,7 @@ function BigTile({ s, index, footer }) {
       </div>
 
       <p className="relative mt-4 text-[30px] font-extrabold leading-none tracking-tight tabular-nums sm:text-[34px] xl:text-[40px]">
-        <Money kurus={s.tutarKurus} />
+        <Money cents={s.tutarKurus} />
       </p>
       <p className="relative mt-2 flex items-center gap-1 text-[12px] text-white/85">
         <span className="inline-flex items-center gap-0.5 font-bold text-white">
@@ -114,9 +114,9 @@ function BigTile({ s, index, footer }) {
 }
 
 function SoftTile({ s, index, total }) {
-  const t = TILE[s.key] || TILE.iade;
+  const t = TILE[s.key] || TILE.refunded;
   const tr = s.trend;
-  const pay = total ? (s.count / total) * 100 : 0;
+  const share = total ? (s.count / total) * 100 : 0;
   return (
     <div
       style={{ "--i": index }}
@@ -129,10 +129,10 @@ function SoftTile({ s, index, total }) {
         </span>
       </div>
       <p className="mt-2.5 text-[16px] font-extrabold leading-none tracking-tight tabular-nums text-[var(--fg)] sm:text-[19px]">
-        <Money kurus={s.tutarKurus} />
+        <Money cents={s.tutarKurus} />
       </p>
       <div className="mt-3 h-1 overflow-hidden rounded-full bg-[var(--surface)]" aria-hidden="true">
-        <div className={`bn-fill h-full rounded-full ${t.fill}`} style={{ width: `${Math.max(pay, 3)}%` }} />
+        <div className={`bn-fill h-full rounded-full ${t.fill}`} style={{ width: `${Math.max(share, 3)}%` }} />
       </div>
       {tr && (
         <p className="mt-2 flex items-center gap-1 text-[11px] text-[var(--muted)]">
@@ -155,17 +155,17 @@ const CHART_TYPES = [
 // Haftalık hacim kartı: kullanıcı sütun ya da çizgi grafiği seçer; seçim tarayıcıda hatırlanır.
 // Büyüt düğmesi grafiği ekranın ortasında büyük bir pencerede açar.
 // hacim: GET /panel/haftalik-hacim cevabı — gunler[{gun, tutarKurus}], toplamKurus, degisimYuzde
-function ChartCard({ hacim }) {
+function ChartCard({ volume }) {
   const [type, setType] = useState("bar");
   const [expanded, setExpanded] = useState(false);
   const expandRef = useRef(null);
   // grafik bin ₺ ile çizer; eksen 250K'nın katına yuvarlanır
-  const week = hacim.gunler.map((g) => ({ d: gunKisa(g.gun), k: Math.round(g.tutarKurus / 100000) }));
+  const week = volume.gunler.map((g) => ({ d: shortDay(g.gun), k: Math.round(g.tutarKurus / 100000) }));
   const axisMax = Math.max(250, Math.ceil(Math.max(0, ...week.map((w) => w.k)) / 250) * 250);
   // veri yok ya da tamamı sıfır: grafik çizilmez (yeni firma, hareketsiz hafta)
-  const bos = week.length === 0 || week.every((w) => w.k === 0);
-  const grafik = (large) =>
-    bos ? <BosDurum baslik="Bu hafta işlem hacmi yok" aciklama="Hacim oluştuğunda grafik burada görünür." /> : type === "bar" ? <BarChart week={week} axisMax={axisMax} large={large} /> : <LineChart week={week} large={large} />;
+  const empty = week.length === 0 || week.every((w) => w.k === 0);
+  const chart = (large) =>
+    empty ? <EmptyState title="Bu hafta işlem hacmi yok" description="Hacim oluştuğunda grafik burada görünür." /> : type === "bar" ? <BarChart week={week} axisMax={axisMax} large={large} /> : <LineChart week={week} large={large} />;
 
   useEffect(() => {
     try {
@@ -186,7 +186,7 @@ function ChartCard({ hacim }) {
     expandRef.current?.focus();
   };
 
-  const subtitle = `Son 7 gün · toplam ${tlKisa(hacim.toplamKurus)}`;
+  const subtitle = `Son 7 gün · toplam ${tlShort(volume.toplamKurus)}`;
 
   return (
     <section style={{ "--i": 5 }} className={`bn-rise p-4 lg:col-span-2 ${CARD}`} aria-labelledby="bn-chart-title">
@@ -198,7 +198,7 @@ function ChartCard({ hacim }) {
           <p className="mt-0.5 text-xs text-[var(--muted)]">{subtitle}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <TrendBadge degisim={hacim.degisimYuzde} />
+          <TrendBadge change={volume.degisimYuzde} />
           <ChartTypeToggle type={type} onChange={choose} />
           <button
             ref={expandRef}
@@ -213,27 +213,27 @@ function ChartCard({ hacim }) {
         </div>
       </div>
 
-      {grafik(false)}
+      {chart(false)}
 
       {expanded && (
-        <Pencere baslik="Haftalık İşlem Hacmi" altBaslik={subtitle} onClose={close}>
+        <Modal title="Haftalık İşlem Hacmi" subtitle={subtitle} onClose={close}>
           <div className="flex flex-wrap items-center gap-2">
-            <TrendBadge degisim={hacim.degisimYuzde} />
+            <TrendBadge change={volume.degisimYuzde} />
             <ChartTypeToggle type={type} onChange={choose} />
           </div>
-          {grafik(true)}
-        </Pencere>
+          {chart(true)}
+        </Modal>
       )}
     </section>
   );
 }
 
-function TrendBadge({ degisim }) {
-  const up = degisim >= 0;
+function TrendBadge({ change }) {
+  const up = change >= 0;
   return (
     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${up ? "bg-[var(--success-soft)] text-[var(--success-text)]" : "bg-[var(--danger-soft)] text-[var(--danger-text)]"}`}>
       <TrendArrow up={up} />
-      {yuzde(Math.abs(degisim))} geçen haftaya göre
+      {formatPercent(Math.abs(change))} geçen haftaya göre
     </span>
   );
 }
@@ -318,7 +318,7 @@ function LineChart({ week, large = false }) {
   const maxI = values.indexOf(max);
   const [active, setActive] = useState(maxI);
   const ax = (pts[active][0] / W) * 100;
-  const ay = (pts[active][1] / H) * 100;
+  const month = (pts[active][1] / H) * 100;
   // aynı anda kartta ve pencerede çizildiğinde gradyan kimlikleri çakışmasın
   const fillId = `bn-line-fill-${useId().replace(/:/g, "")}`;
 
@@ -356,14 +356,14 @@ function LineChart({ week, large = false }) {
         <span
           aria-hidden="true"
           className="pointer-events-none absolute bottom-0 w-px -translate-x-1/2 bg-[var(--border-strong)] transition-[left,top] duration-200 motion-reduce:transition-none"
-          style={{ left: `${ax}%`, top: `${ay}%` }}
+          style={{ left: `${ax}%`, top: `${month}%` }}
         />
         {/* uçtaki günlerde etiket kart dışına taşmasın diye içeri hizalanır */}
         <span
           className={`pointer-events-none absolute -translate-y-full whitespace-nowrap rounded-full bg-[var(--fg)] px-2 py-0.5 text-[10.5px] font-bold tabular-nums text-[var(--bg)] transition-[left,top] duration-200 motion-reduce:transition-none ${
             active === 0 ? "-translate-x-2" : active === pts.length - 1 ? "-translate-x-[calc(100%-8px)]" : "-translate-x-1/2"
           }`}
-          style={{ left: `${ax}%`, top: `calc(${ay}% - 12px)` }}
+          style={{ left: `${ax}%`, top: `calc(${month}% - 12px)` }}
         >
           {week[active].d} · ₺ {week[active].k}K
         </span>
@@ -398,15 +398,15 @@ function LineChart({ week, large = false }) {
 
 // Bakiye ve Borç — veri: GET /panel/bakiye
 function BalanceCard() {
-  const sorgu = useBakiye();
-  const bakiye = sorgu.data;
-  if (!bakiye) {
+  const query = useBalance();
+  const balance = query.data;
+  if (!balance) {
     return (
-      <section style={{ "--i": 6 }} className={`bn-rise flex flex-col p-4 ${CARD}`} aria-labelledby="bn-balance-title" aria-busy={sorgu.isPending}>
+      <section style={{ "--i": 6 }} className={`bn-rise flex flex-col p-4 ${CARD}`} aria-labelledby="bn-balance-title" aria-busy={query.isPending}>
         <h2 id="bn-balance-title" className="text-sm font-bold text-[var(--fg)]">
           Bakiye ve Borç
         </h2>
-        {sorgu.isError ? <HataKutusu hata={sorgu.error} onTekrar={() => sorgu.refetch()} /> : <YukleniyorKutu className="mt-4" />}
+        {query.isError ? <ErrorBox error={query.error} onRetry={() => query.refetch()} /> : <LoadingBox className="mt-4" />}
       </section>
     );
   }
@@ -417,44 +417,44 @@ function BalanceCard() {
           <h2 id="bn-balance-title" className="text-sm font-bold text-[var(--fg)]">
             Bakiye ve Borç
           </h2>
-          <p className="mt-0.5 text-xs text-[var(--muted)]">{bakiye.gorunum === "FIRMA_LIMITI" ? "Firma limiti" : "Üst cari görünümü"}</p>
+          <p className="mt-0.5 text-xs text-[var(--muted)]">{balance.gorunum === "FIRMA_LIMITI" ? "Firma limiti" : "Üst cari görünümü"}</p>
         </div>
-        <span className="rounded-full bg-[var(--brand-soft)] px-2 py-0.5 text-[11px] font-bold tabular-nums text-[var(--brand-text)]">{yuzde(bakiye.kullanimYuzde, 0)}</span>
+        <span className="rounded-full bg-[var(--brand-soft)] px-2 py-0.5 text-[11px] font-bold tabular-nums text-[var(--brand-text)]">{formatPercent(balance.kullanimYuzde, 0)}</span>
       </div>
 
       <div className="relative mt-3 overflow-hidden rounded-xl bg-[#0C34E7] p-3.5 text-white">
         <div className="pointer-events-none absolute -right-8 -top-10 h-28 w-28 rounded-full bg-[#D4D1FC] opacity-25 blur-2xl" aria-hidden="true" />
         <p className="relative text-[11px] font-medium text-white/75">Kullanılabilir Bakiye</p>
         <p className="relative mt-1 text-[21px] font-extrabold leading-none tracking-tight tabular-nums">
-          <Money kurus={bakiye.bakiyeKurus} />
+          <Money cents={balance.bakiyeKurus} />
         </p>
       </div>
 
       <dl className="mt-3 space-y-2 text-[12.5px]">
         <div className="flex items-center justify-between">
           <dt className="text-[var(--muted)]">Güncel Borç</dt>
-          <dd className="font-bold tabular-nums text-[var(--danger-text)]">{tl(bakiye.borcKurus)}</dd>
+          <dd className="font-bold tabular-nums text-[var(--danger-text)]">{tl(balance.borcKurus)}</dd>
         </div>
         <div className="flex items-center justify-between">
           <dt className="text-[var(--muted)]">Ödeme Limiti</dt>
-          <dd className="font-bold tabular-nums text-[var(--fg)]">{tl(bakiye.limitKurus)}</dd>
+          <dd className="font-bold tabular-nums text-[var(--fg)]">{tl(balance.limitKurus)}</dd>
         </div>
       </dl>
 
       <div className="mt-auto pt-4">
         <div className="mb-1.5 flex justify-between text-[11px] font-medium text-[var(--muted)]">
           <span>Limit Kullanımı</span>
-          <span className="font-bold tabular-nums text-[var(--fg-2)]">{yuzde(bakiye.kullanimYuzde, 0)}</span>
+          <span className="font-bold tabular-nums text-[var(--fg-2)]">{formatPercent(balance.kullanimYuzde, 0)}</span>
         </div>
         <div
           className="h-1.5 overflow-hidden rounded-full bg-[var(--brand-soft)]"
           role="progressbar"
-          aria-valuenow={bakiye.kullanimYuzde}
+          aria-valuenow={balance.kullanimYuzde}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-label="Limit kullanımı"
         >
-          <div className="bn-fill h-full rounded-full bg-[linear-gradient(90deg,var(--chart-from),var(--chart-to))]" style={{ width: `${bakiye.kullanimYuzde}%` }} />
+          <div className="bn-fill h-full rounded-full bg-[linear-gradient(90deg,var(--chart-from),var(--chart-to))]" style={{ width: `${balance.kullanimYuzde}%` }} />
         </div>
       </div>
     </section>
@@ -462,17 +462,17 @@ function BalanceCard() {
 }
 
 // Son İşlemler — veri: GET /islemler?boyut=6 (rol kapsamı sunucuda)
-function TransactionsCard({ onSeeAll, onOdeme }) {
-  const sorgu = useIslemler({ boyut: 6 });
-  const satirlar = sorgu.data?.kayitlar || [];
+function TransactionsCard({ onSeeAll, onPayment }) {
+  const query = useTransactions({ boyut: 6 });
+  const rows = query.data?.kayitlar || [];
   return (
-    <section style={{ "--i": 7 }} className={`bn-rise overflow-hidden lg:col-span-2 ${CARD} hover:!translate-y-0`} aria-labelledby="bn-tx-title" aria-busy={sorgu.isFetching}>
+    <section style={{ "--i": 7 }} className={`bn-rise overflow-hidden lg:col-span-2 ${CARD} hover:!translate-y-0`} aria-labelledby="bn-tx-title" aria-busy={query.isFetching}>
       <div className="flex items-center justify-between gap-3 px-4 py-3">
         <div>
           <h2 id="bn-tx-title" className="text-sm font-bold text-[var(--fg)]">
             Son İşlemler
           </h2>
-          <p className="mt-0.5 text-xs text-[var(--muted)]">{sorgu.data ? `En güncel ${satirlar.length} işlem` : "Yükleniyor…"}</p>
+          <p className="mt-0.5 text-xs text-[var(--muted)]">{query.data ? `En güncel ${rows.length} işlem` : "Yükleniyor…"}</p>
         </div>
         <button
           type="button"
@@ -483,10 +483,10 @@ function TransactionsCard({ onSeeAll, onOdeme }) {
           <I name="chevronRight" size={13} className="transition-transform group-hover:translate-x-0.5" />
         </button>
       </div>
-      {sorgu.isPending ? (
-        <Yukleniyor satir={6} baslik={false} />
-      ) : sorgu.isError ? (
-        <HataKutusu hata={sorgu.error} onTekrar={() => sorgu.refetch()} />
+      {query.isPending ? (
+        <Loading row={6} title={false} />
+      ) : query.isError ? (
+        <ErrorBox error={query.error} onRetry={() => query.refetch()} />
       ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full text-[12.5px]">
@@ -501,24 +501,24 @@ function TransactionsCard({ onSeeAll, onOdeme }) {
               </tr>
             </thead>
             <tbody>
-              {satirlar.map((t, i) => (
+              {rows.map((t, i) => (
                 <tr key={t.islemNo} className={`transition-colors hover:bg-[var(--soft)] ${i > 0 ? "border-t border-[var(--border)]" : ""}`}>
                   <td className="whitespace-nowrap px-4 py-2.5 font-bold text-[var(--brand-text)]">{t.islemNo}</td>
                   <td className="whitespace-nowrap px-4 py-2.5">
                     <span className="block font-semibold text-[var(--fg)]">{t.musteri.unvan}</span>
                     <span className="block text-[11px] tabular-nums text-[var(--muted)]">{t.musteri.cariNo}</span>
                   </td>
-                  <td className="whitespace-nowrap px-4 py-2.5 tabular-nums text-[var(--muted)]">{tarihSaat(t.tarih)}</td>
+                  <td className="whitespace-nowrap px-4 py-2.5 tabular-nums text-[var(--muted)]">{formatDateTime(t.tarih)}</td>
                   <td className="whitespace-nowrap px-4 py-2.5 text-[var(--fg-2)]">{t.taksit === 1 ? "Tek Çekim" : t.taksit}</td>
                   <td className="whitespace-nowrap px-4 py-2.5 text-right font-bold tabular-nums text-[var(--fg)]">{tl(t.tutarKurus)}</td>
                   <td className="whitespace-nowrap px-4 py-2.5">
-                    <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${durumTonu(t.durum)}`}>{etiket("islemDurumu", t.durum)}</span>
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${statusTone(t.durum)}`}>{labelOf("transactionStatus", t.durum)}</span>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {satirlar.length === 0 && <BosDurum baslik="Henüz işlem yok" aciklama="İlk tahsilatı Ödeme Al ile başlatın; işlemler burada görünür." ikon="wallet" eylemler={[{ etiket: "Ödeme Al", ikon: "plus", birincil: true, onClick: onOdeme }]} />}
+          {rows.length === 0 && <EmptyState title="Henüz işlem yok" description="İlk tahsilatı Ödeme Al ile başlatın; işlemler burada görünür." icon="wallet" actions={[{ etiket: "Ödeme Al", icon: "plus", primary: true, onClick: onPayment }]} />}
         </div>
       )}
     </section>
@@ -594,40 +594,40 @@ function DistributionCard({ stats }) {
 
 // Ana Sayfa: KPI blokları, haftalık hacim, bakiye, son işlemler.
 // /panel/ozet kalemleri → kart satırları. İyi yönde değişim: toplam ve başarılıda artış, diğerlerinde azalış.
-const KALEM = [
-  { key: "toplam", kod: "TOPLAM", label: "Toplam İşlem", iyiArtis: true },
-  { key: "basarili", kod: "BASARILI", label: "Başarılı", iyiArtis: true },
-  { key: "basarisiz", kod: "BASARISIZ", label: "Başarısız", iyiArtis: false },
-  { key: "iptal", kod: "IPTAL", label: "İptal", iyiArtis: false },
-  { key: "iade", kod: "IADE", label: "İade", iyiArtis: false },
+const ITEM = [
+  { key: "total", code: "TOPLAM", label: "Toplam İşlem", increaseIsGood: true },
+  { key: "successful", code: "BASARILI", label: "Başarılı", increaseIsGood: true },
+  { key: "failed", code: "BASARISIZ", label: "Başarısız", increaseIsGood: false },
+  { key: "cancelled", code: "IPTAL", label: "İptal", increaseIsGood: false },
+  { key: "refunded", code: "IADE", label: "İade", increaseIsGood: false },
 ];
-function kpiSatirlari(ozet) {
-  return KALEM.map((k) => {
-    const v = ozet.kalemler[k.kod] || { adet: 0, tutarKurus: 0, degisimYuzde: 0 };
+function kpiRows(summary) {
+  return ITEM.map((k) => {
+    const v = summary.kalemler[k.code] || { adet: 0, tutarKurus: 0, degisimYuzde: 0 };
     const d = v.degisimYuzde || 0;
     return {
       key: k.key,
       label: k.label,
       count: v.adet,
       tutarKurus: v.tutarKurus,
-      trend: { txt: yuzde(Math.abs(d)), up: d >= 0, good: k.iyiArtis ? d >= 0 : d <= 0 },
-      seri: ozet.seriler?.[k.kod],
+      trend: { txt: formatPercent(Math.abs(d)), up: d >= 0, good: k.increaseIsGood ? d >= 0 : d <= 0 },
+      seri: summary.seriler?.[k.code],
     };
   });
 }
 
 // Ana Sayfa — veri: GET /panel/ozet (KPI), /panel/haftalik-hacim (grafik), /panel/bakiye, /islemler?boyut=6
 export function Dashboard({ role, meta, onNavigate }) {
-  const ozet = usePanelOzet("bugun");
-  const hacim = useHaftalikHacim();
-  const stats = ozet.data ? kpiSatirlari(ozet.data) : null;
-  const toplam = stats?.find((s) => s.key === "toplam");
-  const basarili = stats?.find((s) => s.key === "basarili");
-  const others = stats?.filter((s) => s.key !== "basarili" && s.key !== "toplam") || [];
+  const summary = usePanelSummary("bugun");
+  const volume = useWeeklyVolume();
+  const stats = summary.data ? kpiRows(summary.data) : null;
+  const grandTotal = stats?.find((s) => s.key === "total");
+  const successful = stats?.find((s) => s.key === "successful");
+  const others = stats?.filter((s) => s.key !== "successful" && s.key !== "total") || [];
   return (
     <>
       {/* şartname s.2: ana firmanın duyuruları bayi ekranlarına pop-up olarak düşer */}
-      {role !== ROLES.ANA_FIRMA && <DuyuruPopup />}
+      {role !== ROLES.ANA_FIRMA && <AnnouncementPopup />}
       <div className="bn-rise mb-4 flex flex-col gap-3 px-1 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-xl font-extrabold tracking-tight text-[var(--fg)]">Ana Sayfa</h1>
@@ -635,7 +635,7 @@ export function Dashboard({ role, meta, onNavigate }) {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {/* şartname s.1–2: bayi "Ana Firma Cari Seçimi", alt bayi "Bayi Cari Seçimi" — tahsilatın işleneceği üye işyeri */}
-          {role !== ROLES.ANA_FIRMA && <CariSecici role={role} />}
+          {role !== ROLES.ANA_FIRMA && <AccountPicker role={role} />}
           <button
             type="button"
             onClick={() => onNavigate("/odeme/manuel")}
@@ -648,58 +648,58 @@ export function Dashboard({ role, meta, onNavigate }) {
       </div>
 
       {/* KPI bento blokları — üstte eşit iki büyük blok (başarılı, toplam), altta üç küçük blok */}
-      <div className="grid grid-cols-6 gap-3" aria-busy={ozet.isPending}>
-        {ozet.isError ? (
+      <div className="grid grid-cols-6 gap-3" aria-busy={summary.isPending}>
+        {summary.isError ? (
           <div className={`col-span-6 ${CARD} hover:!translate-y-0`}>
-            <HataKutusu hata={ozet.error} onTekrar={() => ozet.refetch()} />
+            <ErrorBox error={summary.error} onRetry={() => summary.refetch()} />
           </div>
         ) : !stats ? (
           <>
             {[0, 1].map((i) => (
               <div key={i} className="col-span-6 h-[232px] rounded-2xl bg-[var(--soft)] p-5 sm:col-span-3">
-                <YukleniyorKutu />
+                <LoadingBox />
               </div>
             ))}
             {[2, 3, 4].map((i) => (
               <div key={i} className="col-span-2 rounded-2xl bg-[var(--soft)] p-4">
-                <YukleniyorKutu />
+                <LoadingBox />
               </div>
             ))}
           </>
         ) : (
           <>
-            <BigTile s={basarili} index={0} footer={{ label: "Başarı oranı", value: yuzde(ozet.data.basariOraniYuzde), bar: ozet.data.basariOraniYuzde }} />
-            <BigTile s={toplam} index={1} footer={{ label: "Ortalama işlem tutarı", value: tl(ozet.data.ortalamaIslemKurus) }} />
+            <BigTile s={successful} index={0} footer={{ label: "Başarı oranı", value: formatPercent(summary.data.basariOraniYuzde), bar: summary.data.basariOraniYuzde }} />
+            <BigTile s={grandTotal} index={1} footer={{ label: "Ortalama işlem tutarı", value: tl(summary.data.ortalamaIslemKurus) }} />
             {others.map((s, i) => (
-              <SoftTile key={s.key} s={s} index={i + 2} total={toplam.count} />
+              <SoftTile key={s.key} s={s} index={i + 2} total={grandTotal.count} />
             ))}
           </>
         )}
       </div>
 
       <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
-        {hacim.data ? (
-          <ChartCard hacim={hacim.data} />
+        {volume.data ? (
+          <ChartCard volume={volume.data} />
         ) : (
-          <section style={{ "--i": 5 }} className={`bn-rise p-4 lg:col-span-2 ${CARD} hover:!translate-y-0`} aria-labelledby="bn-chart-title" aria-busy={hacim.isPending}>
+          <section style={{ "--i": 5 }} className={`bn-rise p-4 lg:col-span-2 ${CARD} hover:!translate-y-0`} aria-labelledby="bn-chart-title" aria-busy={volume.isPending}>
             <h2 id="bn-chart-title" className="text-sm font-bold text-[var(--fg)]">
               Haftalık İşlem Hacmi
             </h2>
-            {hacim.isError ? <HataKutusu hata={hacim.error} onTekrar={() => hacim.refetch()} /> : <Yukleniyor satir={4} baslik={false} />}
+            {volume.isError ? <ErrorBox error={volume.error} onRetry={() => volume.refetch()} /> : <Loading row={4} title={false} />}
           </section>
         )}
         <BalanceCard />
       </div>
 
       <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <TransactionsCard onSeeAll={() => onNavigate("/raporlar/islem-detaylari")} onOdeme={() => onNavigate("/odeme/manuel")} />
+        <TransactionsCard onSeeAll={() => onNavigate("/raporlar/islem-detaylari")} onPayment={() => onNavigate("/odeme/manuel")} />
         <div className="flex flex-col gap-3">
           <QuickCard onNavigate={onNavigate} />
           {stats ? (
             <DistributionCard stats={stats} />
           ) : (
             <section style={{ "--i": 9 }} className={`bn-rise flex-1 p-4 ${CARD}`}>
-              <YukleniyorKutu />
+              <LoadingBox />
             </section>
           )}
         </div>

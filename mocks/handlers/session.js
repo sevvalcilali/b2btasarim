@@ -1,27 +1,27 @@
 // GET /oturum · PUT /oturum/aktif-uye-isyeri · POST /demo/sifirla
 import { http, HttpResponse } from "msw";
-import { depo } from "../db/store";
-import { YETKI_EKRANLARI, anaFirma, firma } from "../rules";
-import { gecikme, hata, kuralHatasi, uc, yetkili } from "./helpers";
+import { store } from "../db/store";
+import { PERMISSION_SCREENS, mainCompany, company } from "../rules";
+import { latency, error, ruleError, uc, authorized } from "./helpers";
 
 /** Üye işyeri özeti: tahsilatın işleneceği ana firma carisi (şartname s.1: ana firma altında birden çok üye işyeri) */
-const uyeIsyeriOzeti = (cariNo) => {
-  const u = depo.tablo("uyeIsyerleri").find((x) => x.cariNo === cariNo);
+const merchantSummary = (accountNo) => {
+  const u = store.table("merchants").find((x) => x.cariNo === accountNo);
   return u ? { cariNo: u.cariNo, ad: u.ad } : null;
 };
-const tokenOku = (request) => (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
+const readToken = (request) => (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
 
-export const oturumHandlers = [
+export const sessionHandlers = [
   http.get(uc("/oturum"), async ({ request }) => {
-    await gecikme();
-    const { kim, cevap } = yetkili(request);
-    if (cevap) return cevap;
-    const f = firma(kim.firmaId);
-    const ana = anaFirma();
-    const bagli = f.bagliFirmaId ? firma(f.bagliFirmaId) : null;
+    await latency();
+    const { kim: caller, cevap: response } = authorized(request);
+    if (response) return response;
+    const f = company(caller.firmaId);
+    const main = mainCompany();
+    const linked = f.bagliFirmaId ? company(f.bagliFirmaId) : null;
     return HttpResponse.json({
-      kullanici: { kullaniciId: kim.kullaniciId, adSoyad: kim.adSoyad, email: kim.email, yetki: kim.yetki },
-      rol: kim.rol,
+      kullanici: { kullaniciId: caller.kullaniciId, adSoyad: caller.adSoyad, email: caller.email, yetki: caller.yetki },
+      rol: caller.rol,
       firma: {
         firmaId: f.firmaId,
         unvan: f.unvan,
@@ -29,31 +29,31 @@ export const oturumHandlers = [
         cariNo: f.cariNo,
         vergiNo: f.vergiNo,
         logoRenk: f.logoRenk || null,
-        bagli: bagli ? { firmaId: bagli.firmaId, unvan: bagli.unvan, tur: bagli.tur } : null,
+        bagli: linked ? { firmaId: linked.firmaId, unvan: linked.unvan, tur: linked.tur } : null,
       },
-      anaFirma: { firmaId: ana.firmaId, unvan: ana.unvan, kisaAd: ana.kisaAd, aciklama: ana.aciklama, logoRenk: ana.logoRenk || null },
-      yetkiler: YETKI_EKRANLARI[kim.yetki] || [],
-      aktifUyeIsyeri: uyeIsyeriOzeti(kim.aktifUyeIsyeri),
+      anaFirma: { firmaId: main.firmaId, unvan: main.unvan, kisaAd: main.kisaAd, aciklama: main.aciklama, logoRenk: main.logoRenk || null },
+      yetkiler: PERMISSION_SCREENS[caller.yetki] || [],
+      aktifUyeIsyeri: merchantSummary(caller.aktifUyeIsyeri),
     });
   }),
 
   // Cari seçimi (bayi: Ana Firma Cari Seçimi, alt bayi: Bayi Carisi Seçimi): sonraki ödemeler bu üye işyerine işlenir
   http.put(uc("/oturum/aktif-uye-isyeri"), async ({ request }) => {
-    await gecikme();
-    const { kim, cevap } = yetkili(request);
-    if (cevap) return cevap;
+    await latency();
+    const { kim: caller, cevap: response } = authorized(request);
+    if (response) return response;
     const g = await request.json().catch(() => null);
-    if (!g) return hata(400, "GECERSIZ_GOVDE", "İstek gövdesi okunamadı.");
-    const acik = kim.rol === "ANA_FIRMA" ? depo.tablo("uyeIsyerleri").map((u) => u.cariNo) : firma(kim.firmaId)?.uyeIsyerleri || [];
-    if (!acik.includes(g.cariNo)) return kuralHatasi("CARI_KAPALI", "Bu üye işyeri size açık değil.", { cariNo: "Yalnızca size açık üye işyerleri seçilebilir." });
-    depo.guncelle("oturumlar", (o) => ({ ...o, [tokenOku(request)]: { ...kim, aktifUyeIsyeri: g.cariNo } }));
-    return HttpResponse.json(uyeIsyeriOzeti(g.cariNo));
+    if (!g) return error(400, "GECERSIZ_GOVDE", "İstek gövdesi okunamadı.");
+    const open = caller.rol === "ANA_FIRMA" ? store.table("merchants").map((u) => u.cariNo) : company(caller.firmaId)?.uyeIsyerleri || [];
+    if (!open.includes(g.cariNo)) return ruleError("CARI_KAPALI", "Bu üye işyeri size açık değil.", { cariNo: "Yalnızca size açık üye işyerleri seçilebilir." });
+    store.update("sessions", (o) => ({ ...o, [readToken(request)]: { ...caller, aktifUyeIsyeri: g.cariNo } }));
+    return HttpResponse.json(merchantSummary(g.cariNo));
   }),
 
   // Yalnızca sahte backend'de vardır; gerçek backend'de karşılığı yoktur.
   http.post(uc("/demo/sifirla"), async () => {
-    await gecikme();
-    depo.sifirla();
+    await latency();
+    store.reset();
     return new HttpResponse(null, { status: 204 });
   }),
 ];
