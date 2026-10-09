@@ -45,7 +45,6 @@ components/
     theme.js            renk değişkenleri (açık / koyu), animasyonlar, ortak sınıflar
     routes.js           hazır ekranların adresleri (?sayfa=<anahtar> ↔ menü href)
     helpers.js          tutar / tarih biçimleri, sayaç, eğri, durum renkleri
-    ag.js               paylaşılan bayi / alt bayi / müşteri deposu, rol bazlı görünürlük
     shared.js           Konum, Pencere, Bildirim, form alanları, müşteri seçici, kopyala
     payment.js          manuel ve link ile ödemenin ortak müşteri bölümü, ödeme koşulları
     Shell.js            logo, sol menü, kullanıcı menüsü
